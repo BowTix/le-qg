@@ -77,6 +77,15 @@ try {
             }
             break;
 
+        case '/api/auth/profile':
+            if ($method === 'GET') {
+                (new \App\Controllers\AuthController())->profile();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         // --- Solo Quiz ---
         case '/api/quiz/packs':
             if ($method === 'GET') {
@@ -124,10 +133,19 @@ try {
             }
             break;
 
+        case '/api/quiz/leaderboard':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuizController())->getLeaderboard();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         // --- Multiplayer Lobby ---
         case '/api/lobby/create':
             if ($method === 'POST') {
-                (new \App\Controllers\LobbyController())->create(getRequestBody());
+                (new \App\Controllers\LobbyController())->create();
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);
@@ -136,7 +154,7 @@ try {
 
         case '/api/lobby/join':
             if ($method === 'POST') {
-                (new \App\Controllers\LobbyController())->join(getRequestBody());
+                (new \App\Controllers\LobbyController())->join();
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);
@@ -152,18 +170,36 @@ try {
             }
             break;
 
-        case '/api/lobby/answer':
+        case '/api/lobby/start':
             if ($method === 'POST') {
-                (new \App\Controllers\LobbyController())->submitAnswer(getRequestBody());
+                (new \App\Controllers\LobbyController())->startGame();
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);
             }
             break;
 
-        case '/api/lobby/next':
+        case '/api/lobby/my-question':
+            if ($method === 'GET') {
+                (new \App\Controllers\LobbyController())->getMyQuestion($_GET);
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/lobby/answer':
             if ($method === 'POST') {
-                (new \App\Controllers\LobbyController())->nextQuestion(getRequestBody());
+                (new \App\Controllers\LobbyController())->submitAnswer();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/lobby/finish':
+            if ($method === 'POST') {
+                (new \App\Controllers\LobbyController())->finishGame();
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);
@@ -172,7 +208,16 @@ try {
 
         case '/api/lobby/leave':
             if ($method === 'POST') {
-                (new \App\Controllers\LobbyController())->leave(getRequestBody());
+                (new \App\Controllers\LobbyController())->leave();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/lobby/reaction':
+            if ($method === 'POST') {
+                (new \App\Controllers\LobbyController())->submitReaction();
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);

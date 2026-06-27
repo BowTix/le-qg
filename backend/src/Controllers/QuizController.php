@@ -120,10 +120,31 @@ class QuizController {
             return;
         }
 
-        // Fetch a random question from the pack
-        $stmt = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d FROM questions WHERE pack_id = ? ORDER BY RAND() LIMIT 1");
-        $stmt->execute([$packId]);
+        // Parse optional exclude query parameter
+        $excludeIds = [];
+        if (!empty($queryParams['exclude'])) {
+            $excludeIds = array_filter(array_map('intval', explode(',', $queryParams['exclude'])));
+        }
+
+        $excludeClause = "";
+        $params = [$packId];
+        if (!empty($excludeIds)) {
+            $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
+            $excludeClause = " AND id NOT IN ($placeholders)";
+            $params = array_merge($params, $excludeIds);
+        }
+
+        // Fetch a random question from the pack (excluding already answered ones)
+        $stmt = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d FROM questions WHERE pack_id = ?$excludeClause ORDER BY RAND() LIMIT 1");
+        $stmt->execute($params);
         $question = $stmt->fetch();
+
+        // Fallback if all questions are excluded (or pack has fewer than 10 questions)
+        if (!$question) {
+            $stmtFallback = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d FROM questions WHERE pack_id = ? ORDER BY RAND() LIMIT 1");
+            $stmtFallback->execute([$packId]);
+            $question = $stmtFallback->fetch();
+        }
 
         // Create signed token containing question_id & sent_at
         $answerToken = JWT::generateAnswerToken($question['id']);
@@ -203,21 +224,25 @@ class QuizController {
 
         $isCorrect = ($answer === $question['correct_opt']);
         $pointsAwarded = 0;
+        $coinsAwarded = 0;
         
         if ($isCorrect) {
             // Award base 10 points + speed bonus in training
             $timeRatio = max(0, (20000 - $duration) / 20000);
             $pointsAwarded = 10 + (int) ($timeRatio * 10);
+            $coinsAwarded = (int) ($pointsAwarded / 2);
 
-            // Update user global score
-            $stmtUpdate = $db->prepare("UPDATE users SET global_score = global_score + ? WHERE id = ?");
-            $stmtUpdate->execute([$pointsAwarded, $user['user_id']]);
+            // Update user global score and coins
+            $stmtUpdate = $db->prepare("UPDATE users SET global_score = global_score + ?, coins = coins + ? WHERE id = ?");
+            $stmtUpdate->execute([$pointsAwarded, $coinsAwarded, $user['user_id']]);
         }
 
-        // Fetch updated global score
-        $stmtScore = $db->prepare("SELECT global_score FROM users WHERE id = ?");
+        // Fetch updated global score and coins
+        $stmtScore = $db->prepare("SELECT global_score, coins FROM users WHERE id = ?");
         $stmtScore->execute([$user['user_id']]);
-        $newGlobalScore = (int) $stmtScore->fetchColumn();
+        $row = $stmtScore->fetch();
+        $newGlobalScore = (int) ($row['global_score'] ?? 0);
+        $newCoins = (int) ($row['coins'] ?? 0);
 
         // Map correct_opt key to actual text value
         $correctKey = strtolower('opt_' . $question['correct_opt']);
@@ -228,7 +253,9 @@ class QuizController {
             "correct_option" => $question['correct_opt'],
             "correct_text" => htmlspecialchars($correctText),
             "points_awarded" => $pointsAwarded,
+            "coins_awarded" => $coinsAwarded,
             "global_score" => $newGlobalScore,
+            "coins" => $newCoins,
             "response_time_ms" => $duration
         ]);
     }
@@ -607,5 +634,37 @@ class QuizController {
         $stmt->execute([$packId]);
 
         echo json_encode(["success" => true, "message" => "Pack supprimé avec succès."]);
+    }
+
+    /**
+     * GET /api/quiz/leaderboard
+     * Authenticated
+     */
+    public function getLeaderboard() {
+        AuthMiddleware::authenticate();
+        $db = Database::getConnection();
+
+        // 1. Top 10 users sorted by Elo
+        $stmtUsers = $db->query("
+            SELECT id, username, global_score, elo 
+            FROM users 
+            ORDER BY elo DESC 
+            LIMIT 10
+        ");
+        $topPlayers = $stmtUsers->fetchAll();
+
+        // 2. Recent 10 matches
+        $stmtMatches = $db->query("
+            SELECT * 
+            FROM matches 
+            ORDER BY id DESC 
+            LIMIT 10
+        ");
+        $recentMatches = $stmtMatches->fetchAll();
+
+        echo json_encode([
+            "top_players" => $topPlayers,
+            "recent_matches" => $recentMatches
+        ]);
     }
 }

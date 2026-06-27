@@ -5,9 +5,11 @@ import SoloQuizScreen from './components/SoloQuizScreen';
 import MultiplayerArena from './components/MultiplayerArena';
 import AdminScreen from './components/AdminScreen';
 import CreatorScreen from './components/CreatorScreen';
+import LeaderboardScreen from './components/LeaderboardScreen';
+import { api } from './utils/api';
 
 export default function App() {
-  const [view, setView] = useState('auth'); // 'auth', 'dashboard', 'solo', 'lobby', 'admin', 'creator'
+  const [view, setView] = useState('auth'); // 'auth', 'dashboard', 'solo', 'lobby', 'admin', 'creator', 'leaderboard'
   const [user, setUser] = useState(null);
   
   // Navigation Parameter Store
@@ -36,6 +38,24 @@ export default function App() {
     };
   }, []);
 
+  // 2. Auto-Refresh profile statistics when entering dashboard
+  useEffect(() => {
+    if (view === 'dashboard') {
+      const refreshProfile = async () => {
+        try {
+          const res = await api.get('/auth/profile');
+          if (res.success && res.user) {
+            setUser(res.user);
+            localStorage.setItem('quiz_user', JSON.stringify(res.user));
+          }
+        } catch (err) {
+          console.error("Failed to refresh user profile statistics:", err);
+        }
+      };
+      refreshProfile();
+    }
+  }, [view]);
+
   const handleAuthSuccess = (userData) => {
     setUser(userData);
     setView('dashboard');
@@ -48,9 +68,9 @@ export default function App() {
     setView('auth');
   };
 
-  const updateGlobalScore = (newScore) => {
+  const updateUserStats = (stats) => {
     if (user) {
-      const updatedUser = { ...user, global_score: newScore };
+      const updatedUser = { ...user, ...stats };
       setUser(updatedUser);
       localStorage.setItem('quiz_user', JSON.stringify(updatedUser));
     }
@@ -104,6 +124,7 @@ export default function App() {
             }}
             onOpenAdmin={() => setView('admin')}
             onOpenCreator={() => setView('creator')}
+            onOpenLeaderboard={() => setView('leaderboard')}
           />
         )}
 
@@ -111,7 +132,7 @@ export default function App() {
           <SoloQuizScreen
             packId={soloPackId}
             onBack={() => setView('dashboard')}
-            onUpdateUserScore={updateGlobalScore}
+            onUpdateUserStats={updateUserStats}
           />
         )}
 
@@ -120,7 +141,6 @@ export default function App() {
             roomCode={roomCode}
             user={user}
             onBack={() => setView('dashboard')}
-            onUpdateUserScore={updateGlobalScore}
           />
         )}
 
@@ -130,6 +150,10 @@ export default function App() {
 
         {view === 'creator' && (
           <CreatorScreen onBack={() => setView('dashboard')} />
+        )}
+
+        {view === 'leaderboard' && (
+          <LeaderboardScreen onBack={() => setView('dashboard')} />
         )}
       </main>
 

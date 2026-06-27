@@ -24,11 +24,11 @@ class RateLimiter {
             $stmtCount->execute([$ip, $now - 1]);
             $requestCount = (int) $stmtCount->fetchColumn();
 
-            if ($requestCount >= 5) {
+            if ($requestCount >= 30) {
                 http_response_code(429);
                 header('Content-Type: application/json');
                 echo json_encode([
-                    "error" => "Rate limit exceeded (Max 5 requests/sec). Stop spamming the endpoints!"
+                    "error" => "Rate limit exceeded (Max 30 requests/sec). Stop spamming the endpoints!"
                 ]);
                 exit();
             }

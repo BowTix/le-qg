@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../utils/api';
 import { ArrowLeft, Clock, Award, CheckCircle2, XCircle, ChevronRight, Trophy } from 'lucide-react';
 
-export default function SoloQuizScreen({ packId, onBack, onUpdateUserScore }) {
+export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(0); // 0 to 9
   const [selectedOption, setSelectedOption] = useState(null);
@@ -14,6 +14,7 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserScore }) {
   const [score, setScore] = useState(0);
   const [history, setHistory] = useState([]);
   const [gameFinished, setGameFinished] = useState(false);
+  const [seenQuestionIds, setSeenQuestionIds] = useState([]);
 
   const timerRef = useRef(null);
 
@@ -39,8 +40,13 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserScore }) {
     setTimeLeft(20);
 
     try {
-      const qData = await api.get('/quiz/question', { pack_id: packId });
+      const excludeParam = seenQuestionIds.join(',');
+      const qData = await api.get('/quiz/question', { 
+        pack_id: packId,
+        exclude: excludeParam
+      });
       setCurrentQuestion(qData);
+      setSeenQuestionIds(prev => [...prev, qData.id]);
       
       // Start 20s countdown timer
       clearInterval(timerRef.current);
@@ -97,7 +103,9 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserScore }) {
       setResult(response);
       setAnswered(true);
       setScore(prev => prev + response.points_awarded);
-      onUpdateUserScore(response.global_score); // Update global score in dashboard context
+      if (onUpdateUserStats) {
+        onUpdateUserStats({ global_score: response.global_score, coins: response.coins });
+      }
 
       setHistory(prev => [...prev, {
         question_text: currentQuestion.question_text,
@@ -337,7 +345,7 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserScore }) {
                   {result.correct ? (
                     <>
                       <CheckCircle2 size={22} />
-                      Correct ! (+{result.points_awarded} pts)
+                      Correct ! (+{result.points_awarded} pts, +{result.coins_awarded} 🪙)
                     </>
                   ) : (
                     <>

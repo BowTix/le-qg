@@ -66,7 +66,7 @@ class AuthController {
 
         $db = Database::getConnection();
 
-        $stmt = $db->prepare("SELECT id, username, password_hash, role, global_score FROM users WHERE username = ?");
+        $stmt = $db->prepare("SELECT id, username, password_hash, role, global_score, elo, coins FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
@@ -91,7 +91,45 @@ class AuthController {
                 "id" => (int) $user['id'],
                 "username" => $user['username'],
                 "role" => $user['role'],
-                "global_score" => (int) $user['global_score']
+                "global_score" => (int) $user['global_score'],
+                "elo" => (int) $user['elo'],
+                "coins" => (int) $user['coins']
+            ]
+        ]);
+    }
+
+    /**
+     * GET /api/auth/profile
+     * Authenticated
+     */
+    public function profile() {
+        // Authenticate using middleware (which returns decoded JWT claims)
+        // Wait, AuthMiddleware::authenticate() returns the database user if standard,
+        // let's check what AuthMiddleware::authenticate() returns in src/Middleware/AuthMiddleware.php.
+        // Usually it returns the user array or details.
+        // Let's call it and select from db.
+        $authUser = \App\Middleware\AuthMiddleware::authenticate();
+        $db = Database::getConnection();
+        
+        $stmt = $db->prepare("SELECT id, username, role, global_score, elo, coins FROM users WHERE id = ?");
+        $stmt->execute([$authUser['user_id']]);
+        $profile = $stmt->fetch();
+        
+        if (!$profile) {
+            http_response_code(404);
+            echo json_encode(["error" => "Utilisateur introuvable."]);
+            return;
+        }
+        
+        echo json_encode([
+            "success" => true,
+            "user" => [
+                "id" => (int) $profile['id'],
+                "username" => $profile['username'],
+                "role" => $profile['role'],
+                "global_score" => (int) $profile['global_score'],
+                "elo" => (int) $profile['elo'],
+                "coins" => (int) $profile['coins']
             ]
         ]);
     }

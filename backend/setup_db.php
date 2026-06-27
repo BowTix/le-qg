@@ -29,6 +29,7 @@ try {
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(20) NOT NULL DEFAULT 'user',
         global_score INT NOT NULL DEFAULT 0,
+        coins INT NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB");
     echo "Table 'users' checked/created.\n";

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
-import { LogOut, Trophy, Play, Plus, Users, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight } from 'lucide-react';
+import { LogOut, Trophy, Play, Plus, Users, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award } from 'lucide-react';
+import { getLevel, getUsernameStyle, getLevelBadge, getLevelProgressDetails } from '../utils/progression';
 
-export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator }) {
+export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator, onOpenLeaderboard }) {
   const [packs, setPacks] = useState([]);
   const [selectedPackSolo, setSelectedPackSolo] = useState('');
   const [selectedPackLobby, setSelectedPackLobby] = useState('');
@@ -17,6 +18,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   const [mode, setMode] = useState('solo'); // 'solo' or 'online'
   const [activePackIndex, setActivePackIndex] = useState(0);
   const [animateClass, setAnimateClass] = useState('animate-fade-in');
+
 
   useEffect(() => {
     fetchPacks();
@@ -45,6 +47,12 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   const filteredPacks = mode === 'solo' 
     ? packs 
     : packs.filter(p => parseInt(p.is_validated) === 1);
+
+  // Progression computations
+  const lvl = getLevel(user.global_score);
+  const badgeLabel = getLevelBadge(lvl);
+  const nameStyle = getUsernameStyle(user.global_score);
+  const { currentLevelXp, xpNeededForNextLevel } = getLevelProgressDetails(user.global_score);
 
   // Handle index boundaries and pack selections on mode/pack changes
   useEffect(() => {
@@ -115,7 +123,10 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
     setCreating(true);
     setCreateError('');
     try {
-      const data = await api.post('/lobby/create', { pack_id: parseInt(selectedPackLobby) });
+      const data = await api.post('/lobby/create', { 
+        pack_id: parseInt(selectedPackLobby),
+        game_mode: 'classic'
+      });
       if (data.success && data.room_code) {
         onCreateLobby(data.room_code);
       }
@@ -154,25 +165,52 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '20px', padding: '20px 32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{
-            width: '52px',
-            height: '52px',
+            width: '56px',
+            height: '56px',
             borderRadius: '50%',
-            backgroundColor: 'var(--accent)',
-            color: '#12121c',
+            backgroundColor: lvl >= 15 ? 'rgba(0, 229, 255, 0.15)' : lvl >= 10 ? 'rgba(255, 0, 127, 0.15)' : 'rgba(255, 247, 0, 0.1)',
+            border: `2px solid ${lvl >= 15 ? '#00e5ff' : lvl >= 10 ? '#ff007f' : lvl >= 5 ? '#fff700' : 'var(--border-color)'}`,
+            color: lvl >= 15 ? '#00e5ff' : lvl >= 10 ? '#ff007f' : lvl >= 5 ? '#fff700' : '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '1.4rem',
-            fontWeight: 800
+            fontSize: '1.1rem',
+            fontWeight: 800,
+            boxShadow: lvl >= 5 ? `0 0 10px ${lvl >= 15 ? 'rgba(0, 229, 255, 0.3)' : lvl >= 10 ? 'rgba(255, 0, 127, 0.3)' : 'rgba(255, 247, 0, 0.2)'}` : 'none'
           }}>
-            {user.username.substring(0, 2).toUpperCase()}
+            Lvl {lvl}
           </div>
           <div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 700 }}>Salut, {user.username} !</h2>
-            <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.9rem', marginTop: '2px' }}>
-              <Trophy size={15} style={{ color: 'var(--accent)' }} />
-              Score Global : <strong style={{ color: '#fff' }}>{user.global_score} pts</strong>
-            </p>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              Salut, <span style={nameStyle}>{user.username}</span> !
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {badgeLabel}
+                </span>
+                <div style={{ width: '80px', height: '6px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden', display: 'inline-block' }}>
+                  <div style={{
+                    width: `${(currentLevelXp / xpNeededForNextLevel) * 100}%`,
+                    height: '100%',
+                    backgroundColor: lvl >= 15 ? '#00e5ff' : lvl >= 10 ? '#ff007f' : '#fff700'
+                  }} />
+                </div>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  {currentLevelXp}/{xpNeededForNextLevel} XP
+                </span>
+              </div>
+              
+              <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', margin: 0 }}>
+                <Trophy size={14} style={{ color: '#00e5ff' }} />
+                Arène compétitive : <strong style={{ color: '#00e5ff', textShadow: '0 0 8px rgba(0, 229, 255, 0.3)' }}>{user.elo} Elo</strong>
+              </p>
+              
+              <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', margin: 0 }}>
+                <span style={{ fontSize: '0.9rem' }}>🪙</span>
+                Monnaie virtuelle : <strong style={{ color: '#ffb300', textShadow: '0 0 8px rgba(255, 179, 0, 0.3)' }}>{user.coins || 0} pièces</strong>
+              </p>
+            </div>
           </div>
         </div>
         
@@ -183,6 +221,10 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
               Admin
             </button>
           )}
+          <button className="btn-secondary" onClick={onOpenLeaderboard} style={{ padding: '10px 16px', fontSize: '0.9rem' }}>
+            <Trophy size={16} style={{ color: 'var(--accent)' }} />
+            Classement
+          </button>
           <button className="btn-secondary" onClick={onOpenCreator} style={{ padding: '10px 16px', fontSize: '0.9rem' }}>
             <Plus size={16} style={{ color: 'var(--accent)' }} />
             Créer un Thème
@@ -473,9 +515,12 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                 <Plus size={16} style={{ color: 'var(--accent)' }} />
                 Créer une Partie
               </h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', lineHeight: '1.4', flexGrow: 1, marginBottom: '8px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', lineHeight: '1.4', marginBottom: '8px' }}>
                 Générez un salon de jeu en direct sur le thème sélectionné et invitez vos amis.
               </p>
+
+
+
               <button 
                 className="btn-primary" 
                 onClick={handleCreateLobby}
