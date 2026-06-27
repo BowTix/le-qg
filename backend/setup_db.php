@@ -38,7 +38,10 @@ try {
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         description TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        creator_id INT DEFAULT NULL,
+        is_validated TINYINT(1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB");
     echo "Table 'packs' checked/created.\n";
 
@@ -130,16 +133,16 @@ try {
     $pack_count = $stmt->fetchColumn();
     if ($pack_count == 0) {
         // Pack 1: Geek & Programmation
-        $pdo->prepare("INSERT INTO packs (id, name, description) VALUES (1, 'Geek & Programmation', 'Testez vos connaissances en code, jeux vidéo et tech.')")
+        $pdo->prepare("INSERT INTO packs (id, name, description, is_validated) VALUES (1, 'Geek & Programmation', 'Testez vos connaissances en code, jeux vidéo et tech.', 1)")
             ->execute();
         
         $questions1 = [
             [
-                "Quel protocole est utilisé pour transférer des pages web de manière sécurisée ?",
+                "Quel protocole est utilise pour transferer des pages web de maniere securisee ?",
                 "HTTP", "FTP", "HTTPS", "SSH", "C"
             ],
             [
-                "Qui est le principal créateur du noyau Linux ?",
+                "Qui est le principal createur du noyau Linux ?",
                 "Bill Gates", "Linus Torvalds", "Steve Jobs", "Richard Stallman", "B"
             ],
             [
@@ -147,31 +150,31 @@ try {
                 "Hyper Text Markup Language", "High Tech Multi Language", "Hyper Transfer Mail Language", "Home Tool Markup Language", "A"
             ],
             [
-                "En JavaScript, quelle méthode convertit un objet JSON en chaîne de caractères ?",
+                "En JavaScript, quelle methode convertit un objet JSON en chaine de caracteres ?",
                 "JSON.parse()", "JSON.stringify()", "JSON.toString()", "JSON.serialize()", "B"
             ],
             [
-                "Quel est le port par défaut pour un serveur MySQL ?",
+                "Quel est le port par defaut pour un serveur MySQL ?",
                 "80", "443", "3306", "8080", "C"
             ],
             [
-                "Quel langage de programmation a été créé par Brendan Eich en 10 jours en 1995 ?",
+                "Quel langage de programmation a ete cree par Brendan Eich en 10 jours en 1995 ?",
                 "Python", "Java", "C++", "JavaScript", "D"
             ],
             [
-                "Quelle structure de données fonctionne sur le principe LIFO (Last In, First Out) ?",
+                "Quelle structure de donnees fonctionne sur le principe LIFO (Last In, First Out) ?",
                 "La Pile (Stack)", "La File (Queue)", "L'Arbre binaire", "Le Tableau", "A"
             ],
             [
-                "Comment s'appelle l'IA d'assistance au code développée par GitHub ?",
+                "Comment s'appelle l'IA d'assistance au code developpee par GitHub ?",
                 "ChatGPT", "Copilot", "Claude", "Gemini", "B"
             ],
             [
-                "Quel mot clé est utilisé en Python pour déclarer une fonction ?",
+                "Quel mot cle est utilise en Python pour declarer une fonction ?",
                 "function", "def", "func", "define", "B"
             ],
             [
-                "En CSS, quelle propriété permet de modifier l'espace intérieur d'un élément ?",
+                "En CSS, quelle propriete permet de modifier l'espace interieur d'un element ?",
                 "margin", "border", "padding", "spacing", "C"
             ]
         ];
@@ -182,7 +185,7 @@ try {
         }
 
         // Pack 2: Culture Générale
-        $pdo->prepare("INSERT INTO packs (id, name, description) VALUES (2, 'Culture Générale', 'Questions diverses de géographie, histoire et sciences.')")
+        $pdo->prepare("INSERT INTO packs (id, name, description, is_validated) VALUES (2, 'Culture Générale', 'Questions diverses de géographie, histoire et sciences.', 1)")
             ->execute();
 
         $questions2 = [

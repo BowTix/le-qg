@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
-import { ArrowLeft, Plus, Trash2, Edit3, Save, X, BookOpen, HelpCircle, Check } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit3, Save, X, BookOpen, HelpCircle, AlertCircle, CheckCircle2 } from 'lucide-react';
 
-export default function AdminScreen({ onBack }) {
+export default function CreatorScreen({ onBack }) {
   const [packs, setPacks] = useState([]);
   const [selectedPackId, setSelectedPackId] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -15,7 +15,7 @@ export default function AdminScreen({ onBack }) {
   const [newPackDesc, setNewPackDesc] = useState('');
 
   // Question Form State
-  const [editingQuestionId, setEditingQuestionId] = useState(null); // null for new, ID for editing
+  const [editingQuestionId, setEditingQuestionId] = useState(null); 
   const [questionText, setQuestionText] = useState('');
   const [optA, setOptA] = useState('');
   const [optB, setOptB] = useState('');
@@ -25,7 +25,7 @@ export default function AdminScreen({ onBack }) {
   const [showQuestionForm, setShowQuestionForm] = useState(false);
 
   useEffect(() => {
-    fetchPacks();
+    fetchMyPacks();
   }, []);
 
   useEffect(() => {
@@ -36,31 +36,37 @@ export default function AdminScreen({ onBack }) {
     }
   }, [selectedPackId]);
 
-  const fetchPacks = async () => {
+  const fetchMyPacks = async () => {
     try {
-      const data = await api.get('/admin/packs');
-      setPacks(data);
-      if (data.length > 0 && !selectedPackId) {
-        setSelectedPackId(data[0].id);
+      // getPacks returns both validated packs AND custom packs created by current user
+      const data = await api.get('/quiz/packs');
+      
+      // Filter packs to show ONLY the ones created by the current user
+      const currentUser = JSON.parse(localStorage.getItem('quiz_user'));
+      const myCustomPacks = data.filter(p => p.creator_id === currentUser.id);
+      
+      setPacks(myCustomPacks);
+      if (myCustomPacks.length > 0 && !selectedPackId) {
+        setSelectedPackId(myCustomPacks[0].id);
       }
     } catch (err) {
-      setError("Impossible de charger les packs.");
+      setError("Impossible de charger vos thèmes.");
     }
   };
 
   const fetchQuestions = async (packId) => {
     setLoading(true);
     try {
-      const data = await api.get('/admin/questions', { pack_id: packId });
+      const data = await api.get('/quiz/questions', { pack_id: packId });
       setQuestions(data);
     } catch (err) {
-      setError("Impossible de charger les questions du pack.");
+      setError("Impossible de charger les questions.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Pack CRUD
+  // Pack Actions
   const handleCreatePack = async (e) => {
     e.preventDefault();
     setError('');
@@ -68,45 +74,33 @@ export default function AdminScreen({ onBack }) {
     if (!newPackName.trim()) return;
 
     try {
-      const res = await api.post('/admin/packs', { name: newPackName, description: newPackDesc });
+      const res = await api.post('/quiz/packs', { name: newPackName, description: newPackDesc });
       setSuccess(res.message);
       setNewPackName('');
       setNewPackDesc('');
-      await fetchPacks();
+      await fetchMyPacks();
     } catch (err) {
-      setError(err.message || "Erreur de création du pack.");
+      setError(err.message || "Erreur de création.");
     }
   };
 
   const handleDeletePack = async (packId) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce pack et toutes ses questions ?")) return;
+    if (!window.confirm("Supprimer ce thème ? Cela effacera également toutes ses questions.")) return;
     setError('');
     setSuccess('');
     try {
-      const res = await api.delete('/admin/packs', { pack_id: packId });
+      const res = await api.delete('/quiz/packs', { pack_id: packId });
       setSuccess(res.message);
       if (selectedPackId === packId) {
         setSelectedPackId(null);
       }
-      await fetchPacks();
+      await fetchMyPacks();
     } catch (err) {
-      setError(err.message || "Erreur de suppression du pack.");
+      setError(err.message || "Erreur de suppression.");
     }
   };
 
-  const handleValidatePack = async (packId) => {
-    setError('');
-    setSuccess('');
-    try {
-      const res = await api.post('/admin/packs/validate', { pack_id: packId });
-      setSuccess(res.message);
-      await fetchPacks();
-    } catch (err) {
-      setError(err.message || "Erreur lors de la validation du pack.");
-    }
-  };
-
-  // Question CRUD
+  // Question Actions
   const handleOpenQuestionForm = (q = null) => {
     setError('');
     setSuccess('');
@@ -148,16 +142,16 @@ export default function AdminScreen({ onBack }) {
     try {
       let res;
       if (editingQuestionId) {
-        res = await api.put('/admin/questions', { ...payload, id: editingQuestionId });
+        res = await api.put('/quiz/questions', { ...payload, id: editingQuestionId });
       } else {
-        res = await api.post('/admin/questions', payload);
+        res = await api.post('/quiz/questions', payload);
       }
       setSuccess(res.message);
       setShowQuestionForm(false);
       fetchQuestions(selectedPackId);
-      fetchPacks(); // Refresh counts
+      fetchMyPacks(); // Refresh counts
     } catch (err) {
-      setError(err.message || "Erreur lors de l'enregistrement de la question.");
+      setError(err.message || "Erreur lors de la sauvegarde.");
     }
   };
 
@@ -166,14 +160,16 @@ export default function AdminScreen({ onBack }) {
     setError('');
     setSuccess('');
     try {
-      const res = await api.delete('/admin/questions', { id: qId });
+      const res = await api.delete('/quiz/questions', { id: qId });
       setSuccess(res.message);
       fetchQuestions(selectedPackId);
-      fetchPacks(); // Refresh counts
+      fetchMyPacks(); // Refresh counts
     } catch (err) {
       setError(err.message || "Erreur de suppression.");
     }
   };
+
+  const activePack = packs.find(p => p.id === selectedPackId);
 
   return (
     <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-8 animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -184,8 +180,8 @@ export default function AdminScreen({ onBack }) {
           <ArrowLeft size={16} />
           Retour Dashboard
         </button>
-        <h2 style={{ fontSize: '1.8rem', color: 'var(--error)' }}>
-          🛠️ Espace Administrateur
+        <h2 style={{ fontSize: '1.8rem', color: 'var(--accent)' }}>
+          ✏️ Créateur de Thèmes
         </h2>
       </div>
 
@@ -195,46 +191,46 @@ export default function AdminScreen({ onBack }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', md: '1fr 2fr', gap: '32px', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
         
-        {/* Left Side: Packs CRUD */}
+        {/* Left Card: Create pack & List packs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Create Pack Form */}
+          {/* Create pack form */}
           <div className="glass-card">
             <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Plus size={18} style={{ color: 'var(--accent)' }} />
-              Nouveau Pack
+              Nouveau Thème
             </h3>
             <form onSubmit={handleCreatePack} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <input
                 type="text"
-                placeholder="Nom du pack (ex: Cinéma)"
+                placeholder="Nom du pack (ex: Séries TV)"
                 value={newPackName}
                 onChange={(e) => setNewPackName(e.target.value)}
                 required
               />
               <input
                 type="text"
-                placeholder="Description rapide"
+                placeholder="Description du thème"
                 value={newPackDesc}
                 onChange={(e) => setNewPackDesc(e.target.value)}
               />
               <button type="submit" className="btn-primary" style={{ width: '100%' }}>
-                Créer le Pack
+                Créer le Thème
               </button>
             </form>
           </div>
 
-          {/* Packs list */}
+          {/* User Packs List */}
           <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', flexGrow: 1 }}>
             <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
               <BookOpen size={18} style={{ color: 'var(--accent)' }} />
-              Packs Existants
+              Mes Thèmes Créés
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '350px' }}>
               {packs.map(p => {
                 const isValidated = parseInt(p.is_validated) === 1;
-
+                
                 return (
                   <div 
                     key={p.id} 
@@ -253,58 +249,66 @@ export default function AdminScreen({ onBack }) {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <strong style={{ display: 'block', fontSize: '0.95rem' }}>{p.name}</strong>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          {p.question_count} questions {p.creator_username && `| par ${p.creator_username}`}
+                        <strong style={{ fontSize: '1rem', color: '#fff' }}>{p.name}</strong>
+                        <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                          {p.question_count} questions
                         </span>
                       </div>
                       
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        {!isValidated && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleValidatePack(p.id); }} 
-                            style={{ background: 'transparent', border: 'none', color: 'var(--success)', cursor: 'pointer', padding: '4px' }}
-                            title="Approuver et publier le pack"
-                          >
-                            <Check size={18} />
-                          </button>
-                        )}
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); handleDeletePack(p.id); }} 
-                          style={{ background: 'transparent', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '4px' }}
-                          title="Supprimer le pack"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeletePack(p.id); }} 
+                        style={{ background: 'transparent', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '4px' }}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
 
-                    {/* Status indicator */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}>
+                    {/* Validation Status Badge */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', marginTop: '4px' }}>
                       {isValidated ? (
-                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>Validé (Public)</span>
+                        <span style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                          <CheckCircle2 size={14} />
+                          Validé (Public)
+                        </span>
                       ) : (
-                        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>En attente de validation</span>
+                        <span style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                          <AlertCircle size={14} style={{ color: 'var(--accent)' }} />
+                          En attente de validation admin
+                        </span>
                       )}
                     </div>
                   </div>
                 );
               })}
+
+              {packs.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  Vous n'avez pas encore créé de thème.
+                </div>
+              )}
             </div>
           </div>
 
         </div>
 
-        {/* Right Side: Questions CRUD */}
+        {/* Right Card: Pack questions CRUD */}
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '400px' }}>
           
           {selectedPackId ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-                <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <HelpCircle size={20} style={{ color: 'var(--accent)' }} />
-                  Questions du pack ({questions.length})
-                </h3>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <HelpCircle size={20} style={{ color: 'var(--accent)' }} />
+                    Questions du thème ({questions.length})
+                  </h3>
+                  {activePack && parseInt(activePack.is_validated) === 1 && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>
+                      Note : Ce thème est public. Les modifications s'appliquent immédiatement.
+                    </span>
+                  )}
+                </div>
+                
                 <button className="btn-primary" onClick={() => handleOpenQuestionForm(null)} style={{ padding: '8px 16px', fontSize: '0.9rem' }}>
                   <Plus size={16} />
                   Ajouter Question
@@ -356,7 +360,7 @@ export default function AdminScreen({ onBack }) {
                   
                   {questions.length === 0 && (
                     <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-                      Aucune question dans ce pack. Cliquez sur "Ajouter Question" pour commencer !
+                      Aucune question dans ce thème. Ajoutez au moins 10 questions pour que la validation puisse être effectuée !
                     </div>
                   )}
                 </div>
@@ -364,7 +368,7 @@ export default function AdminScreen({ onBack }) {
             </>
           ) : (
             <div style={{ display: 'flex', flex1: 1, alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
-              Sélectionnez ou créez un pack pour gérer ses questions.
+              Sélectionnez ou créez un thème pour gérer ses questions.
             </div>
           )}
 
@@ -372,7 +376,7 @@ export default function AdminScreen({ onBack }) {
 
       </div>
 
-      {/* QUESTION FORM MODAL */}
+      {/* QUESTION FORM DIALOG */}
       {showQuestionForm && (
         <div style={{
           position: 'fixed',
@@ -409,7 +413,7 @@ export default function AdminScreen({ onBack }) {
                   type="text"
                   value={questionText}
                   onChange={(e) => setQuestionText(e.target.value)}
-                  placeholder="Quelle est la capitale du..."
+                  placeholder="Écrivez la question..."
                   required
                 />
               </div>

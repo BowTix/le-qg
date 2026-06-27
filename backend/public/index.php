@@ -81,6 +81,25 @@ try {
         case '/api/quiz/packs':
             if ($method === 'GET') {
                 (new \App\Controllers\QuizController())->getPacks();
+            } elseif ($method === 'POST') {
+                (new \App\Controllers\QuizController())->createPack(getRequestBody());
+            } elseif ($method === 'DELETE') {
+                (new \App\Controllers\QuizController())->deletePack(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/quiz/questions':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuizController())->getQuestions($_GET);
+            } elseif ($method === 'POST') {
+                (new \App\Controllers\QuizController())->createQuestion(getRequestBody());
+            } elseif ($method === 'PUT') {
+                (new \App\Controllers\QuizController())->updateQuestion(getRequestBody());
+            } elseif ($method === 'DELETE') {
+                (new \App\Controllers\QuizController())->deleteQuestion(getRequestBody());
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);
@@ -177,6 +196,15 @@ try {
             break;
 
         // --- Admin Pack Management (CRUD) ---
+        case '/api/admin/packs/validate':
+            if ($method === 'POST') {
+                (new \App\Controllers\QuizController())->validatePack(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         case '/api/admin/packs':
             if ($method === 'GET') {
                 (new \App\Controllers\QuizController())->getAdminPacks();

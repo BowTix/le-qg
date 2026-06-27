@@ -4,9 +4,10 @@ import DashboardScreen from './components/DashboardScreen';
 import SoloQuizScreen from './components/SoloQuizScreen';
 import MultiplayerArena from './components/MultiplayerArena';
 import AdminScreen from './components/AdminScreen';
+import CreatorScreen from './components/CreatorScreen';
 
 export default function App() {
-  const [view, setView] = useState('auth'); // 'auth', 'dashboard', 'solo', 'lobby', 'admin'
+  const [view, setView] = useState('auth'); // 'auth', 'dashboard', 'solo', 'lobby', 'admin', 'creator'
   const [user, setUser] = useState(null);
   
   // Navigation Parameter Store
@@ -102,6 +103,7 @@ export default function App() {
               setView('lobby');
             }}
             onOpenAdmin={() => setView('admin')}
+            onOpenCreator={() => setView('creator')}
           />
         )}
 
@@ -124,6 +126,10 @@ export default function App() {
 
         {view === 'admin' && (
           <AdminScreen onBack={() => setView('dashboard')} />
+        )}
+
+        {view === 'creator' && (
+          <CreatorScreen onBack={() => setView('dashboard')} />
         )}
       </main>
 

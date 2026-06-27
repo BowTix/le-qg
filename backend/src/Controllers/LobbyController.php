@@ -20,12 +20,19 @@ class LobbyController {
 
         $db = Database::getConnection();
 
-        // Check if pack exists
-        $stmtPack = $db->prepare("SELECT id FROM packs WHERE id = ?");
+        // Check if pack exists and is validated (unless admin)
+        $stmtPack = $db->prepare("SELECT id, is_validated FROM packs WHERE id = ?");
         $stmtPack->execute([$packId]);
-        if (!$stmtPack->fetch()) {
+        $pack = $stmtPack->fetch();
+        if (!$pack) {
             http_response_code(404);
             echo json_encode(["error" => "Pack introuvable."]);
+            return;
+        }
+
+        if ((int)$pack['is_validated'] !== 1 && $user['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(["error" => "Interdit. Impossible de lancer une partie multijoueur sur un thème non validé."]);
             return;
         }
 
