@@ -1,0 +1,13 @@
+# Secret Environment Variables
+backend/.env
+
+# Aiven SSL Certificates
+backend/ca.pem
+
+# IDEs
+.idea/
+.vscode/
+
+# Node dependencies (frontend)
+frontend/node_modules/
+frontend/dist/

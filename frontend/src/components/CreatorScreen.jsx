@@ -22,6 +22,7 @@ export default function CreatorScreen({ onBack }) {
   const [optC, setOptC] = useState('');
   const [optD, setOptD] = useState('');
   const [correctOpt, setCorrectOpt] = useState('A');
+  const [questionType, setQuestionType] = useState('multiple_choice');
   const [showQuestionForm, setShowQuestionForm] = useState(false);
 
   useEffect(() => {
@@ -107,6 +108,7 @@ export default function CreatorScreen({ onBack }) {
     if (q) {
       setEditingQuestionId(q.id);
       setQuestionText(q.question_text);
+      setQuestionType(q.question_type || 'multiple_choice');
       setOptA(q.opt_a);
       setOptB(q.opt_b);
       setOptC(q.opt_c);
@@ -115,6 +117,7 @@ export default function CreatorScreen({ onBack }) {
     } else {
       setEditingQuestionId(null);
       setQuestionText('');
+      setQuestionType('multiple_choice');
       setOptA('');
       setOptB('');
       setOptC('');
@@ -132,11 +135,12 @@ export default function CreatorScreen({ onBack }) {
     const payload = {
       pack_id: selectedPackId,
       question_text: questionText,
+      question_type: questionType,
       opt_a: optA,
-      opt_b: optB,
-      opt_c: optC,
-      opt_d: optD,
-      correct_opt: correctOpt
+      opt_b: questionType === 'open' ? '' : optB,
+      opt_c: questionType === 'open' ? '' : optC,
+      opt_d: questionType === 'open' ? '' : optD,
+      correct_opt: questionType === 'open' ? 'A' : correctOpt
     };
 
     try {
@@ -172,7 +176,7 @@ export default function CreatorScreen({ onBack }) {
   const activePack = packs.find(p => p.id === selectedPackId);
 
   return (
-    <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-8 animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div className="container animate-slide-up" style={{ gap: '32px' }}>
       
       {/* Top Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -332,13 +336,24 @@ export default function CreatorScreen({ onBack }) {
                       gap: '16px'
                     }}>
                       <div style={{ flexGrow: 1 }}>
-                        <p style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '8px' }}>{i + 1}. {q.question_text}</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                          <span style={{ color: q.correct_opt === 'A' ? 'var(--success)' : 'inherit' }}>A: {q.opt_a}</span>
-                          <span style={{ color: q.correct_opt === 'B' ? 'var(--success)' : 'inherit' }}>B: {q.opt_b}</span>
-                          <span style={{ color: q.correct_opt === 'C' ? 'var(--success)' : 'inherit' }}>C: {q.opt_c}</span>
-                          <span style={{ color: q.correct_opt === 'D' ? 'var(--success)' : 'inherit' }}>D: {q.opt_d}</span>
-                        </div>
+                        <p style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '8px' }}>
+                          {i + 1}. {q.question_text}
+                          <span style={{ marginLeft: '8px', fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'var(--border-color)', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                            {q.question_type === 'open' ? 'Ouverte' : 'Choix Multiples'}
+                          </span>
+                        </p>
+                        {q.question_type === 'open' ? (
+                          <div style={{ fontSize: '0.85rem' }}>
+                            Réponse correcte : <span style={{ color: 'var(--success)', fontWeight: 500 }}>{q.opt_a}</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ color: q.correct_opt === 'A' ? 'var(--success)' : 'inherit' }}>A: {q.opt_a}</span>
+                            <span style={{ color: q.correct_opt === 'B' ? 'var(--success)' : 'inherit' }}>B: {q.opt_b}</span>
+                            <span style={{ color: q.correct_opt === 'C' ? 'var(--success)' : 'inherit' }}>C: {q.opt_c}</span>
+                            <span style={{ color: q.correct_opt === 'D' ? 'var(--success)' : 'inherit' }}>D: {q.opt_d}</span>
+                          </div>
+                        )}
                       </div>
                       
                       <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
@@ -407,6 +422,16 @@ export default function CreatorScreen({ onBack }) {
             <form onSubmit={handleSaveQuestion} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Type de Question
+                </label>
+                <select value={questionType} onChange={(e) => setQuestionType(e.target.value)} style={{ width: '100%' }}>
+                  <option value="multiple_choice">Choix Multiples (A, B, C, D)</option>
+                  <option value="open">Question Ouverte (Saisie Libre)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   Texte de la Question
                 </label>
                 <input
@@ -418,36 +443,45 @@ export default function CreatorScreen({ onBack }) {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {questionType === 'open' ? (
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option A</label>
-                  <input type="text" value={optA} onChange={(e) => setOptA(e.target.value)} placeholder="Option A" required />
+                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Réponse attendue (exacte)</label>
+                  <input type="text" value={optA} onChange={(e) => setOptA(e.target.value)} placeholder="Ex: Paris" required />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option B</label>
-                  <input type="text" value={optB} onChange={(e) => setOptB(e.target.value)} placeholder="Option B" required />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option C</label>
-                  <input type="text" value={optC} onChange={(e) => setOptC(e.target.value)} placeholder="Option C" required />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option D</label>
-                  <input type="text" value={optD} onChange={(e) => setOptD(e.target.value)} placeholder="Option D" required />
-                </div>
-              </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option A</label>
+                      <input type="text" value={optA} onChange={(e) => setOptA(e.target.value)} placeholder="Option A" required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option B</label>
+                      <input type="text" value={optB} onChange={(e) => setOptB(e.target.value)} placeholder="Option B" required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option C</label>
+                      <input type="text" value={optC} onChange={(e) => setOptC(e.target.value)} placeholder="Option C" required />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Option D</label>
+                      <input type="text" value={optD} onChange={(e) => setOptD(e.target.value)} placeholder="Option D" required />
+                    </div>
+                  </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Bonne Réponse
-                </label>
-                <select value={correctOpt} onChange={(e) => setCorrectOpt(e.target.value)}>
-                  <option value="A">Option A</option>
-                  <option value="B">Option B</option>
-                  <option value="C">Option C</option>
-                  <option value="D">Option D</option>
-                </select>
-              </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                      Bonne Réponse
+                    </label>
+                    <select value={correctOpt} onChange={(e) => setCorrectOpt(e.target.value)} style={{ width: '100%' }}>
+                      <option value="A">Option A</option>
+                      <option value="B">Option B</option>
+                      <option value="C">Option C</option>
+                      <option value="D">Option D</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowQuestionForm(false)}>

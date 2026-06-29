@@ -76,8 +76,95 @@ export const getUsernameStyle = (xp) => {
  * Returns user level badge/label name based on level
  */
 export const getLevelBadge = (level) => {
-  if (level >= 15) return '🥇 Élite des Quiz';
-  if (level >= 10) return '🥈 Connaisseur';
-  if (level >= 5)  return '🥉 Initié';
+  if (level >= 15) return 'Élite des Quiz';
+  if (level >= 10) return 'Connaisseur';
+  if (level >= 5)  return 'Initié';
   return 'Novice';
+};
+
+/**
+ * Returns Elo rank details (name, color, glow) based on ELO score
+ */
+export const getEloRank = (elo) => {
+  const score = elo || 0;
+  
+  if (score < 100) {
+    return {
+      name: 'Plastique',
+      color: '#a0a0a0',
+      glow: 'none'
+    };
+  }
+  if (score < 300) {
+    let div = 'I';
+    if (score >= 233) div = 'III';
+    else if (score >= 166) div = 'II';
+    return {
+      name: `Bronze ${div}`,
+      color: '#cd7f32',
+      glow: 'none'
+    };
+  }
+  if (score < 500) {
+    let div = 'I';
+    if (score >= 433) div = 'III';
+    else if (score >= 366) div = 'II';
+    return {
+      name: `Argent ${div}`,
+      color: '#c0c0c0',
+      glow: 'none'
+    };
+  }
+  if (score < 750) {
+    let div = 'I';
+    if (score >= 666) div = 'III';
+    else if (score >= 583) div = 'II';
+    return {
+      name: `Or ${div}`,
+      color: '#ffd700',
+      glow: '0 0 8px rgba(255, 215, 0, 0.3)'
+    };
+  }
+  if (score < 1000) {
+    let div = 'I';
+    if (score >= 916) div = 'III';
+    else if (score >= 833) div = 'II';
+    return {
+      name: `Platine ${div}`,
+      color: '#00ffcc',
+      glow: '0 0 8px rgba(0, 255, 204, 0.4)'
+    };
+  }
+  if (score < 1300) {
+    let div = 'I';
+    if (score >= 1200) div = 'III';
+    else if (score >= 1100) div = 'II';
+    return {
+      name: `Diamant ${div}`,
+      color: '#00bfff',
+      glow: '0 0 10px rgba(0, 191, 255, 0.5)'
+    };
+  }
+  if (score < 1600) {
+    let div = 'I';
+    if (score >= 1500) div = 'III';
+    else if (score >= 1400) div = 'II';
+    return {
+      name: `Champion ${div}`,
+      color: '#df00ff',
+      glow: '0 0 12px rgba(223, 0, 255, 0.6)'
+    };
+  }
+  if (score < 2000) {
+    return {
+      name: 'Grand Champion',
+      color: '#ff007f',
+      glow: '0 0 15px rgba(255, 0, 127, 0.7)'
+    };
+  }
+  return {
+    name: 'Légende',
+    color: '#ffffff',
+    glow: '0 0 15px rgba(255, 255, 255, 0.8), 0 0 25px var(--accent)'
+  };
 };

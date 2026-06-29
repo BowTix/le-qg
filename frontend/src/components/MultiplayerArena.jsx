@@ -448,7 +448,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
     const timeRatio = questionTimer / 15000;
 
     return (
-      <div className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 animate-fade-in"
+      <div className="container animate-fade-in"
         style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px', alignItems: 'start' }}>
 
         {/* LEFT: Question Area */}

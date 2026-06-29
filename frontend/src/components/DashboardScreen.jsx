@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
-import { LogOut, Trophy, Play, Plus, Users, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award } from 'lucide-react';
+import { LogOut, Trophy, Play, Plus, Users, User, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award } from 'lucide-react';
 import { getLevel, getUsernameStyle, getLevelBadge, getLevelProgressDetails } from '../utils/progression';
 
-export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator, onOpenLeaderboard }) {
+export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator, onOpenLeaderboard, onOpenProfile }) {
   const [packs, setPacks] = useState([]);
   const [selectedPackSolo, setSelectedPackSolo] = useState('');
   const [selectedPackLobby, setSelectedPackLobby] = useState('');
@@ -159,138 +159,27 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   };
 
   return (
-    <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '680px', width: '100%', margin: '0 auto', padding: '24px 16px' }}>
+    <div className="container animate-slide-up">
       
-      {/* Header Profile Bar */}
-      <div className="glass-card" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '20px', padding: '20px 32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{
-            width: '56px',
-            height: '56px',
-            borderRadius: '50%',
-            backgroundColor: lvl >= 15 ? 'rgba(0, 229, 255, 0.15)' : lvl >= 10 ? 'rgba(255, 0, 127, 0.15)' : 'rgba(255, 247, 0, 0.1)',
-            border: `2px solid ${lvl >= 15 ? '#00e5ff' : lvl >= 10 ? '#ff007f' : lvl >= 5 ? '#fff700' : 'var(--border-color)'}`,
-            color: lvl >= 15 ? '#00e5ff' : lvl >= 10 ? '#ff007f' : lvl >= 5 ? '#fff700' : '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '1.1rem',
-            fontWeight: 800,
-            boxShadow: lvl >= 5 ? `0 0 10px ${lvl >= 15 ? 'rgba(0, 229, 255, 0.3)' : lvl >= 10 ? 'rgba(255, 0, 127, 0.3)' : 'rgba(255, 247, 0, 0.2)'}` : 'none'
-          }}>
-            Lvl {lvl}
-          </div>
-          <div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              Salut, <span style={nameStyle}>{user.username}</span> !
-            </h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  {badgeLabel}
-                </span>
-                <div style={{ width: '80px', height: '6px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '3px', overflow: 'hidden', display: 'inline-block' }}>
-                  <div style={{
-                    width: `${(currentLevelXp / xpNeededForNextLevel) * 100}%`,
-                    height: '100%',
-                    backgroundColor: lvl >= 15 ? '#00e5ff' : lvl >= 10 ? '#ff007f' : '#fff700'
-                  }} />
-                </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                  {currentLevelXp}/{xpNeededForNextLevel} XP
-                </span>
-              </div>
-              
-              <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', margin: 0 }}>
-                <Trophy size={14} style={{ color: '#00e5ff' }} />
-                Arène compétitive : <strong style={{ color: '#00e5ff', textShadow: '0 0 8px rgba(0, 229, 255, 0.3)' }}>{user.elo} Elo</strong>
-              </p>
-              
-              <p style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', margin: 0 }}>
-                <span style={{ fontSize: '0.9rem' }}>🪙</span>
-                Monnaie virtuelle : <strong style={{ color: '#ffb300', textShadow: '0 0 8px rgba(255, 179, 0, 0.3)' }}>{user.coins || 0} pièces</strong>
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '10px' }}>
-          {user.role === 'admin' && (
-            <button className="btn-secondary" onClick={onOpenAdmin} style={{ borderColor: 'rgba(255, 59, 105, 0.4)', color: 'var(--error)', padding: '10px 16px', fontSize: '0.9rem' }}>
-              <ShieldAlert size={16} />
-              Admin
-            </button>
-          )}
-          <button className="btn-secondary" onClick={onOpenLeaderboard} style={{ padding: '10px 16px', fontSize: '0.9rem' }}>
-            <Trophy size={16} style={{ color: 'var(--accent)' }} />
-            Classement
-          </button>
-          <button className="btn-secondary" onClick={onOpenCreator} style={{ padding: '10px 16px', fontSize: '0.9rem' }}>
-            <Plus size={16} style={{ color: 'var(--accent)' }} />
-            Créer un Thème
-          </button>
-          <button className="btn-secondary" onClick={onLogout} style={{ padding: '10px 16px', fontSize: '0.9rem' }}>
-            <LogOut size={16} />
-            Déconnexion
-          </button>
-        </div>
-      </div>
+
 
       {/* Central Control Hub Card */}
       <div className="glass-card max-w-2xl w-full mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '28px', padding: '36px' }}>
         
-        {/* Sliding Segmented Tab Toggles */}
-        <div style={{
-          display: 'flex',
-          backgroundColor: 'var(--bg-input)',
-          borderRadius: '12px',
-          padding: '4px',
-          border: '1px solid var(--border-color)'
-        }}>
+        {/* Segmented Tab Control */}
+        <div className="tab-group">
           <button
+            className={`tab-btn${mode === 'solo' ? ' active' : ''}`}
             onClick={() => setMode('solo')}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '14px',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 700,
-              fontSize: '1rem',
-              transition: 'var(--transition-smooth)',
-              backgroundColor: mode === 'solo' ? 'var(--accent)' : 'transparent',
-              color: mode === 'solo' ? '#12121c' : 'var(--text-secondary)',
-              boxShadow: mode === 'solo' ? '0 4px 12px rgba(255, 247, 0, 0.15)' : 'none'
-            }}
           >
-            <BookOpen size={18} />
+            <BookOpen size={17} />
             Mode Entraînement
           </button>
           <button
+            className={`tab-btn${mode === 'online' ? ' active' : ''}`}
             onClick={() => setMode('online')}
-            style={{
-              flex: 1,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '14px',
-              borderRadius: '8px',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 700,
-              fontSize: '1rem',
-              transition: 'var(--transition-smooth)',
-              backgroundColor: mode === 'online' ? 'var(--accent)' : 'transparent',
-              color: mode === 'online' ? '#12121c' : 'var(--text-secondary)',
-              boxShadow: mode === 'online' ? '0 4px 12px rgba(255, 247, 0, 0.15)' : 'none'
-            }}
           >
-            <Globe size={18} />
+            <Globe size={17} />
             Mode En Ligne
           </button>
         </div>
@@ -298,11 +187,9 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
         {/* Theme Selection Section */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Choisir un Thème
-            </span>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              {mode === 'online' ? '🔒 Uniquement thèmes validés' : '🔓 Thèmes publics & privés'}
+            <span className="section-label">Choisir un Thème</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              {mode === 'online' ? 'Thèmes validés uniquement' : 'Thèmes publics & privés'}
             </span>
           </div>
 

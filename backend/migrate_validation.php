@@ -4,16 +4,27 @@
  * Run this from the CLI: php migrate_validation.php
  */
 
-$host = '127.0.0.1';
-$dbName = 'quiz_db';
-$user = 'root';
-$pass = '';
+// Register autoloader
+spl_autoload_register(function ($class) {
+    $prefix = 'App\\';
+    $base_dir = __DIR__ . '/src/';
+    $len = strlen($prefix);
+    
+    if (strncmp($prefix, $class, $len) !== 0) {
+        return;
+    }
+    
+    $relative_class = substr($class, $len);
+    $file = $base_dir . str_replace('\\', '/', $relative_class) . '.php';
+    
+    if (file_exists($file)) {
+        require $file;
+    }
+});
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbName;charset=utf8mb4", $user, $pass, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
-    echo "Connected to MySQL database 'quiz_db' successfully.\n";
+    $pdo = \App\Config\Database::getConnection();
+    echo "Connected to database successfully.\n";
 
     // 1. Check if 'creator_id' column exists
     $stmt = $pdo->query("SHOW COLUMNS FROM packs LIKE 'creator_id'");

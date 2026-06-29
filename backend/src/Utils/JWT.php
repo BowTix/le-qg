@@ -84,14 +84,14 @@ class JWT {
      * Generates a signed Answer Token specifically for the speed timer.
      * Contains the question_id and the sent_at millisecond timestamp.
      */
-    public static function generateAnswerToken(int $questionId): string {
+    public static function generateAnswerToken(int $questionId, array $extra = []): string {
         // Use a millisecond timestamp for high precision anti-bot check
         $sentAt = (int) (microtime(true) * 1000);
-        $payload = [
+        $payload = array_merge([
             'question_id' => $questionId,
             'sent_at' => $sentAt,
             'exp' => time() + 30 // Question answer session expires after 30 seconds
-        ];
+        ], $extra);
         return self::encode($payload, 30);
     }
 }

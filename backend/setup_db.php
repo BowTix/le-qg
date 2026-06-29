@@ -4,33 +4,95 @@
  * Run this from the CLI: php setup_db.php
  */
 
-$host = '127.0.0.1';
-$user = 'root';
-$pass = ''; // Default Laragon password is empty
+// Load environment variables if .env exists
+function loadEnv() {
+    $envFile = __DIR__ . '/.env';
+    if (file_exists($envFile)) {
+        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line) || strpos($line, '#') === 0) {
+                continue;
+            }
+            $parts = explode('=', $line, 2);
+            if (count($parts) === 2) {
+                $key = trim($parts[0]);
+                $val = trim($parts[1]);
+                if (preg_match('/^"([^"]*)"$/', $val, $matches) || preg_match("/^'([^']*)'$/", $val, $matches)) {
+                    $val = $matches[1];
+                }
+                putenv("$key=$val");
+                $_ENV[$key] = $val;
+                $_SERVER[$key] = $val;
+            }
+        }
+    }
+}
+
+loadEnv();
+
+$host = getenv('DB_HOST') ?: '127.0.0.1';
+$port = getenv('DB_PORT') ?: '3306';
+$dbName = getenv('DB_NAME') ?: 'quiz_db';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASS') !== false ? getenv('DB_PASS') : '';
+$sslCa = getenv('DB_SSL_CA') ?: null;
+
+$options = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
+];
+if ($sslCa && file_exists(__DIR__ . '/' . $sslCa)) {
+    $options[PDO::MYSQL_ATTR_SSL_CA] = __DIR__ . '/' . $sslCa;
+}
 
 try {
-    // 1. Connect to MySQL Server
-    $pdo = new PDO("mysql:host=$host", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    echo "Connected to MySQL server successfully.\n";
+    // 1. Try to connect to MySQL server without database first to create it
+    echo "Connecting to MySQL server...\n";
+    $pdo = new PDO("mysql:host=$host;port=$port;charset=utf8mb4", $user, $pass, $options);
+    
+    // 2. Try to create database (will warning-fail on restricted users/platforms like Aiven)
+    try {
+        $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbName` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        echo "Database '$dbName' checked/created.\n";
+    } catch (PDOException $e) {
+        echo "Warning: Could not create database (might be due to restricted cloud permissions on Aiven): " . $e->getMessage() . "\n";
+    }
+    
+    // 3. Connect/switch to the specific database
+    $pdo->exec("USE `$dbName`");
+    echo "Using database '$dbName'.\n";
+} catch (PDOException $e) {
+    // 4. Fallback to connecting directly to the database (required for some managed hosts)
+    echo "Could not connect without database name. Retrying connection directly to '$dbName'...\n";
+    try {
+        $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbName;charset=utf8mb4", $user, $pass, $options);
+        echo "Connected directly to database '$dbName' successfully.\n";
+    } catch (PDOException $ex) {
+        echo "Database setup error: " . $ex->getMessage() . "\n";
+        exit(1);
+    }
+}
 
-    // 2. Create Database
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS quiz_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    echo "Database 'quiz_db' checked/created.\n";
-
-    // 3. Connect to the specific Database
-    $pdo->exec("USE quiz_db");
-
+try {
     // 4. Create Tables
     // Users Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(50) NOT NULL UNIQUE,
+        username VARCHAR(50) NOT NULL,
+        discriminator VARCHAR(4) NOT NULL,
+        email VARCHAR(100) DEFAULT NULL UNIQUE,
         password_hash VARCHAR(255) NOT NULL,
         role VARCHAR(20) NOT NULL DEFAULT 'user',
         global_score INT NOT NULL DEFAULT 0,
         coins INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        is_verified TINYINT(1) NOT NULL DEFAULT 0,
+        verification_code VARCHAR(6) DEFAULT NULL,
+        bio TEXT DEFAULT NULL,
+        avatar_url VARCHAR(255) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_username_discriminator (username, discriminator)
     ) ENGINE=InnoDB");
     echo "Table 'users' checked/created.\n";
 
@@ -56,6 +118,8 @@ try {
         opt_c VARCHAR(255) NOT NULL,
         opt_d VARCHAR(255) NOT NULL,
         correct_opt CHAR(1) NOT NULL,
+        question_type ENUM('multiple_choice', 'guess_number', 'open') NOT NULL DEFAULT 'multiple_choice',
+        correct_value INT DEFAULT NULL,
         FOREIGN KEY (pack_id) REFERENCES packs(id) ON DELETE CASCADE
     ) ENGINE=InnoDB");
     echo "Table 'questions' checked/created.\n";
@@ -90,8 +154,22 @@ try {
     ) ENGINE=InnoDB");
     echo "Table 'lobby_players' checked/created.\n";
 
+    // Friendships Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS friendships (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        friend_id INT NOT NULL,
+        status ENUM('pending', 'accepted') NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_friendship (user_id, friend_id)
+    ) ENGINE=InnoDB");
+    echo "Table 'friendships' checked/created.\n";
+
     // Rate Limits Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS rate_limits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
         ip VARCHAR(45) NOT NULL,
         endpoint VARCHAR(255) NOT NULL,
         timestamp INT UNSIGNED NOT NULL,

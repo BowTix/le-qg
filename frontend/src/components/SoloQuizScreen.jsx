@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../utils/api';
 import { ArrowLeft, Clock, Award, CheckCircle2, XCircle, ChevronRight, Trophy } from 'lucide-react';
 
@@ -9,90 +9,139 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
   const [answered, setAnswered] = useState(false);
   const [result, setResult] = useState(null);
   const [timeLeft, setTimeLeft] = useState(20);
-  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true); // true only for the very first load
+  const [transitioning, setTransitioning] = useState(false); // true between questions
   const [error, setError] = useState('');
   const [score, setScore] = useState(0);
   const [history, setHistory] = useState([]);
   const [gameFinished, setGameFinished] = useState(false);
   const [seenQuestionIds, setSeenQuestionIds] = useState([]);
+  const [openAnswer, setOpenAnswer] = useState('');
 
   const timerRef = useRef(null);
+  const answeredRef = useRef(false); // ref mirror of answered to avoid stale closures in timer
 
+  // Keep ref in sync
   useEffect(() => {
-    fetchNextQuestion();
-    return () => clearInterval(timerRef.current);
+    answeredRef.current = answered;
+  }, [answered]);
+
+  // Fetch question
+  useEffect(() => {
+    let active = true;
+
+    const loadQuestion = async () => {
+      if (gameFinished) return;
+
+      try {
+        const excludeParam = seenQuestionIds.join(',');
+        const qData = await api.get('/quiz/question', { 
+          pack_id: packId,
+          exclude: excludeParam
+        });
+        
+        if (!active) return;
+
+        // Reset all answer state BEFORE setting the new question
+        setSelectedOption(null);
+        setOpenAnswer('');
+        setAnswered(false);
+        setResult(null);
+        setTimeLeft(20);
+        setError('');
+
+        // Set question — this triggers the card animation via key change
+        setCurrentQuestion(qData);
+        setSeenQuestionIds(prev => [...prev, qData.id]);
+        setInitialLoading(false);
+        setTransitioning(false);
+        
+        // Start 20s countdown timer
+        clearInterval(timerRef.current);
+        timerRef.current = setInterval(() => {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              clearInterval(timerRef.current);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } catch (err) {
+        if (!active) return;
+        if (questionIndex > 0) {
+          setGameFinished(true);
+        } else {
+          setError(err.message || "Impossible de charger les questions.");
+          setInitialLoading(false);
+        }
+      }
+    };
+
+    loadQuestion();
+
+    return () => {
+      active = false;
+      clearInterval(timerRef.current);
+    };
   }, [questionIndex]);
 
-  // Handle timer countdown
+  // Handle timer reaching zero
   useEffect(() => {
-    if (timeLeft === 0 && !answered && currentQuestion) {
+    if (timeLeft === 0 && !answeredRef.current && currentQuestion) {
       handleTimeOut();
     }
   }, [timeLeft]);
 
-  const fetchNextQuestion = async () => {
-    if (gameFinished) return;
-    setLoading(true);
-    setError('');
-    setSelectedOption(null);
-    setAnswered(false);
-    setResult(null);
-    setTimeLeft(20);
+  const handleTimeOut = useCallback(async () => {
+    if (answeredRef.current) return;
+    clearInterval(timerRef.current);
+    // Mark answered immediately so UI reacts instantly
+    setAnswered(true);
+    answeredRef.current = true;
 
     try {
-      const excludeParam = seenQuestionIds.join(',');
-      const qData = await api.get('/quiz/question', { 
-        pack_id: packId,
-        exclude: excludeParam
+      const response = await api.post('/quiz/answer', {
+        answer_token: currentQuestion.answer_token,
+        answer: 'TIMEOUT'
       });
-      setCurrentQuestion(qData);
-      setSeenQuestionIds(prev => [...prev, qData.id]);
-      
-      // Start 20s countdown timer
-      clearInterval(timerRef.current);
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerRef.current);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } catch (err) {
-      // If we run out of questions or get an error, finish early
-      if (questionIndex > 0) {
-        setGameFinished(true);
-      } else {
-        setError(err.message || "Impossible de charger les questions.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleTimeOut = () => {
-    clearInterval(timerRef.current);
-    setAnswered(true);
-    setResult({
-      correct: false,
-      correct_option: '',
-      correct_text: "Temps écoulé !",
-      points_awarded: 0
-    });
-    setHistory(prev => [...prev, {
-      question_text: currentQuestion.question_text,
-      correct: false,
-      user_answer: 'AUCUNE',
-      correct_text: ''
-    }]);
-  };
+      setResult({
+        ...response,
+        is_timeout: true
+      });
+      setHistory(prev => [...prev, {
+        question_text: currentQuestion.question_text,
+        correct: false,
+        user_answer: 'AUCUNE',
+        correct_text: response.correct_text
+      }]);
+    } catch {
+      setResult({
+        correct: false,
+        correct_option: null,
+        correct_text: '',
+        points_awarded: 0,
+        coins_awarded: 0,
+        is_timeout: true
+      });
+      setHistory(prev => [...prev, {
+        question_text: currentQuestion.question_text,
+        correct: false,
+        user_answer: 'AUCUNE',
+        correct_text: ''
+      }]);
+    }
+  }, [currentQuestion]);
 
   const handleSelectOption = async (optionKey) => {
-    if (answered || loading) return;
+    if (answered || transitioning) return;
+    
+    // Immediately mark as answered and selected — UI updates instantly
     setSelectedOption(optionKey);
+    setAnswered(true);
+    answeredRef.current = true;
     clearInterval(timerRef.current);
-    setLoading(true);
 
     try {
       const response = await api.post('/quiz/answer', {
@@ -101,7 +150,6 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
       });
 
       setResult(response);
-      setAnswered(true);
       setScore(prev => prev + response.points_awarded);
       if (onUpdateUserStats) {
         onUpdateUserStats({ global_score: response.global_score, coins: response.coins });
@@ -115,8 +163,37 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
       }]);
     } catch (err) {
       setError(err.message || "Erreur de validation de la réponse.");
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const handleOpenAnswerSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (answered || transitioning || !openAnswer.trim()) return;
+    
+    setAnswered(true);
+    answeredRef.current = true;
+    clearInterval(timerRef.current);
+
+    try {
+      const response = await api.post('/quiz/answer', {
+        answer_token: currentQuestion.answer_token,
+        answer: openAnswer.trim()
+      });
+
+      setResult(response);
+      setScore(prev => prev + response.points_awarded);
+      if (onUpdateUserStats) {
+        onUpdateUserStats({ global_score: response.global_score, coins: response.coins });
+      }
+
+      setHistory(prev => [...prev, {
+        question_text: currentQuestion.question_text,
+        correct: response.correct,
+        user_answer: openAnswer.trim(),
+        correct_text: response.correct_text
+      }]);
+    } catch (err) {
+      setError(err.message || "Erreur de validation de la réponse.");
     }
   };
 
@@ -124,6 +201,8 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
     if (questionIndex >= 9) {
       setGameFinished(true);
     } else {
+      // Start transition: keep old question visible but faded while loading
+      setTransitioning(true);
       setQuestionIndex(prev => prev + 1);
     }
   };
@@ -205,7 +284,7 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
                 )}
                 <div>
                   <p style={{ fontSize: '0.95rem', fontWeight: 500 }}>{i + 1}. {h.question_text}</p>
-                  {!h.correct && (
+                  {!h.correct && h.correct_text && (
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                       Correct : <span style={{ color: 'var(--success)', fontWeight: 500 }}>{h.correct_text}</span>
                     </p>
@@ -223,8 +302,11 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
     );
   }
 
+  // Determine if we're waiting for the first question ever
+  const showSkeleton = initialLoading || (!currentQuestion && !error);
+
   return (
-    <div className="flex-1 max-w-3xl w-full mx-auto p-4 md:p-8 animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div className="container animate-fade-in" style={{ maxWidth: '800px' }}>
       
       {/* Top Bar Info */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -270,105 +352,169 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
       </div>
 
       {/* Question Card */}
-      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase' }}>
-          Question {questionIndex + 1} de 10
-        </span>
-        
-        {loading && !currentQuestion ? (
-          <div style={{ padding: '40px 0', textSelf: 'center', color: 'var(--text-secondary)' }}>Chargement de la question...</div>
-        ) : currentQuestion ? (
+      {showSkeleton ? (
+        /* Skeleton loader — same shape as the real card to prevent layout shift */
+        <div className="glass-card animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ width: '120px', height: '14px', backgroundColor: 'var(--border-color)', borderRadius: '4px' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ width: '85%', height: '22px', backgroundColor: 'var(--border-color)', borderRadius: '6px' }} />
+            <div style={{ width: '60%', height: '22px', backgroundColor: 'var(--border-color)', borderRadius: '6px' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+            {[1,2,3,4].map(i => (
+              <div key={i} style={{ width: '100%', height: '56px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '12px' }} />
+            ))}
+          </div>
+        </div>
+      ) : currentQuestion ? (
+        <div 
+          key={currentQuestion.id} 
+          className="glass-card animate-slide-up" 
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '24px',
+            opacity: transitioning ? 0.4 : 1,
+            transition: 'opacity 0.2s ease'
+          }}
+        >
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Question {questionIndex + 1} de 10
+          </span>
+          
           <>
             <h2 style={{ fontSize: '1.4rem', lineHeight: '1.4', fontWeight: 600 }}>
               {currentQuestion.question_text}
             </h2>
 
-            {/* Options list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-              {Object.keys(currentQuestion.options).map((key) => {
-                const isSelected = selectedOption === key;
-                const isCorrectOption = result?.correct_option === key;
-                
-                let optionClass = 'option-btn';
-                if (answered) {
-                  if (isCorrectOption) {
-                    optionClass += ' correct';
-                  } else if (isSelected && !result?.correct) {
-                    optionClass += ' incorrect';
-                  } else {
+            {currentQuestion.question_type === 'open' ? (
+              <form onSubmit={handleOpenAnswerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+                <input
+                  type="text"
+                  value={openAnswer}
+                  onChange={(e) => setOpenAnswer(e.target.value)}
+                  placeholder="Écrivez votre réponse ici..."
+                  disabled={answered}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-input)',
+                    color: '#fff',
+                    fontSize: '1.1rem',
+                    outline: 'none',
+                    transition: 'border-color 0.2s'
+                  }}
+                  autoFocus
+                />
+                {!answered && (
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={!openAnswer.trim()}
+                    style={{ alignSelf: 'flex-start', padding: '12px 24px' }}
+                  >
+                    Valider
+                  </button>
+                )}
+              </form>
+            ) : (
+              /* Options list */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
+                {Object.keys(currentQuestion.options || {}).map((key) => {
+                  const isSelected = selectedOption === key;
+                  const hasResult = result !== null;
+                  const isCorrectOption = result?.correct_option === key;
+                  
+                  let optionClass = 'option-btn';
+                  if (hasResult) {
+                    // Server responded — show correct/incorrect
+                    if (isCorrectOption) {
+                      optionClass += ' correct';
+                    } else if (isSelected && !result?.correct) {
+                      optionClass += ' incorrect';
+                    } else {
+                      optionClass += ' disabled';
+                    }
+                  } else if (answered && isSelected) {
+                    // Answered but server hasn't responded yet — keep selected style
+                    optionClass += ' selected';
+                  } else if (answered) {
+                    // Other buttons while waiting for server
                     optionClass += ' disabled';
                   }
-                } else if (isSelected) {
-                  optionClass += ' selected';
-                }
 
-                return (
-                  <button
-                    key={key}
-                    className={optionClass}
-                    onClick={() => handleSelectOption(key)}
-                    disabled={answered || loading}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center' }}>
-                      <span className="option-badge">{key}</span>
-                      {currentQuestion.options[key]}
-                    </span>
-                    {answered && isCorrectOption && <CheckCircle2 size={18} />}
-                    {answered && isSelected && !result?.correct && <XCircle size={18} />}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        ) : null}
-
-        {/* Action Panel after Answered */}
-        {answered && (
-          <div className="animate-fade-in" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-            marginTop: '12px',
-            paddingTop: '24px',
-            borderTop: '1px solid var(--border-color)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'space-between', gap: '16px' }}>
-              <div>
-                <p style={{
-                  color: result.correct ? 'var(--success)' : 'var(--error)',
-                  fontWeight: 700,
-                  fontSize: '1.2rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  {result.correct ? (
-                    <>
-                      <CheckCircle2 size={22} />
-                      Correct ! (+{result.points_awarded} pts, +{result.coins_awarded} 🪙)
-                    </>
-                  ) : (
-                    <>
-                      <XCircle size={22} />
-                      {result.correct_text === "Temps écoulé !" ? "Temps écoulé !" : "Incorrect"}
-                    </>
-                  )}
-                </p>
-                {!result.correct && result.correct_option && (
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '6px' }}>
-                    La bonne réponse était : <strong style={{ color: '#fff' }}>({result.correct_option}) {result.correct_text}</strong>
-                  </p>
-                )}
+                  return (
+                    <button
+                      key={key}
+                      className={optionClass}
+                      onClick={() => handleSelectOption(key)}
+                      disabled={answered}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center' }}>
+                        <span className="option-badge">{key}</span>
+                        {currentQuestion.options[key]}
+                      </span>
+                      {hasResult && isCorrectOption && <CheckCircle2 size={18} />}
+                      {hasResult && isSelected && !result?.correct && <XCircle size={18} />}
+                    </button>
+                  );
+                })}
               </div>
+            )}
+          </>
 
-              <button className="btn-primary" onClick={handleNext} style={{ marginLeft: 'auto' }}>
-                {questionIndex >= 9 ? 'Voir les résultats' : 'Suivant'}
-                <ChevronRight size={18} />
-              </button>
+          {/* Action Panel after Server Response */}
+          {result && (
+            <div className="animate-fade-in" style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              marginTop: '12px',
+              paddingTop: '24px',
+              borderTop: '1px solid var(--border-color)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div>
+                  <p style={{
+                    color: result.correct ? 'var(--success)' : 'var(--error)',
+                    fontWeight: 700,
+                    fontSize: '1.2rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {result.correct ? (
+                      <>
+                        <CheckCircle2 size={22} />
+                        Correct ! (+{result.points_awarded} pts, +{result.coins_awarded} 🪙)
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={22} />
+                        {result.is_timeout ? "Temps écoulé !" : "Incorrect"}
+                      </>
+                    )}
+                  </p>
+                  {!result.correct && result.correct_text && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '6px' }}>
+                      La bonne réponse était : <strong style={{ color: '#fff' }}>
+                        {result.correct_option ? `(${result.correct_option}) ` : ''}{result.correct_text}
+                      </strong>
+                    </p>
+                  )}
+                </div>
+
+                <button className="btn-primary" onClick={handleNext} style={{ marginLeft: 'auto' }}>
+                  {questionIndex >= 9 ? 'Voir les résultats' : 'Suivant'}
+                  <ChevronRight size={18} />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

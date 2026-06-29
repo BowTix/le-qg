@@ -80,6 +80,81 @@ try {
         case '/api/auth/profile':
             if ($method === 'GET') {
                 (new \App\Controllers\AuthController())->profile();
+            } elseif ($method === 'PUT') {
+                (new \App\Controllers\AuthController())->updateProfile(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/auth/upload-avatar':
+            if ($method === 'POST') {
+                (new \App\Controllers\AuthController())->uploadAvatar();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/auth/verify':
+            if ($method === 'POST') {
+                (new \App\Controllers\AuthController())->verify(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/auth/resend':
+            if ($method === 'POST') {
+                (new \App\Controllers\AuthController())->resend(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        // --- Friends Management ---
+        case '/api/friends':
+            if ($method === 'GET') {
+                (new \App\Controllers\FriendsController())->getFriends();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/friends/search':
+            if ($method === 'GET') {
+                (new \App\Controllers\FriendsController())->searchUsers();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/friends/request':
+            if ($method === 'POST') {
+                (new \App\Controllers\FriendsController())->sendRequest(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/friends/respond':
+            if ($method === 'POST') {
+                (new \App\Controllers\FriendsController())->respondRequest(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/friends/remove':
+            if ($method === 'DELETE') {
+                (new \App\Controllers\FriendsController())->removeFriend(getRequestBody());
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);

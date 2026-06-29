@@ -3,6 +3,8 @@ const API_BASE = window.location.port && window.location.port !== '80'
   ? 'http://127.0.0.1:8000/api'
   : `${window.location.origin}/quiz/backend/public/api`;
 
+export const PUBLIC_BASE = API_BASE.replace('/api', '');
+
 /**
  * Perform an HTTP request
  */
@@ -10,7 +12,7 @@ async function request(endpoint, options = {}) {
   const token = localStorage.getItem('quiz_token');
   
   const headers = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers || {}),
   };
 

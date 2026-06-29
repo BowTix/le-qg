@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import { ArrowLeft, Trophy, Calendar, Zap, Skull, ShieldCheck, Gamepad } from 'lucide-react';
-import { getLevel, getUsernameStyle } from '../utils/progression';
+import { getLevel, getUsernameStyle, getEloRank } from '../utils/progression';
 
 export default function LeaderboardScreen({ onBack }) {
   const [topPlayers, setTopPlayers] = useState([]);
@@ -28,10 +28,10 @@ export default function LeaderboardScreen({ onBack }) {
 
   const getModeLabel = (mode) => {
     switch (mode) {
-      case 'sudden_death': return '💀 Mort Subite';
-      case 'speed_blitz': return '⚡ Blitz (5s)';
-      case 'guess_number': return '🧮 Le Juste Nombre';
-      default: return '🎮 Classique';
+      case 'sudden_death': return 'Mort Subite';
+      case 'speed_blitz': return 'Blitz (5s)';
+      case 'guess_number': return 'Juste Nombre';
+      default: return 'Classique';
     }
   };
 
@@ -54,7 +54,7 @@ export default function LeaderboardScreen({ onBack }) {
   const third = podium[2];
 
   return (
-    <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '680px', width: '100%', margin: '0 auto', padding: '24px 16px' }}>
+    <div className="container animate-slide-up">
       
       {/* Top Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -62,16 +62,17 @@ export default function LeaderboardScreen({ onBack }) {
           <ArrowLeft size={16} />
           Retour Dashboard
         </button>
-        <h2 style={{ fontSize: '1.6rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          🏆 Classement du QG
+        <h2 style={{ fontSize: '1.5rem', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800 }}>
+          <Trophy size={22} style={{ color: 'var(--accent)' }} />
+          Classement du QG
         </h2>
       </div>
 
-      {error && <div style={{ backgroundColor: 'var(--error-glow)', color: 'var(--error)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 59, 105, 0.2)' }}>{error}</div>}
+      {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
-        <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-          <div className="spinner" style={{ width: '28px', height: '28px', border: '2px solid rgba(255,255,255,0.05)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.6s linear infinite', display: 'inline-block', marginBottom: '8px' }} />
+        <div className="loading-state">
+          <div className="spinner spinner-lg" />
           <div>Chargement du QG...</div>
         </div>
       ) : (
@@ -89,7 +90,14 @@ export default function LeaderboardScreen({ onBack }) {
                 {second && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
                     <span style={{ ...getUsernameStyle(second.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{second.username}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#00e5ff', fontWeight: 600, marginBottom: '8px' }}>{second.elo} Elo</span>
+                    {(() => {
+                      const rank = getEloRank(second.elo);
+                      return (
+                        <span style={{ fontSize: '0.75rem', color: rank.color, textShadow: rank.glow, fontWeight: 700, marginBottom: '8px' }}>
+                          {rank.name} ({second.elo})
+                        </span>
+                      );
+                    })()}
                     <div style={{
                       width: '100%',
                       height: '70px',
@@ -103,7 +111,7 @@ export default function LeaderboardScreen({ onBack }) {
                       fontWeight: 800,
                       color: '#b0b5bc'
                     }}>
-                      🥈
+                      <Trophy size={28} style={{ color: '#b0b5bc' }} />
                     </div>
                   </div>
                 )}
@@ -112,7 +120,14 @@ export default function LeaderboardScreen({ onBack }) {
                 {first && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
                     <span style={{ ...getUsernameStyle(first.global_score), fontSize: '0.95rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{first.username}</span>
-                    <span style={{ fontSize: '0.8rem', color: '#00e5ff', fontWeight: 700, marginBottom: '8px' }}>{first.elo} Elo</span>
+                    {(() => {
+                      const rank = getEloRank(first.elo);
+                      return (
+                        <span style={{ fontSize: '0.8rem', color: rank.color, textShadow: rank.glow, fontWeight: 800, marginBottom: '8px' }}>
+                          {rank.name} ({first.elo})
+                        </span>
+                      );
+                    })()}
                     <div style={{
                       width: '100%',
                       height: '100px',
@@ -127,7 +142,7 @@ export default function LeaderboardScreen({ onBack }) {
                       color: 'var(--accent)',
                       boxShadow: '0 0 20px rgba(255,247,0,0.12)'
                     }}>
-                      👑
+                      <Trophy size={36} style={{ color: 'var(--accent)' }} />
                     </div>
                   </div>
                 )}
@@ -136,7 +151,14 @@ export default function LeaderboardScreen({ onBack }) {
                 {third && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
                     <span style={{ ...getUsernameStyle(third.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{third.username}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#00e5ff', fontWeight: 600, marginBottom: '8px' }}>{third.elo} Elo</span>
+                    {(() => {
+                      const rank = getEloRank(third.elo);
+                      return (
+                        <span style={{ fontSize: '0.75rem', color: rank.color, textShadow: rank.glow, fontWeight: 700, marginBottom: '8px' }}>
+                          {rank.name} ({third.elo})
+                        </span>
+                      );
+                    })()}
                     <div style={{
                       width: '100%',
                       height: '50px',
@@ -150,7 +172,7 @@ export default function LeaderboardScreen({ onBack }) {
                       fontWeight: 800,
                       color: '#cd7f32'
                     }}>
-                      🥉
+                      <Trophy size={22} style={{ color: '#cd7f32' }} />
                     </div>
                   </div>
                 )}
@@ -184,7 +206,14 @@ export default function LeaderboardScreen({ onBack }) {
                     <span style={{ ...getUsernameStyle(p.global_score), fontWeight: 600 }}>{p.username}</span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Lvl {getLevel(p.global_score)})</span>
                   </div>
-                  <strong style={{ color: '#00e5ff' }}>{p.elo} Elo</strong>
+                  {(() => {
+                    const rank = getEloRank(p.elo);
+                    return (
+                      <span style={{ color: rank.color, textShadow: rank.glow, fontWeight: 700, fontSize: '0.85rem' }}>
+                        {rank.name} ({p.elo})
+                      </span>
+                    );
+                  })()}
                 </div>
               ))}
               

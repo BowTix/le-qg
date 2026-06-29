@@ -26,6 +26,19 @@ class QuizController {
         $stmt->execute([$user['user_id']]);
         $packs = $stmt->fetchAll();
 
+        // Get total question count in database
+        $totalQuestions = (int)$db->query("SELECT COUNT(*) FROM questions")->fetchColumn();
+        if ($totalQuestions > 0) {
+            $packs[] = [
+                "id" => 0,
+                "name" => "🎲 Thème Aléatoire",
+                "description" => "Un mélange de 10 questions choisies au hasard parmi tous les thèmes.",
+                "creator_id" => null,
+                "is_validated" => 1,
+                "question_count" => min($totalQuestions, 10)
+            ];
+        }
+
         echo json_encode($packs);
     }
 
@@ -101,22 +114,26 @@ class QuizController {
         AuthMiddleware::authenticate();
         $packId = (int) ($queryParams['pack_id'] ?? 0);
 
-        if ($packId <= 0) {
+        if ($packId < 0) {
             http_response_code(400);
-            echo json_encode(["error" => "pack_id manquant ou invalide."]);
+            echo json_encode(["error" => "pack_id invalide."]);
             return;
         }
 
         $db = Database::getConnection();
 
-        // Check if pack exists and has questions
-        $stmtCount = $db->prepare("SELECT COUNT(*) FROM questions WHERE pack_id = ?");
-        $stmtCount->execute([$packId]);
+        // Check if questions exist
+        if ($packId === 0) {
+            $stmtCount = $db->query("SELECT COUNT(*) FROM questions");
+        } else {
+            $stmtCount = $db->prepare("SELECT COUNT(*) FROM questions WHERE pack_id = ?");
+            $stmtCount->execute([$packId]);
+        }
         $count = $stmtCount->fetchColumn();
 
         if ($count == 0) {
             http_response_code(404);
-            echo json_encode(["error" => "Aucune question trouvée dans ce pack."]);
+            echo json_encode(["error" => "Aucune question trouvée."]);
             return;
         }
 
@@ -127,40 +144,107 @@ class QuizController {
         }
 
         $excludeClause = "";
-        $params = [$packId];
+        $params = [];
+        if ($packId > 0) {
+            $params[] = $packId;
+            $excludeClause = " WHERE pack_id = ?";
+        }
+        
         if (!empty($excludeIds)) {
             $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
-            $excludeClause = " AND id NOT IN ($placeholders)";
+            if ($packId > 0) {
+                $excludeClause .= " AND id NOT IN ($placeholders)";
+            } else {
+                $excludeClause .= " WHERE id NOT IN ($placeholders)";
+            }
             $params = array_merge($params, $excludeIds);
         }
 
-        // Fetch a random question from the pack (excluding already answered ones)
-        $stmt = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d FROM questions WHERE pack_id = ?$excludeClause ORDER BY RAND() LIMIT 1");
+        // Fetch a random question (excluding already answered ones)
+        $stmt = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type FROM questions$excludeClause ORDER BY RAND() LIMIT 1");
         $stmt->execute($params);
         $question = $stmt->fetch();
 
-        // Fallback if all questions are excluded (or pack has fewer than 10 questions)
+        // Fallback if all questions are excluded
         if (!$question) {
-            $stmtFallback = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d FROM questions WHERE pack_id = ? ORDER BY RAND() LIMIT 1");
-            $stmtFallback->execute([$packId]);
-            $question = $stmtFallback->fetch();
+            if (!empty($excludeIds)) {
+                $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
+                $stmtFallback = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type FROM questions WHERE id NOT IN ($placeholders) ORDER BY RAND() LIMIT 1");
+                $stmtFallback->execute($excludeIds);
+                $question = $stmtFallback->fetch();
+            }
+            
+            if (!$question) {
+                $question = $db->query("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type FROM questions ORDER BY RAND() LIMIT 1")->fetch();
+            }
         }
 
-        // Create signed token containing question_id & sent_at
-        $answerToken = JWT::generateAnswerToken($question['id']);
+        $questionType = $question['question_type'] ?? 'multiple_choice';
+        $shuffledOptions = null;
+        $correctOpt = 'A'; // default fallback for token
+
+        if ($questionType === 'open') {
+            $shuffledOptions = null;
+        } else {
+            $shuffledValues = [$question['opt_a'], $question['opt_b'], $question['opt_c'], $question['opt_d']];
+            shuffle($shuffledValues);
+            
+            $shuffledOptions = [
+                'A' => $shuffledValues[0],
+                'B' => $shuffledValues[1],
+                'C' => $shuffledValues[2],
+                'D' => $shuffledValues[3]
+            ];
+            
+            $correctKey = strtolower('opt_' . $question['correct_opt']);
+            $correctAnswerText = $question[$correctKey] ?? '';
+            
+            foreach ($shuffledOptions as $key => $val) {
+                if ($val === $correctAnswerText) {
+                    $correctOpt = $key;
+                    break;
+                }
+            }
+        }
+
+        // Create signed token containing question_id, sent_at & correct_opt
+        $answerToken = JWT::generateAnswerToken($question['id'], ['correct_opt' => $correctOpt]);
 
         // Return clean payload (BLIND DATA - NO correct_opt)
         echo json_encode([
             "id" => (int) $question['id'],
-            "question_text" => htmlspecialchars($question['question_text']),
-            "options" => [
-                "A" => htmlspecialchars($question['opt_a']),
-                "B" => htmlspecialchars($question['opt_b']),
-                "C" => htmlspecialchars($question['opt_c']),
-                "D" => htmlspecialchars($question['opt_d'])
-            ],
+            "question_text" => $question['question_text'],
+            "question_type" => $questionType,
+            "options" => $shuffledOptions,
             "answer_token" => $answerToken
         ]);
+    }
+
+    /**
+     * POST /api/quiz/answer
+     * Authenticated & Secure
+     */
+    private static function normalizeText($text) {
+        $text = mb_strtolower(trim($text), 'UTF-8');
+        
+        if (class_exists('Transliterator')) {
+            $transliterator = \Transliterator::create('Any-Latin; Latin-ASCII');
+            if ($transliterator) {
+                $text = $transliterator->transliterate($text);
+            }
+        } else {
+            $unwanted_array = array(
+                'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a', 'æ'=>'a', 'ç'=>'c',
+                'è'=>'e', 'é'=>'e', 'ê'=>'e', 'ë'=>'e', 'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i',
+                'ð'=>'o', 'ñ'=>'n', 'ò'=>'o', 'ó'=>'o', 'ô'=>'o', 'õ'=>'o', 'ö'=>'o', 'ø'=>'o',
+                'ù'=>'u', 'ú'=>'u', 'û'=>'u', 'ü'=>'u', 'ý'=>'y', 'þ'=>'b', 'ÿ'=>'y',
+                'œ'=>'oe', 'æ'=>'ae'
+            );
+            $text = strtr($text, $unwanted_array);
+        }
+        
+        $text = preg_replace('/[^a-z0-9]/', '', $text);
+        return $text;
     }
 
     /**
@@ -171,11 +255,11 @@ class QuizController {
         $user = AuthMiddleware::authenticate();
         
         $answerToken = $data['answer_token'] ?? '';
-        $answer = strtoupper(trim($data['answer'] ?? ''));
+        $userAnswer = trim($data['answer'] ?? '');
 
-        if (empty($answerToken) || !in_array($answer, ['A', 'B', 'C', 'D'])) {
+        if (empty($answerToken)) {
             http_response_code(400);
-            echo json_encode(["error" => "Données de réponse invalides."]);
+            echo json_encode(["error" => "Token de réponse manquant."]);
             return;
         }
 
@@ -203,7 +287,8 @@ class QuizController {
         }
 
         // Match duration to standard timer (e.g. 20s)
-        if ($duration > 20000) {
+        $isTimeoutAnswer = (strtoupper(trim($data['answer'] ?? '')) === 'TIMEOUT');
+        if (!$isTimeoutAnswer && $duration > 20000) {
             http_response_code(403);
             echo json_encode(["error" => "Temps écoulé (Max 20s)."]);
             return;
@@ -211,20 +296,62 @@ class QuizController {
 
         $db = Database::getConnection();
 
-        // Fetch correct option
-        $stmt = $db->prepare("SELECT correct_opt, opt_a, opt_b, opt_c, opt_d FROM questions WHERE id = ?");
-        $stmt->execute([$questionId]);
-        $question = $stmt->fetch();
+        // Fetch question info and user score in a single query to reduce database roundtrip latency
+        $stmt = $db->prepare("
+            SELECT q.question_type, q.correct_opt, q.opt_a, q.opt_b, q.opt_c, q.opt_d, u.global_score, u.coins 
+            FROM questions q, users u 
+            WHERE q.id = ? AND u.id = ?
+        ");
+        $stmt->execute([$questionId, $user['user_id']]);
+        $row = $stmt->fetch();
 
-        if (!$question) {
+        if (!$row) {
             http_response_code(404);
-            echo json_encode(["error" => "Question introuvable."]);
+            echo json_encode(["error" => "Question ou utilisateur introuvable."]);
             return;
         }
 
-        $isCorrect = ($answer === $question['correct_opt']);
+        $questionType = $row['question_type'] ?? 'multiple_choice';
+        $isCorrect = false;
+        $correctText = '';
+        $correctOpt = null;
+
+        if ($questionType === 'open') {
+            $correctText = $row['opt_a'] ?? '';
+            if (strtoupper($userAnswer) === 'TIMEOUT') {
+                $isCorrect = false;
+            } else {
+                if (empty($userAnswer)) {
+                    http_response_code(400);
+                    echo json_encode(["error" => "Réponse vide."]);
+                    return;
+                }
+                $isCorrect = (self::normalizeText($userAnswer) === self::normalizeText($correctText));
+            }
+        } else {
+            $userAnswer = strtoupper($userAnswer);
+            if ($userAnswer === 'TIMEOUT') {
+                $isCorrect = false;
+                $correctOpt = $decoded['correct_opt'] ?? $row['correct_opt'];
+                $correctKey = strtolower('opt_' . $row['correct_opt']);
+                $correctText = $row[$correctKey] ?? '';
+            } else {
+                if (!in_array($userAnswer, ['A', 'B', 'C', 'D'])) {
+                    http_response_code(400);
+                    echo json_encode(["error" => "Option de réponse invalide."]);
+                    return;
+                }
+                $correctOpt = $decoded['correct_opt'] ?? $row['correct_opt'];
+                $isCorrect = ($userAnswer === $correctOpt);
+                $correctKey = strtolower('opt_' . $row['correct_opt']);
+                $correctText = $row[$correctKey] ?? '';
+            }
+        }
+
         $pointsAwarded = 0;
         $coinsAwarded = 0;
+        $newGlobalScore = (int) ($row['global_score'] ?? 0);
+        $newCoins = (int) ($row['coins'] ?? 0);
         
         if ($isCorrect) {
             // Award base 10 points + speed bonus in training
@@ -232,26 +359,18 @@ class QuizController {
             $pointsAwarded = 10 + (int) ($timeRatio * 10);
             $coinsAwarded = (int) ($pointsAwarded / 2);
 
+            $newGlobalScore += $pointsAwarded;
+            $newCoins += $coinsAwarded;
+
             // Update user global score and coins
-            $stmtUpdate = $db->prepare("UPDATE users SET global_score = global_score + ?, coins = coins + ? WHERE id = ?");
-            $stmtUpdate->execute([$pointsAwarded, $coinsAwarded, $user['user_id']]);
+            $stmtUpdate = $db->prepare("UPDATE users SET global_score = ?, coins = ? WHERE id = ?");
+            $stmtUpdate->execute([$newGlobalScore, $newCoins, $user['user_id']]);
         }
-
-        // Fetch updated global score and coins
-        $stmtScore = $db->prepare("SELECT global_score, coins FROM users WHERE id = ?");
-        $stmtScore->execute([$user['user_id']]);
-        $row = $stmtScore->fetch();
-        $newGlobalScore = (int) ($row['global_score'] ?? 0);
-        $newCoins = (int) ($row['coins'] ?? 0);
-
-        // Map correct_opt key to actual text value
-        $correctKey = strtolower('opt_' . $question['correct_opt']);
-        $correctText = $question[$correctKey] ?? '';
 
         echo json_encode([
             "correct" => $isCorrect,
-            "correct_option" => $question['correct_opt'],
-            "correct_text" => htmlspecialchars($correctText),
+            "correct_option" => $correctOpt,
+            "correct_text" => $correctText,
             "points_awarded" => $pointsAwarded,
             "coins_awarded" => $coinsAwarded,
             "global_score" => $newGlobalScore,
@@ -312,16 +431,29 @@ class QuizController {
 
         $packId = (int) ($data['pack_id'] ?? 0);
         $questionText = trim($data['question_text'] ?? '');
+        $questionType = trim($data['question_type'] ?? 'multiple_choice');
         $optA = trim($data['opt_a'] ?? '');
         $optB = trim($data['opt_b'] ?? '');
         $optC = trim($data['opt_c'] ?? '');
         $optD = trim($data['opt_d'] ?? '');
         $correctOpt = strtoupper(trim($data['correct_opt'] ?? ''));
 
-        if ($packId <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
-            http_response_code(400);
-            echo json_encode(["error" => "Tous les champs sont requis."]);
-            return;
+        if ($questionType === 'open') {
+            if ($packId <= 0 || empty($questionText) || empty($optA)) {
+                http_response_code(400);
+                echo json_encode(["error" => "La question et la réponse attendue sont requises."]);
+                return;
+            }
+            $optB = '';
+            $optC = '';
+            $optD = '';
+            $correctOpt = 'A';
+        } else {
+            if ($packId <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
+                http_response_code(400);
+                echo json_encode(["error" => "Tous les champs sont requis."]);
+                return;
+            }
         }
 
         $db = Database::getConnection();
@@ -343,10 +475,10 @@ class QuizController {
         }
 
         $stmt = $db->prepare("
-            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$packId, $questionText, $optA, $optB, $optC, $optD, $correctOpt]);
+        $stmt->execute([$packId, $questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType]);
 
         echo json_encode(["success" => true, "message" => "Question ajoutée avec succès !"]);
     }
@@ -360,16 +492,29 @@ class QuizController {
 
         $id = (int) ($data['id'] ?? 0);
         $questionText = trim($data['question_text'] ?? '');
+        $questionType = trim($data['question_type'] ?? 'multiple_choice');
         $optA = trim($data['opt_a'] ?? '');
         $optB = trim($data['opt_b'] ?? '');
         $optC = trim($data['opt_c'] ?? '');
         $optD = trim($data['opt_d'] ?? '');
         $correctOpt = strtoupper(trim($data['correct_opt'] ?? ''));
 
-        if ($id <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
-            http_response_code(400);
-            echo json_encode(["error" => "Champs invalides."]);
-            return;
+        if ($questionType === 'open') {
+            if ($id <= 0 || empty($questionText) || empty($optA)) {
+                http_response_code(400);
+                echo json_encode(["error" => "Champs invalides."]);
+                return;
+            }
+            $optB = '';
+            $optC = '';
+            $optD = '';
+            $correctOpt = 'A';
+        } else {
+            if ($id <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
+                http_response_code(400);
+                echo json_encode(["error" => "Champs invalides."]);
+                return;
+            }
         }
 
         $db = Database::getConnection();
@@ -392,10 +537,10 @@ class QuizController {
 
         $stmt = $db->prepare("
             UPDATE questions 
-            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ? 
+            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ?, question_type = ? 
             WHERE id = ?
         ");
-        $stmt->execute([$questionText, $optA, $optB, $optC, $optD, $correctOpt, $id]);
+        $stmt->execute([$questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType, $id]);
 
         echo json_encode(["success" => true, "message" => "Question modifiée avec succès !"]);
     }
@@ -495,24 +640,37 @@ class QuizController {
 
         $packId = (int) ($data['pack_id'] ?? 0);
         $questionText = trim($data['question_text'] ?? '');
+        $questionType = trim($data['question_type'] ?? 'multiple_choice');
         $optA = trim($data['opt_a'] ?? '');
         $optB = trim($data['opt_b'] ?? '');
         $optC = trim($data['opt_c'] ?? '');
         $optD = trim($data['opt_d'] ?? '');
         $correctOpt = strtoupper(trim($data['correct_opt'] ?? ''));
 
-        if ($packId <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
-            http_response_code(400);
-            echo json_encode(["error" => "Tous les champs sont requis."]);
-            return;
+        if ($questionType === 'open') {
+            if ($packId <= 0 || empty($questionText) || empty($optA)) {
+                http_response_code(400);
+                echo json_encode(["error" => "Tous les champs sont requis."]);
+                return;
+            }
+            $optB = '';
+            $optC = '';
+            $optD = '';
+            $correctOpt = 'A';
+        } else {
+            if ($packId <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
+                http_response_code(400);
+                echo json_encode(["error" => "Tous les champs sont requis."]);
+                return;
+            }
         }
 
         $db = Database::getConnection();
         $stmt = $db->prepare("
-            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$packId, $questionText, $optA, $optB, $optC, $optD, $correctOpt]);
+        $stmt->execute([$packId, $questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType]);
 
         echo json_encode(["success" => true, "message" => "Question ajoutée avec succès !"]);
     }
@@ -526,25 +684,38 @@ class QuizController {
 
         $id = (int) ($data['id'] ?? 0);
         $questionText = trim($data['question_text'] ?? '');
+        $questionType = trim($data['question_type'] ?? 'multiple_choice');
         $optA = trim($data['opt_a'] ?? '');
         $optB = trim($data['opt_b'] ?? '');
         $optC = trim($data['opt_c'] ?? '');
         $optD = trim($data['opt_d'] ?? '');
         $correctOpt = strtoupper(trim($data['correct_opt'] ?? ''));
 
-        if ($id <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
-            http_response_code(400);
-            echo json_encode(["error" => "Champs invalides."]);
-            return;
+        if ($questionType === 'open') {
+            if ($id <= 0 || empty($questionText) || empty($optA)) {
+                http_response_code(400);
+                echo json_encode(["error" => "Champs invalides."]);
+                return;
+            }
+            $optB = '';
+            $optC = '';
+            $optD = '';
+            $correctOpt = 'A';
+        } else {
+            if ($id <= 0 || empty($questionText) || empty($optA) || empty($optB) || empty($optC) || empty($optD) || !in_array($correctOpt, ['A', 'B', 'C', 'D'])) {
+                http_response_code(400);
+                echo json_encode(["error" => "Champs invalides."]);
+                return;
+            }
         }
 
         $db = Database::getConnection();
         $stmt = $db->prepare("
             UPDATE questions 
-            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ? 
+            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ?, question_type = ? 
             WHERE id = ?
         ");
-        $stmt->execute([$questionText, $optA, $optB, $optC, $optD, $correctOpt, $id]);
+        $stmt->execute([$questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType, $id]);
 
         echo json_encode(["success" => true, "message" => "Question modifiée avec succès !"]);
     }

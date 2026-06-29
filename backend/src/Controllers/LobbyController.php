@@ -374,8 +374,8 @@ class LobbyController
 
         $questionId = intval($questionIds[$requestedIndex]);
 
-        // Fetch question details (WITHOUT correct answer)
-        $stmtQ = $db->prepare("SELECT id, question_text, question_type, opt_a, opt_b, opt_c, opt_d FROM questions WHERE id = ?");
+        // Fetch question details
+        $stmtQ = $db->prepare("SELECT id, question_text, question_type, correct_opt, opt_a, opt_b, opt_c, opt_d FROM questions WHERE id = ?");
         $stmtQ->execute([$questionId]);
         $question = $stmtQ->fetch();
 
@@ -385,13 +385,42 @@ class LobbyController
             return;
         }
 
+        $questionType = $question['question_type'] ?? 'multiple_choice';
+        $shuffledOptions = null;
+        $correctOpt = 'A'; // default fallback for token
+
+        if ($questionType === 'open') {
+            $shuffledOptions = null;
+        } else {
+            $shuffledValues = [$question['opt_a'], $question['opt_b'], $question['opt_c'], $question['opt_d']];
+            shuffle($shuffledValues);
+            
+            $shuffledOptions = [
+                'A' => $shuffledValues[0],
+                'B' => $shuffledValues[1],
+                'C' => $shuffledValues[2],
+                'D' => $shuffledValues[3]
+            ];
+            
+            $optMap = ['A' => 'opt_a', 'B' => 'opt_b', 'C' => 'opt_c', 'D' => 'opt_d'];
+            $correctAnswerText = $question[$optMap[$question['correct_opt']]] ?? '';
+            
+            foreach ($shuffledOptions as $key => $val) {
+                if ($val === $correctAnswerText) {
+                    $correctOpt = $key;
+                    break;
+                }
+            }
+        }
+
         // Generate signed answer token (expires in 30 seconds)
         $answerToken = JWT::encode([
             'question_id' => $questionId,
             'sent_at' => $nowMs,
             'lobby_id' => intval($lobby['id']),
             'question_index' => $requestedIndex,
-            'user_id' => $user['user_id']
+            'user_id' => $user['user_id'],
+            'correct_opt' => $correctOpt
         ], 30);
 
         echo json_encode([
@@ -399,12 +428,8 @@ class LobbyController
             'question' => [
                 'id' => intval($question['id']),
                 'question_text' => $question['question_text'],
-                'options' => [
-                    'A' => $question['opt_a'],
-                    'B' => $question['opt_b'],
-                    'C' => $question['opt_c'],
-                    'D' => $question['opt_d']
-                ]
+                'question_type' => $questionType,
+                'options' => $shuffledOptions
             ],
             'question_index' => $requestedIndex,
             'total_questions' => count($questionIds),
@@ -510,7 +535,7 @@ class LobbyController
             return;
         }
 
-        $correctOpt = $question['correct_opt'];
+        $correctOpt = $payload['correct_opt'] ?? $question['correct_opt'];
         $isCorrect = ($answer === $correctOpt);
 
         // Calculate points based on speed (only for correct answers)

@@ -176,7 +176,7 @@ export default function AdminScreen({ onBack }) {
   };
 
   return (
-    <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-8 animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+    <div className="container animate-slide-up" style={{ gap: '32px' }}>
       
       {/* Top Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
