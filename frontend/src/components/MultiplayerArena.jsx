@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
 import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel } from 'lucide-react';
+import Pusher from 'pusher-js';
 
 export default function MultiplayerArena({ roomCode, user, onBack }) {
   // === LOBBY STATE (from polling) ===
@@ -46,9 +47,15 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   const totalQuestions = useRef(10);
   const gamePhaseRef = useRef('waiting');
 
+  // === WEBSOCKET REFS ===
+  const pusherRef = useRef(null);
+  const channelRef = useRef(null);
+  const pusherActiveRef = useRef(false);
+
   const fetchQuestionRef = useRef(null);
   const handleAnswerRef = useRef(null);
   const handleFinishRef = useRef(null);
+  const fetchStatusRef = useRef(null);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -67,6 +74,35 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
       if (data.total_questions) {
         totalQuestions.current = data.total_questions;
+      }
+
+      // Initialize Pusher if credentials are returned and connection isn't established yet
+      if (data.pusher_key && !pusherActiveRef.current) {
+        console.log('Pusher configuration found. Initializing WebSocket connection...');
+        try {
+          if (pusherRef.current) {
+            pusherRef.current.disconnect();
+          }
+          const pusher = new Pusher(data.pusher_key, {
+            cluster: data.pusher_cluster || 'eu',
+            forceTLS: true
+          });
+          pusherRef.current = pusher;
+
+          const channel = pusher.subscribe(`lobby-${roomCode}`);
+          channelRef.current = channel;
+
+          channel.bind('lobby_updated', () => {
+            console.log('Pusher: Lobby update event received. Fetching state...');
+            if (fetchStatusRef.current) {
+              fetchStatusRef.current();
+            }
+          });
+
+          pusherActiveRef.current = true;
+        } catch (pusherErr) {
+          console.error('Failed to init Pusher client:', pusherErr);
+        }
       }
 
       const phase = gamePhaseRef.current;
@@ -106,8 +142,11 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
     } catch (e) {
       console.error(e);
     } finally {
-      clearTimeout(pollRef.current);
-      pollRef.current = setTimeout(fetchStatusLoop, 2000);
+      // ONLY reschedule polling timeout if Pusher is NOT active!
+      if (!pusherActiveRef.current) {
+        clearTimeout(pollRef.current);
+        pollRef.current = setTimeout(fetchStatusLoop, 2000);
+      }
     }
   }, [fetchStatus]);
 
@@ -151,6 +190,17 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
     return () => clearInterval(tickInterval);
   }, [lobbyState?.game_mode, gamePhase, lobbyState?.tribunal?.phase, lobbyState?.tribunal?.round]);
+
+  // Trigger server-side phase transition when local timer expires
+  useEffect(() => {
+    if (lobbyState?.game_mode !== 'tribunal' || gamePhase !== 'playing') return;
+    if (tribunalTimer === 0 && lobbyState.tribunal?.phase_remaining_ms > 0) {
+      console.log('Local timer expired. Triggering server phase transition...');
+      if (fetchStatusRef.current) {
+        fetchStatusRef.current();
+      }
+    }
+  }, [tribunalTimer, lobbyState, gamePhase]);
 
   const handleTribunalSubmit = async (e) => {
     e.preventDefault();
@@ -327,6 +377,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   fetchQuestionRef.current = fetchQuestion;
   handleAnswerRef.current = handleAnswer;
   handleFinishRef.current = handleFinish;
+  fetchStatusRef.current = fetchStatus;
 
 
 
@@ -358,6 +409,18 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
     clearInterval(timerRef.current);
     clearInterval(countdownRef.current);
     clearTimeout(feedbackRef.current);
+
+    if (pusherRef.current) {
+      console.log('Disconnecting Pusher WebSocket...');
+      try {
+        pusherRef.current.disconnect();
+      } catch (e) {
+        console.error(e);
+      }
+      pusherRef.current = null;
+      channelRef.current = null;
+      pusherActiveRef.current = false;
+    }
   };
 
   // ============================================================
