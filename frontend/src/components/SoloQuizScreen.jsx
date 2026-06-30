@@ -2,13 +2,14 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../utils/api';
 import { ArrowLeft, Clock, Award, CheckCircle2, XCircle, ChevronRight, Trophy } from 'lucide-react';
 
-export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
+export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, onUpdateUserStats }) {
+  const timeLimit = gameMode === 'speed_blitz' ? 5 : 20;
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(0); // 0 to 9
   const [selectedOption, setSelectedOption] = useState(null);
   const [answered, setAnswered] = useState(false);
   const [result, setResult] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(20);
+  const [timeLeft, setTimeLeft] = useState(timeLimit);
   const [initialLoading, setInitialLoading] = useState(true); // true only for the very first load
   const [transitioning, setTransitioning] = useState(false); // true between questions
   const [error, setError] = useState('');
@@ -47,7 +48,7 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
         setOpenAnswer('');
         setAnswered(false);
         setResult(null);
-        setTimeLeft(20);
+        setTimeLeft(timeLimit);
         setError('');
 
         // Set question — this triggers the card animation via key change
@@ -103,7 +104,8 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
     try {
       const response = await api.post('/quiz/answer', {
         answer_token: currentQuestion.answer_token,
-        answer: 'TIMEOUT'
+        answer: 'TIMEOUT',
+        game_mode: gameMode
       });
 
       setResult({
@@ -146,7 +148,8 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
     try {
       const response = await api.post('/quiz/answer', {
         answer_token: currentQuestion.answer_token,
-        answer: optionKey
+        answer: optionKey,
+        game_mode: gameMode
       });
 
       setResult(response);
@@ -177,7 +180,8 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
     try {
       const response = await api.post('/quiz/answer', {
         answer_token: currentQuestion.answer_token,
-        answer: openAnswer.trim()
+        answer: openAnswer.trim(),
+        game_mode: gameMode
       });
 
       setResult(response);
@@ -198,7 +202,7 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
   };
 
   const handleNext = () => {
-    if (questionIndex >= 9) {
+    if (questionIndex >= 9 || (gameMode === 'sudden_death' && result && !result.correct)) {
       setGameFinished(true);
     } else {
       // Start transition: keep old question visible but faded while loading
@@ -387,13 +391,13 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
               {currentQuestion.question_text}
             </h2>
 
-            {currentQuestion.question_type === 'open' ? (
+            {currentQuestion.question_type === 'open' || currentQuestion.question_type === 'guess_number' ? (
               <form onSubmit={handleOpenAnswerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
                 <input
-                  type="text"
+                  type={currentQuestion.question_type === 'guess_number' ? 'number' : 'text'}
                   value={openAnswer}
                   onChange={(e) => setOpenAnswer(e.target.value)}
-                  placeholder="Écrivez votre réponse ici..."
+                  placeholder={currentQuestion.question_type === 'guess_number' ? 'Entrez votre estimation...' : 'Écrivez votre réponse ici...'}
                   disabled={answered}
                   style={{
                     width: '100%',
@@ -507,7 +511,7 @@ export default function SoloQuizScreen({ packId, onBack, onUpdateUserStats }) {
                 </div>
 
                 <button className="btn-primary" onClick={handleNext} style={{ marginLeft: 'auto' }}>
-                  {questionIndex >= 9 ? 'Voir les résultats' : 'Suivant'}
+                  {(questionIndex >= 9 || (gameMode === 'sudden_death' && result && !result.correct)) ? 'Voir les résultats' : 'Suivant'}
                   <ChevronRight size={18} />
                 </button>
               </div>

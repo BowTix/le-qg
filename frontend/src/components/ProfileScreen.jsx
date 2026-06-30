@@ -3,19 +3,6 @@ import { api, PUBLIC_BASE } from '../utils/api';
 import { ArrowLeft, User, KeyRound, Award, Heart, UserPlus, UserMinus, Check, X, ShieldAlert, BookOpen, Edit3, Image, LogOut, Trophy, Coins } from 'lucide-react';
 import { getLevel, getLevelBadge, getLevelProgressDetails, getUsernameStyle, getEloRank } from '../utils/progression';
 
-const AVATAR_PRESETS = [
-  'https://api.dicebear.com/10.x/glass/svg?seed=Mathis',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Felix',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Aneka',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Gamer',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Hacker',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Shadow',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Neon',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Cyber',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Future',
-  'https://api.dicebear.com/10.x/glass/svg?seed=Cosmos',
-];
-
 export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
   // Modal visibility
   const [showEditModal, setShowEditModal] = useState(false);
@@ -224,7 +211,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
         <img 
           src={`${PUBLIC_BASE}${url}`} 
           alt="Avatar" 
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}
         />
       );
     }
@@ -234,14 +221,14 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
         <img 
           src={url} 
           alt="Avatar" 
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}
         />
       );
     }
 
     // Emoji preset (fallback)
     return (
-      <div style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize, border: '3px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}>
+      <div style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize, border: '2px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}>
         {url}
       </div>
     );
@@ -636,34 +623,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
                   </div>
                 </div>
 
-                {/* Preset Avatars Selector */}
-                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Ou choisissez un avatar prédéfini :
-                </label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {AVATAR_PRESETS.map((url) => (
-                    <button
-                      key={url}
-                      type="button"
-                      onClick={() => setSelectedAvatar(url)}
-                      style={{
-                        width: '42px',
-                        height: '42px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: selectedAvatar === url ? 'var(--accent-secondary-glow)' : 'rgba(255,255,255,0.02)',
-                        border: `2px solid ${selectedAvatar === url ? 'var(--accent-secondary)' : 'var(--border-color)'}`,
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        transition: 'var(--transition-smooth)'
-                      }}
-                    >
-                      <img src={url} alt="Preset Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                    </button>
-                  ))}
-                </div>
+
               </div>
 
               <div>

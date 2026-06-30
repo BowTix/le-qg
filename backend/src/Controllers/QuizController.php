@@ -224,6 +224,10 @@ class QuizController {
      * POST /api/quiz/answer
      * Authenticated & Secure
      */
+    private static function isGuessCorrect($userVal, $correctValue) {
+        return $userVal === $correctValue;
+    }
+
     private static function normalizeText($text) {
         $text = mb_strtolower(trim($text), 'UTF-8');
         
@@ -286,11 +290,17 @@ class QuizController {
             return;
         }
 
-        // Match duration to standard timer (e.g. 20s)
+        $gameMode = $data['game_mode'] ?? 'classic';
+        if (!in_array($gameMode, ['classic', 'speed_blitz', 'sudden_death', 'guess_number'])) {
+            $gameMode = 'classic';
+        }
+
+        // Match duration to dynamic timer (5s for Blitz, 20s otherwise)
+        $timeLimitMs = ($gameMode === 'speed_blitz') ? 5000 : 20000;
         $isTimeoutAnswer = (strtoupper(trim($data['answer'] ?? '')) === 'TIMEOUT');
-        if (!$isTimeoutAnswer && $duration > 20000) {
+        if (!$isTimeoutAnswer && $duration > $timeLimitMs) {
             http_response_code(403);
-            echo json_encode(["error" => "Temps écoulé (Max 20s)."]);
+            echo json_encode(["error" => "Temps écoulé (Max " . ($timeLimitMs / 1000) . "s)."]);
             return;
         }
 
@@ -298,7 +308,7 @@ class QuizController {
 
         // Fetch question info and user score in a single query to reduce database roundtrip latency
         $stmt = $db->prepare("
-            SELECT q.question_type, q.correct_opt, q.opt_a, q.opt_b, q.opt_c, q.opt_d, u.global_score, u.coins 
+            SELECT q.question_type, q.correct_value, q.correct_opt, q.opt_a, q.opt_b, q.opt_c, q.opt_d, u.global_score, u.coins 
             FROM questions q, users u 
             WHERE q.id = ? AND u.id = ?
         ");
@@ -315,10 +325,31 @@ class QuizController {
         $isCorrect = false;
         $correctText = '';
         $correctOpt = null;
+        $pointsAwarded = 0;
 
-        if ($questionType === 'open') {
+        if ($questionType === 'guess_number') {
+            $correctValue = intval($row['correct_value'] ?? 0);
+            $correctText = "Valeur attendue : " . $correctValue;
+            
+            if ($isTimeoutAnswer) {
+                $isCorrect = false;
+            } else {
+                if (empty($userAnswer)) {
+                    http_response_code(400);
+                    echo json_encode(["error" => "Réponse vide."]);
+                    return;
+                }
+                $userVal = intval($userAnswer);
+                if ($userVal === $correctValue) {
+                    $isCorrect = true;
+                    $pointsAwarded = 150;
+                } else {
+                    $isCorrect = false;
+                }
+            }
+        } elseif ($questionType === 'open') {
             $correctText = $row['opt_a'] ?? '';
-            if (strtoupper($userAnswer) === 'TIMEOUT') {
+            if ($isTimeoutAnswer) {
                 $isCorrect = false;
             } else {
                 if (empty($userAnswer)) {
@@ -348,15 +379,18 @@ class QuizController {
             }
         }
 
-        $pointsAwarded = 0;
         $coinsAwarded = 0;
         $newGlobalScore = (int) ($row['global_score'] ?? 0);
         $newCoins = (int) ($row['coins'] ?? 0);
         
         if ($isCorrect) {
-            // Award base 10 points + speed bonus in training
-            $timeRatio = max(0, (20000 - $duration) / 20000);
-            $pointsAwarded = 10 + (int) ($timeRatio * 10);
+            if (($questionType === 'guess_number' || $gameMode === 'guess_number') && $pointsAwarded > 0) {
+                // Points already set for guess_number
+            } else {
+                // Award base 10 points + speed bonus in training
+                $timeRatio = max(0, ($timeLimitMs - $duration) / $timeLimitMs);
+                $pointsAwarded = 10 + (int) ($timeRatio * 10);
+            }
             $coinsAwarded = (int) ($pointsAwarded / 2);
 
             $newGlobalScore += $pointsAwarded;
@@ -616,14 +650,23 @@ class QuizController {
     public function getAdminQuestions() {
         AuthMiddleware::requireAdmin();
         $packId = (int) ($_GET['pack_id'] ?? 0);
+        $db = Database::getConnection();
 
         if ($packId <= 0) {
-            http_response_code(400);
-            echo json_encode(["error" => "pack_id requis."]);
+            $stmt = $db->query("
+                SELECT q.id, q.question_text, q.question_type, p.name as pack_name 
+                FROM questions q 
+                JOIN packs p ON q.pack_id = p.id 
+                ORDER BY p.name ASC, q.id ASC
+            ");
+            $questions = $stmt->fetchAll();
+            echo json_encode([
+                "success" => true,
+                "questions" => $questions
+            ]);
             return;
         }
 
-        $db = Database::getConnection();
         $stmt = $db->prepare("SELECT * FROM questions WHERE pack_id = ? ORDER BY id DESC");
         $stmt->execute([$packId]);
         $questions = $stmt->fetchAll();
@@ -836,6 +879,424 @@ class QuizController {
         echo json_encode([
             "top_players" => $topPlayers,
             "recent_matches" => $recentMatches
+        ]);
+    }
+
+    // =========================================================================
+    // DAILY QUIZ FEATURES
+    // =========================================================================
+
+    public function getDailyStatus() {
+        $user = AuthMiddleware::authenticate();
+        $db = Database::getConnection();
+        $today = date('Y-m-d');
+
+        // Check if daily quiz exists for today
+        $stmtQuiz = $db->prepare("SELECT * FROM daily_quizzes WHERE date = ?");
+        $stmtQuiz->execute([$today]);
+        $quiz = $stmtQuiz->fetch();
+
+        if (!$quiz) {
+            echo json_encode([
+                "success" => true,
+                "scheduled" => false
+            ]);
+            return;
+        }
+
+        // Check user's attempt for today
+        $stmtAttempt = $db->prepare("SELECT * FROM daily_quiz_attempts WHERE user_id = ? AND date = ?");
+        $stmtAttempt->execute([$user['user_id'], $today]);
+        $attempt = $stmtAttempt->fetch();
+
+        if ($attempt) {
+            // Get stats for today
+            $stmtStats = $db->prepare("
+                SELECT 
+                    COUNT(*) as total_attempts,
+                    COALESCE(AVG(q1_correct) * 100, 0) as q1_pct,
+                    COALESCE(AVG(q2_correct) * 100, 0) as q2_pct,
+                    COALESCE(AVG(q3_correct) * 100, 0) as q3_pct
+                FROM daily_quiz_attempts
+                WHERE date = ?
+            ");
+            $stmtStats->execute([$today]);
+            $stats = $stmtStats->fetch();
+
+            echo json_encode([
+                "success" => true,
+                "scheduled" => true,
+                "completed" => true,
+                "attempt" => [
+                    "q1_correct" => (int)$attempt['q1_correct'] === 1,
+                    "q2_correct" => (int)$attempt['q2_correct'] === 1,
+                    "q3_correct" => (int)$attempt['q3_correct'] === 1,
+                    "score" => (int)$attempt['score']
+                ],
+                "stats" => [
+                    "total" => (int)$stats['total_attempts'],
+                    "q1_pct" => round($stats['q1_pct']),
+                    "q2_pct" => round($stats['q2_pct']),
+                    "q3_pct" => round($stats['q3_pct'])
+                ]
+            ]);
+        } else {
+            echo json_encode([
+                "success" => true,
+                "scheduled" => true,
+                "completed" => false
+            ]);
+        }
+    }
+
+    public function getDailyQuestions() {
+        $user = AuthMiddleware::authenticate();
+        $db = Database::getConnection();
+        $today = date('Y-m-d');
+
+        // Check if daily quiz exists for today
+        $stmtQuiz = $db->prepare("SELECT * FROM daily_quizzes WHERE date = ?");
+        $stmtQuiz->execute([$today]);
+        $quiz = $stmtQuiz->fetch();
+
+        if (!$quiz) {
+            http_response_code(404);
+            echo json_encode(["error" => "Aucun quiz n'est planifié pour aujourd'hui."]);
+            return;
+        }
+
+        // Check if already completed
+        $stmtAttempt = $db->prepare("SELECT id FROM daily_quiz_attempts WHERE user_id = ? AND date = ?");
+        $stmtAttempt->execute([$user['user_id'], $today]);
+        if ($stmtAttempt->fetch()) {
+            http_response_code(403);
+            echo json_encode(["error" => "Vous avez déjà joué le quiz du jour."]);
+            return;
+        }
+
+        // Fetch the 3 questions
+        $questionIds = [$quiz['q1_id'], $quiz['q2_id'], $quiz['q3_id']];
+        $questions = [];
+
+        foreach ($questionIds as $idx => $qId) {
+            $stmtQ = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, correct_value FROM questions WHERE id = ?");
+            $stmtQ->execute([$qId]);
+            $question = $stmtQ->fetch();
+
+            if (!$question) {
+                http_response_code(500);
+                echo json_encode(["error" => "Une question du quiz est introuvable."]);
+                return;
+            }
+
+            $questionType = $question['question_type'] ?? 'multiple_choice';
+            $shuffledOptions = null;
+            $correctOpt = 'A';
+
+            if ($questionType === 'open') {
+                $shuffledOptions = null;
+            } elseif ($questionType === 'guess_number') {
+                $shuffledOptions = null;
+            } else {
+                $shuffledValues = [$question['opt_a'], $question['opt_b'], $question['opt_c'], $question['opt_d']];
+                shuffle($shuffledValues);
+                
+                $shuffledOptions = [
+                    'A' => $shuffledValues[0],
+                    'B' => $shuffledValues[1],
+                    'C' => $shuffledValues[2],
+                    'D' => $shuffledValues[3]
+                ];
+                
+                $correctKey = strtolower('opt_' . $question['correct_opt']);
+                $correctAnswerText = $question[$correctKey] ?? '';
+                
+                foreach ($shuffledOptions as $key => $val) {
+                    if ($val === $correctAnswerText) {
+                        $correctOpt = $key;
+                        break;
+                    }
+                }
+            }
+
+            // Generate signed answer token
+            $extraPayload = [];
+            if ($questionType === 'guess_number') {
+                $extraPayload['correct_value'] = intval($question['correct_value']);
+            } else {
+                $extraPayload['correct_opt'] = $correctOpt;
+            }
+            $answerToken = JWT::generateAnswerToken($question['id'], $extraPayload);
+
+            $questions[] = [
+                "id" => (int) $question['id'],
+                "question_text" => $question['question_text'],
+                "question_type" => $questionType,
+                "options" => $shuffledOptions,
+                "answer_token" => $answerToken
+            ];
+        }
+
+        echo json_encode([
+            "success" => true,
+            "questions" => $questions
+        ]);
+    }
+
+    public function submitDailyAnswer(array $data) {
+        $user = AuthMiddleware::authenticate();
+        $db = Database::getConnection();
+        $today = date('Y-m-d');
+
+        // Check if daily quiz exists for today
+        $stmtQuiz = $db->prepare("SELECT * FROM daily_quizzes WHERE date = ?");
+        $stmtQuiz->execute([$today]);
+        $quiz = $stmtQuiz->fetch();
+
+        if (!$quiz) {
+            http_response_code(404);
+            echo json_encode(["error" => "Aucun quiz n'est planifié pour aujourd'hui."]);
+            return;
+        }
+
+        // Check if already completed
+        $stmtAttempt = $db->prepare("SELECT id FROM daily_quiz_attempts WHERE user_id = ? AND date = ?");
+        $stmtAttempt->execute([$user['user_id'], $today]);
+        if ($stmtAttempt->fetch()) {
+            http_response_code(403);
+            echo json_encode(["error" => "Vous avez déjà soumis votre tentative."]);
+            return;
+        }
+
+        $submittedAnswers = $data['answers'] ?? [];
+        if (count($submittedAnswers) !== 3) {
+            http_response_code(400);
+            echo json_encode(["error" => "Vous devez soumettre exactement 3 réponses."]);
+            return;
+        }
+
+        $results = [];
+        $totalCorrect = 0;
+        $q1_correct = 0;
+        $q2_correct = 0;
+        $q3_correct = 0;
+
+        foreach ($submittedAnswers as $idx => $ansData) {
+            $answerToken = $ansData['answer_token'] ?? '';
+            $userAnswer = trim($ansData['answer'] ?? '');
+
+            $decoded = JWT::decode($answerToken);
+            if (!$decoded || !isset($decoded['question_id']) || !isset($decoded['sent_at'])) {
+                http_response_code(403);
+                echo json_encode(["error" => "Session de question quotidienne invalide ou expirée."]);
+                return;
+            }
+
+            $questionId = (int) $decoded['question_id'];
+            $sentAt = (int) $decoded['sent_at'];
+            $now = (int) (microtime(true) * 1000);
+            $duration = $now - $sentAt;
+
+            // Anti-cheat time check (max 20s)
+            $isTimeout = (strtoupper($userAnswer) === 'TIMEOUT');
+            if (!$isTimeout && $duration > 20000) {
+                $userAnswer = 'TIMEOUT';
+                $isTimeout = true;
+            }
+
+            // Fetch question type
+            $stmtQ = $db->prepare("SELECT question_type, correct_value, correct_opt, opt_a, opt_b, opt_c, opt_d FROM questions WHERE id = ?");
+            $stmtQ->execute([$questionId]);
+            $question = $stmtQ->fetch();
+
+            if (!$question) {
+                http_response_code(500);
+                echo json_encode(["error" => "Question introuvable en base."]);
+                return;
+            }
+
+            $questionType = $question['question_type'] ?? 'multiple_choice';
+            $isCorrect = false;
+            $correctText = '';
+
+            if ($questionType === 'guess_number') {
+                $correctValue = intval($question['correct_value'] ?? 0);
+                $correctText = "Valeur attendue : " . $correctValue;
+                if (!$isTimeout) {
+                    $userVal = intval($userAnswer);
+                    if (self::isGuessCorrect($userVal, $correctValue)) {
+                        $isCorrect = true;
+                    }
+                }
+            } elseif ($questionType === 'open') {
+                $correctText = $question['opt_a'] ?? '';
+                if (!$isTimeout) {
+                    $isCorrect = (self::normalizeText($userAnswer) === self::normalizeText($correctText));
+                }
+            } else {
+                $correctOpt = $decoded['correct_opt'] ?? $question['correct_opt'];
+                $correctKey = strtolower('opt_' . $question['correct_opt']);
+                $correctText = $question[$correctKey] ?? '';
+                if (!$isTimeout) {
+                    $isCorrect = (strtoupper($userAnswer) === $correctOpt);
+                }
+            }
+
+            if ($isCorrect) {
+                $totalCorrect++;
+                if ($idx === 0) $q1_correct = 1;
+                if ($idx === 1) $q2_correct = 1;
+                if ($idx === 2) $q3_correct = 1;
+            }
+
+        }
+
+        // Award points: +30 global score (XP) and +15 coins per correct answer
+        $pointsEarned = $totalCorrect * 30;
+        $coinsEarned = $totalCorrect * 15;
+
+        // Update user
+        if ($pointsEarned > 0) {
+            $stmtUpdateUser = $db->prepare("UPDATE users SET global_score = global_score + ?, coins = coins + ? WHERE id = ?");
+            $stmtUpdateUser->execute([$pointsEarned, $coinsEarned, $user['user_id']]);
+        }
+
+        // Insert attempt
+        $stmtInsertAttempt = $db->prepare("
+            INSERT INTO daily_quiz_attempts (user_id, date, q1_correct, q2_correct, q3_correct, score) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ");
+        $stmtInsertAttempt->execute([
+            $user['user_id'],
+            $today,
+            $q1_correct,
+            $q2_correct,
+            $q3_correct,
+            $pointsEarned
+        ]);
+
+        // Get updated stats
+        $stmtStats = $db->prepare("
+            SELECT 
+                COUNT(*) as total_attempts,
+                COALESCE(AVG(q1_correct) * 100, 0) as q1_pct,
+                COALESCE(AVG(q2_correct) * 100, 0) as q2_pct,
+                COALESCE(AVG(q3_correct) * 100, 0) as q3_pct
+            FROM daily_quiz_attempts
+            WHERE date = ?
+        ");
+        $stmtStats->execute([$today]);
+        $stats = $stmtStats->fetch();
+
+        echo json_encode([
+            "success" => true,
+            "attempt" => [
+                "q1_correct" => $q1_correct === 1,
+                "q2_correct" => $q2_correct === 1,
+                "q3_correct" => $q3_correct === 1,
+                "score" => $pointsEarned
+            ],
+            "stats" => [
+                "total" => (int)$stats['total_attempts'],
+                "q1_pct" => round($stats['q1_pct']),
+                "q2_pct" => round($stats['q2_pct']),
+                "q3_pct" => round($stats['q3_pct'])
+            ],
+            "points_earned" => $pointsEarned,
+            "coins_earned" => $coinsEarned
+        ]);
+    }
+
+    // =========================================================================
+    // ADMIN DAILY QUIZ SCHEDULING
+    // =========================================================================
+
+    public function getDailyQuizzes() {
+        $user = AuthMiddleware::authenticate();
+        if ($user['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(["error" => "Réservé aux administrateurs."]);
+            return;
+        }
+
+        $db = Database::getConnection();
+        $stmt = $db->query("
+            SELECT dq.date, 
+                   dq.q1_id, dq.q2_id, dq.q3_id,
+                   q1.question_text as q1_text, q1.question_type as q1_type,
+                   q2.question_text as q2_text, q2.question_type as q2_type,
+                   q3.question_text as q3_text, q3.question_type as q3_type
+            FROM daily_quizzes dq
+            JOIN questions q1 ON dq.q1_id = q1.id
+            JOIN questions q2 ON dq.q2_id = q2.id
+            JOIN questions q3 ON dq.q3_id = q3.id
+            ORDER BY dq.date DESC
+        ");
+        $quizzes = $stmt->fetchAll();
+
+        echo json_encode([
+            "success" => true,
+            "quizzes" => $quizzes
+        ]);
+    }
+
+    public function scheduleDailyQuiz(array $data) {
+        $user = AuthMiddleware::authenticate();
+        if ($user['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(["error" => "Réservé aux administrateurs."]);
+            return;
+        }
+
+        $date = $data['date'] ?? '';
+        $q1_id = (int) ($data['q1_id'] ?? 0);
+        $q2_id = (int) ($data['q2_id'] ?? 0);
+        $q3_id = (int) ($data['q3_id'] ?? 0);
+
+        if (empty($date) || !$q1_id || !$q2_id || !$q3_id) {
+            http_response_code(400);
+            echo json_encode(["error" => "Données manquantes (date, q1_id, q2_id, q3_id requis)."]);
+            return;
+        }
+
+        $db = Database::getConnection();
+
+        // Insert or Update scheduling
+        $stmt = $db->prepare("
+            INSERT INTO daily_quizzes (date, q1_id, q2_id, q3_id) 
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE q1_id = VALUES(q1_id), q2_id = VALUES(q2_id), q3_id = VALUES(q3_id)
+        ");
+        $stmt->execute([$date, $q1_id, $q2_id, $q3_id]);
+
+        echo json_encode([
+            "success" => true,
+            "message" => "Quiz du jour planifié avec succès pour le " . $date
+        ]);
+    }
+
+    public function deleteDailyQuiz(array $data) {
+        $user = AuthMiddleware::authenticate();
+        if ($user['role'] !== 'admin') {
+            http_response_code(403);
+            echo json_encode(["error" => "Réservé aux administrateurs."]);
+            return;
+        }
+
+        $date = $data['date'] ?? '';
+        if (empty($date)) {
+            http_response_code(400);
+            echo json_encode(["error" => "Date manquante."]);
+            return;
+        }
+
+        $db = Database::getConnection();
+        $stmt = $db->prepare("DELETE FROM daily_quizzes WHERE date = ?");
+        $stmt->execute([$date]);
+
+        echo json_encode([
+            "success" => true,
+            "message" => "Planification supprimée."
         ]);
     }
 }

@@ -52,9 +52,22 @@ class LobbyController
             $checkStmt->execute([$roomCode]);
         } while ($checkStmt->fetch());
 
-        // Insert lobby (always classic mode)
-        $stmt = $db->prepare("INSERT INTO lobbies (room_code, host_id, pack_id, status, game_mode, current_question_index) VALUES (?, ?, ?, 'waiting', 'classic', 0)");
-        $stmt->execute([$roomCode, $user['user_id'], $packId]);
+        $gameMode = $data['game_mode'] ?? 'classic';
+        if (!in_array($gameMode, ['classic', 'speed_blitz', 'sudden_death', 'guess_number', 'tribunal'])) {
+            $gameMode = 'classic';
+        }
+
+        if ($gameMode === 'tribunal') {
+            $stmtTribunalPack = $db->query("SELECT id FROM packs WHERE name = 'Le Tribunal'");
+            $tribunalPackId = (int) $stmtTribunalPack->fetchColumn();
+            if ($tribunalPackId > 0) {
+                $packId = $tribunalPackId;
+            }
+        }
+
+        // Insert lobby
+        $stmt = $db->prepare("INSERT INTO lobbies (room_code, host_id, pack_id, status, game_mode, tribunal_phase, tribunal_phase_ends_at, current_question_index) VALUES (?, ?, ?, 'waiting', ?, NULL, NULL, 0)");
+        $stmt->execute([$roomCode, $user['user_id'], $packId, $gameMode]);
         $lobbyId = $db->lastInsertId();
 
         // Insert host as player
@@ -144,7 +157,7 @@ class LobbyController
         // Fetch all players sorted by score
         $stmtPlayers = $db->prepare("
             SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
-                   lp.elo_change, lp.reaction, lp.reaction_sent_at,
+                   lp.elo_change, lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
                    u.username, u.global_score, u.elo
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
@@ -153,6 +166,12 @@ class LobbyController
         ");
         $stmtPlayers->execute([$lobby['id']]);
         $playersRaw = $stmtPlayers->fetchAll();
+        $playerIds = array_column($playersRaw, 'user_id');
+
+        $nowMs = round(microtime(true) * 1000);
+        if ($lobby['game_mode'] === 'tribunal' && $lobby['status'] === 'playing') {
+            $this->checkTribunalStateTransition($db, $lobby, $nowMs, $playerIds);
+        }
 
         $nowMs = round(microtime(true) * 1000);
 
@@ -173,7 +192,8 @@ class LobbyController
                 'finished' => $p['finished_at'] !== null,
                 'global_score' => intval($p['global_score']),
                 'elo' => intval($p['elo']),
-                'reaction' => $reaction
+                'reaction' => $reaction,
+                'is_eliminated' => intval($p['is_eliminated']) === 1
             ];
 
             // Only expose Elo and Coin changes when game is finished
@@ -218,6 +238,113 @@ class LobbyController
             'total_questions' => $totalQuestions
         ];
 
+        if ($lobby['game_mode'] === 'tribunal' && $lobby['status'] === 'playing') {
+            $phase = $lobby['tribunal_phase'];
+            $endsAt = intval($lobby['tribunal_phase_ends_at']);
+            $phaseRemainingMs = max(0, $endsAt - $nowMs);
+            $round = intval($lobby['current_question_index']);
+
+            $questionIds = explode(',', $lobby['questions_list']);
+            $currentQuestionId = intval($questionIds[$round]);
+            
+            $stmtQ = $db->prepare("SELECT question_text FROM questions WHERE id = ?");
+            $stmtQ->execute([$currentQuestionId]);
+            $promptText = $stmtQ->fetchColumn();
+
+            $submissions = [];
+            $mySubmission = null;
+            $hasVoted = false;
+
+            if ($phase === 'writing') {
+                $stmtSubs = $db->prepare("SELECT user_id FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ?");
+                $stmtSubs->execute([$lobby['id'], $round]);
+                $subsRaw = $stmtSubs->fetchAll(\PDO::FETCH_COLUMN);
+
+                foreach ($response['players'] as &$p) {
+                    $p['has_submitted'] = in_array($p['user_id'], $subsRaw);
+                }
+
+                $stmtMy = $db->prepare("SELECT answer_text FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ? AND user_id = ?");
+                $stmtMy->execute([$lobby['id'], $round, $user['user_id']]);
+                $mySubmission = $stmtMy->fetchColumn() ?: null;
+
+            } elseif ($phase === 'voting') {
+                $stmtSubs = $db->prepare("SELECT id, answer_text, user_id FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ?");
+                $stmtSubs->execute([$lobby['id'], $round]);
+                $subsRaw = $stmtSubs->fetchAll();
+
+                $stmtVoted = $db->prepare("SELECT voted_for_user_id FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ? AND user_id = ?");
+                $stmtVoted->execute([$lobby['id'], $round, $user['user_id']]);
+                $voteRow = $stmtVoted->fetch();
+                $hasVoted = ($voteRow && $voteRow['voted_for_user_id'] !== null);
+
+                foreach ($subsRaw as $sub) {
+                    $submissions[] = [
+                        'id' => intval($sub['id']),
+                        'answer_text' => $sub['answer_text'],
+                        'is_mine' => (intval($sub['user_id']) === $user['user_id'])
+                    ];
+                }
+                
+                // Deterministic sort using a seed based on lobby ID and round number.
+                // This ensures that the order is:
+                // 1. Shuffled randomly (not ordered by join/submission sequence)
+                // 2. IDENTICAL for all players (so they read the answers in the same order)
+                // 3. STABLE across all status polls during the round
+                $seed = intval($lobby['id']) * 1000 + intval($round);
+                srand($seed);
+                shuffle($submissions);
+                srand(); // Reset rand seed to default
+
+            } elseif ($phase === 'results') {
+                $stmtSubs = $db->prepare("
+                    SELECT ts.id, ts.answer_text, ts.user_id, ts.voted_for_user_id, u.username
+                    FROM tribunal_submissions ts
+                    JOIN users u ON ts.user_id = u.id
+                    WHERE ts.lobby_id = ? AND ts.round_number = ?
+                ");
+                $stmtSubs->execute([$lobby['id'], $round]);
+                $subsRaw = $stmtSubs->fetchAll();
+
+                $votersForUser = [];
+                foreach ($subsRaw as $s) {
+                    $voterUsername = $s['username'];
+                    $votedFor = $s['voted_for_user_id'];
+                    if ($votedFor) {
+                        $votersForUser[$votedFor][] = $voterUsername;
+                    }
+                }
+
+                foreach ($subsRaw as $sub) {
+                    $authorId = intval($sub['user_id']);
+                    $votes = $votersForUser[$authorId] ?? [];
+                    $submissions[] = [
+                        'id' => intval($sub['id']),
+                        'answer_text' => $sub['answer_text'],
+                        'author_id' => $authorId,
+                        'author_username' => $sub['username'],
+                        'votes' => $votes,
+                        'vote_count' => count($votes),
+                        'is_mine' => ($authorId === $user['user_id'])
+                    ];
+                }
+
+                usort($submissions, function($a, $b) {
+                    return $b['vote_count'] - $a['vote_count'];
+                });
+            }
+
+            $response['tribunal'] = [
+                'phase' => $phase,
+                'phase_remaining_ms' => $phaseRemainingMs,
+                'round' => $round,
+                'prompt_text' => $promptText,
+                'submissions' => $submissions,
+                'my_submission' => $mySubmission,
+                'has_voted' => $hasVoted
+            ];
+        }
+
         echo json_encode($response);
     }
 
@@ -256,8 +383,9 @@ class LobbyController
             return;
         }
 
-        // Select 10 random questions from the pack
-        $stmtQuestions = $db->prepare("SELECT id FROM questions WHERE pack_id = ? ORDER BY RAND() LIMIT 10");
+        // Select random questions from the pack (5 for tribunal, 10 otherwise)
+        $limit = ($lobby['game_mode'] === 'tribunal') ? 5 : 10;
+        $stmtQuestions = $db->prepare("SELECT id FROM questions WHERE pack_id = ? ORDER BY RAND() LIMIT " . $limit);
         $stmtQuestions->execute([$lobby['pack_id']]);
         $questionRows = $stmtQuestions->fetchAll();
 
@@ -270,21 +398,31 @@ class LobbyController
         $questionIds = array_column($questionRows, 'id');
         $questionsList = implode(',', $questionIds);
 
-        // Set game_started_at = now + 3 seconds (countdown)
+        // Set game_started_at (no countdown for tribunal, 3s countdown otherwise)
         $nowMs = round(microtime(true) * 1000);
-        $gameStartedAt = $nowMs + 3000; // 3-second countdown
+        $countdownDuration = ($lobby['game_mode'] === 'tribunal') ? 0 : 3000;
+        $gameStartedAt = $nowMs + $countdownDuration;
 
         // Update lobby: status=playing, store questions, set start time
+        $tribunalPhase = null;
+        $tribunalEndsAt = null;
+        if ($lobby['game_mode'] === 'tribunal') {
+            $tribunalPhase = 'writing';
+            $tribunalEndsAt = $gameStartedAt + 45000; // 45 seconds for writing phase
+        }
+
         $stmtUpdate = $db->prepare("
             UPDATE lobbies
             SET status = 'playing',
                 questions_list = ?,
                 game_started_at = ?,
                 current_question_index = 0,
-                current_question_id = NULL
+                current_question_id = NULL,
+                tribunal_phase = ?,
+                tribunal_phase_ends_at = ?
             WHERE id = ?
         ");
-        $stmtUpdate->execute([$questionsList, $gameStartedAt, $lobby['id']]);
+        $stmtUpdate->execute([$questionsList, $gameStartedAt, $tribunalPhase, $tribunalEndsAt, $lobby['id']]);
 
         // Reset all players
         $stmtReset = $db->prepare("
@@ -495,19 +633,26 @@ class LobbyController
             return;
         }
 
-        // Verify question index matches (prevent double-answer or skipping)
-        $tokenIndex = intval($payload['question_index'] ?? -1);
-        $playerIndex = intval($player['current_question_index']);
-        if ($tokenIndex !== $playerIndex) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Vous avez déjà répondu à cette question.']);
+        if (intval($player['is_eliminated']) === 1) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Vous êtes éliminé de cette partie.']);
             return;
         }
+
+        $playerIndex = intval($player['current_question_index']);
 
         // Calculate elapsed time (anti-cheat)
         $nowMs = round(microtime(true) * 1000);
         $sentAt = intval($payload['sent_at']);
         $elapsedMs = $nowMs - $sentAt;
+
+        // Dynamic time limit based on mode
+        $timeLimit = ($lobby['game_mode'] === 'speed_blitz') ? 5000 : 15000;
+
+        // Auto timeout if response time exceeds limit (excluding TIMEOUT message itself)
+        if ($answer !== 'TIMEOUT' && $elapsedMs > $timeLimit) {
+            $answer = 'TIMEOUT';
+        }
 
         // Anti-bot: reject if answered too fast
         if ($elapsedMs < 200) {
@@ -516,16 +661,9 @@ class LobbyController
             return;
         }
 
-        // Validate answer format (allow TIMEOUT for auto-submit on countdown end)
-        if (!in_array($answer, ['A', 'B', 'C', 'D', 'TIMEOUT'])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Réponse invalide. Choisissez A, B, C ou D.']);
-            return;
-        }
-
-        // Fetch correct answer from DB
+        // Validate answer format (depending on game mode / question type)
         $questionId = intval($payload['question_id']);
-        $stmtQ = $db->prepare("SELECT correct_opt, opt_a, opt_b, opt_c, opt_d FROM questions WHERE id = ?");
+        $stmtQ = $db->prepare("SELECT question_type, correct_value, correct_opt, opt_a, opt_b, opt_c, opt_d FROM questions WHERE id = ?");
         $stmtQ->execute([$questionId]);
         $question = $stmtQ->fetch();
 
@@ -535,22 +673,74 @@ class LobbyController
             return;
         }
 
-        $correctOpt = $payload['correct_opt'] ?? $question['correct_opt'];
-        $isCorrect = ($answer === $correctOpt);
-
-        // Calculate points based on speed (only for correct answers)
+        $questionType = $question['question_type'] ?? 'multiple_choice';
+        $isCorrect = false;
         $pointsAwarded = 0;
-        $timeLimit = 15000; // 15 seconds
-        if ($isCorrect) {
+        $correctOpt = null;
+        $correctText = '';
+
+        if ($questionType === 'guess_number') {
+            $correctValue = intval($question['correct_value'] ?? 0);
+            $correctText = "Valeur attendue : " . $correctValue;
+            
+            if ($answer !== 'TIMEOUT') {
+                $userVal = intval($answer);
+                $diff = abs($userVal - $correctValue);
+                $tolerance1 = 0.01 * $correctValue;
+                $tolerance10 = 0.10 * $correctValue;
+                
+                if ($diff <= $tolerance1) {
+                    $isCorrect = true;
+                    $pointsAwarded = 150;
+                } elseif ($diff <= $tolerance10) {
+                    $isCorrect = true;
+                    $pointsAwarded = 50;
+                } else {
+                    $isCorrect = false;
+                }
+            }
+        } elseif ($questionType === 'open') {
+            $correctText = $question['opt_a'] ?? '';
+            if ($answer !== 'TIMEOUT') {
+                $isCorrect = (self::cleanText($answer) === self::cleanText($correctText));
+                if ($isCorrect) {
+                    $pointsAwarded = 100;
+                }
+            }
+        } else {
+            // Standard Multiple Choice
+            if (!in_array($answer, ['A', 'B', 'C', 'D', 'TIMEOUT'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Réponse invalide. Choisissez A, B, C ou D.']);
+                return;
+            }
+            $correctOpt = $payload['correct_opt'] ?? $question['correct_opt'];
+            $isCorrect = ($answer === $correctOpt);
+            
+            // Get correct answer text
+            $optMap = ['A' => 'opt_a', 'B' => 'opt_b', 'C' => 'opt_c', 'D' => 'opt_d'];
+            $correctText = $question[$optMap[$correctOpt]] ?? '';
+        }
+
+        // Calculate points based on speed (only for correct multiple choice answers)
+        if ($isCorrect && $pointsAwarded === 0) {
             $effectiveElapsed = min($elapsedMs, $timeLimit);
             $timeLeftRatio = max(0, ($timeLimit - $effectiveElapsed)) / $timeLimit;
             $pointsAwarded = max(10, intval(round(100 * $timeLeftRatio)));
         }
 
+        // Sudden death elimination
+        $isEliminatedNow = false;
+        $finishedAt = null;
+        if (!$isCorrect && $lobby['game_mode'] === 'sudden_death') {
+            $isEliminatedNow = true;
+            $finishedAt = date('Y-m-d H:i:s'); // DB format for datetime finished_at is NULL or datetime string
+        }
+
         // Update player: add score and advance question index
         $newIndex = $playerIndex + 1;
-        $stmtUpdate = $db->prepare("UPDATE lobby_players SET current_score = current_score + ?, current_question_index = ? WHERE lobby_id = ? AND user_id = ?");
-        $stmtUpdate->execute([$pointsAwarded, $newIndex, $lobby['id'], $user['user_id']]);
+        $stmtUpdate = $db->prepare("UPDATE lobby_players SET current_score = current_score + ?, current_question_index = ?, is_eliminated = ?, finished_at = ? WHERE lobby_id = ? AND user_id = ?");
+        $stmtUpdate->execute([$pointsAwarded, $newIndex, $isEliminatedNow ? 1 : 0, $finishedAt, $lobby['id'], $user['user_id']]);
 
         // Update global_score (XP) and coins (50% of XP) for correct answers
         $coinsAwarded = 0;
@@ -615,13 +805,15 @@ class LobbyController
             return;
         }
 
-        // Verify player has answered all questions
-        $questionIds = explode(',', $lobby['questions_list']);
-        $totalQuestions = count($questionIds);
-        if (intval($player['current_question_index']) < $totalQuestions) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Vous n\'avez pas encore répondu à toutes les questions.']);
-            return;
+        // Verify player has answered all questions (skip if eliminated)
+        if (intval($player['is_eliminated']) === 0) {
+            $questionIds = explode(',', $lobby['questions_list']);
+            $totalQuestions = count($questionIds);
+            if (intval($player['current_question_index']) < $totalQuestions) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Vous n\'avez pas encore répondu à toutes les questions.']);
+                return;
+            }
         }
 
         // Mark player as finished (idempotent)
@@ -791,5 +983,366 @@ class LobbyController
         }
 
         echo json_encode(['success' => true]);
+    }
+
+    private static function cleanText($text) {
+        $text = mb_strtolower(trim($text), 'UTF-8');
+        $unwanted_array = array(
+            'à'=>'a', 'á'=>'a', 'â'=>'a', 'ã'=>'a', 'ä'=>'a', 'å'=>'a', 'æ'=>'a', 'ç'=>'c',
+            'è'=>'e', 'é'=>'e', 'ê'=>'e', 'ë'=>'e', 'ì'=>'i', 'í'=>'i', 'î'=>'i', 'ï'=>'i',
+            'ò'=>'o', 'ó'=>'o', 'ô'=>'o', 'õ'=>'o', 'ö'=>'o', 'ø'=>'o',
+            'ù'=>'u', 'ú'=>'u', 'û'=>'u', 'ü'=>'u', 'ý'=>'y', 'ÿ'=>'y',
+            'œ'=>'oe', 'æ'=>'ae'
+        );
+        $text = strtr($text, $unwanted_array);
+        return preg_replace('/[^a-z0-9]/', '', $text);
+    }
+
+    // ================================================================
+    // TRIBUNAL: SUBMIT ANSWER
+    // ================================================================
+    public function submitTribunalAnswer(array $data)
+    {
+        $user = AuthMiddleware::authenticate();
+        $roomCode = strtoupper(trim($data['room_code'] ?? ''));
+        $answerText = trim($data['answer'] ?? '');
+
+        if ($answerText === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'La réponse ne peut pas être vide.']);
+            return;
+        }
+
+        $db = Database::getConnection();
+
+        $stmtLobby = $db->prepare("SELECT * FROM lobbies WHERE room_code = ?");
+        $stmtLobby->execute([$roomCode]);
+        $lobby = $stmtLobby->fetch();
+
+        if (!$lobby || $lobby['status'] !== 'playing' || $lobby['game_mode'] !== 'tribunal') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Salon invalide ou partie non en cours.']);
+            return;
+        }
+
+        if ($lobby['tribunal_phase'] !== 'writing') {
+            http_response_code(400);
+            echo json_encode(['error' => 'La phase de saisie est terminée.']);
+            return;
+        }
+
+        $round = intval($lobby['current_question_index']);
+
+        // Check if user has already submitted for this round
+        $stmtCheck = $db->prepare("SELECT id FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ? AND user_id = ?");
+        $stmtCheck->execute([$lobby['id'], $round, $user['user_id']]);
+        if ($stmtCheck->fetch()) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Vous avez déjà soumis votre réponse pour cette manche.']);
+            return;
+        }
+
+        // Insert submission
+        $stmtInsert = $db->prepare("INSERT INTO tribunal_submissions (lobby_id, round_number, user_id, answer_text) VALUES (?, ?, ?, ?)");
+        $stmtInsert->execute([$lobby['id'], $round, $user['user_id'], $answerText]);
+
+        echo json_encode(['success' => true]);
+    }
+
+    // ================================================================
+    // TRIBUNAL: SUBMIT VOTE
+    // ================================================================
+    public function submitTribunalVote(array $data)
+    {
+        $user = AuthMiddleware::authenticate();
+        $roomCode = strtoupper(trim($data['room_code'] ?? ''));
+        $submissionId = intval($data['submission_id'] ?? 0);
+
+        if ($submissionId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'ID de soumission invalide.']);
+            return;
+        }
+
+        $db = Database::getConnection();
+
+        $stmtLobby = $db->prepare("SELECT * FROM lobbies WHERE room_code = ?");
+        $stmtLobby->execute([$roomCode]);
+        $lobby = $stmtLobby->fetch();
+
+        if (!$lobby || $lobby['status'] !== 'playing' || $lobby['game_mode'] !== 'tribunal') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Salon invalide ou partie non en cours.']);
+            return;
+        }
+
+        if ($lobby['tribunal_phase'] !== 'voting') {
+            http_response_code(400);
+            echo json_encode(['error' => 'La phase de vote n\'est pas active.']);
+            return;
+        }
+
+        $round = intval($lobby['current_question_index']);
+
+        // Fetch submission to vote for
+        $stmtSub = $db->prepare("SELECT * FROM tribunal_submissions WHERE id = ? AND lobby_id = ? AND round_number = ?");
+        $stmtSub->execute([$submissionId, $lobby['id'], $round]);
+        $targetSub = $stmtSub->fetch();
+
+        if (!$targetSub) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Réponse introuvable dans cette manche.']);
+            return;
+        }
+
+        // Prevent self-voting
+        if (intval($targetSub['user_id']) === $user['user_id']) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Vous ne pouvez pas voter pour votre propre réponse !']);
+            return;
+        }
+
+        // Update current player's submission row to set voted_for_user_id
+        $stmtUpdate = $db->prepare("
+            UPDATE tribunal_submissions 
+            SET voted_for_user_id = ? 
+            WHERE lobby_id = ? AND round_number = ? AND user_id = ?
+        ");
+        $stmtUpdate->execute([$targetSub['user_id'], $lobby['id'], $round, $user['user_id']]);
+
+        echo json_encode(['success' => true]);
+    }
+
+    // ================================================================
+    // TRIBUNAL: STATE MACHINE CHECK & TRANSITION (self-driving)
+    // ================================================================
+    private function checkTribunalStateTransition($db, &$lobby, $nowMs, $playerIds)
+    {
+        $phase = $lobby['tribunal_phase'];
+        $endsAt = intval($lobby['tribunal_phase_ends_at']);
+        $round = intval($lobby['current_question_index']);
+        $playerCount = count($playerIds);
+
+        if ($phase === 'writing') {
+            // Count submissions
+            $stmtS = $db->prepare("SELECT COUNT(*) FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ?");
+            $stmtS->execute([$lobby['id'], $round]);
+            $submittedCount = intval($stmtS->fetchColumn());
+
+            $timeExpired = ($nowMs >= $endsAt);
+            $allSubmitted = ($submittedCount >= $playerCount);
+
+            if ($allSubmitted || $timeExpired) {
+                $questionIds = explode(',', $lobby['questions_list']);
+                $nextRound = $round + 1;
+                $hasMoreWriting = ($nextRound < count($questionIds));
+
+                if ($hasMoreWriting) {
+                    // Progress to the next writing round
+                    $newEndsAt = $nowMs + 45000; // 45s for next question
+                    $stmtUp = $db->prepare("
+                        UPDATE lobbies 
+                        SET current_question_index = ?, 
+                            tribunal_phase = 'writing', 
+                            tribunal_phase_ends_at = ? 
+                        WHERE id = ? AND tribunal_phase = 'writing' AND current_question_index = ?
+                    ");
+                    $stmtUp->execute([$nextRound, $newEndsAt, $lobby['id'], $round]);
+                } else {
+                    // All 5 questions answered -> transition to voting phase starting at round 0
+                    $newEndsAt = $nowMs + 30000; // 30s to vote for Q1
+                    $stmtUp = $db->prepare("
+                        UPDATE lobbies 
+                        SET current_question_index = 0, 
+                            tribunal_phase = 'voting', 
+                            tribunal_phase_ends_at = ? 
+                        WHERE id = ? AND tribunal_phase = 'writing' AND current_question_index = ?
+                    ");
+                    $stmtUp->execute([$newEndsAt, $lobby['id'], $round]);
+                }
+                
+                if ($stmtUp->rowCount() === 0) {
+                    $stmtReload = $db->prepare("SELECT tribunal_phase, tribunal_phase_ends_at, current_question_index, status FROM lobbies WHERE id = ?");
+                    $stmtReload->execute([$lobby['id']]);
+                    $reloaded = $stmtReload->fetch();
+                    if ($reloaded) {
+                        $lobby['tribunal_phase'] = $reloaded['tribunal_phase'];
+                        $lobby['tribunal_phase_ends_at'] = $reloaded['tribunal_phase_ends_at'];
+                        $lobby['current_question_index'] = $reloaded['current_question_index'];
+                        $lobby['status'] = $reloaded['status'];
+                    }
+                    return;
+                }
+
+                // Autocomplete missing answers for the completed round
+                $stmtMissing = $db->prepare("
+                    SELECT lp.user_id 
+                    FROM lobby_players lp
+                    LEFT JOIN tribunal_submissions ts ON lp.user_id = ts.user_id AND ts.lobby_id = ? AND ts.round_number = ?
+                    WHERE lp.lobby_id = ? AND ts.id IS NULL
+                ");
+                $stmtMissing->execute([$lobby['id'], $round, $lobby['id']]);
+                $missingPlayers = $stmtMissing->fetchAll();
+                
+                $defaultAnswers = [
+                    "J'ai oublié d'écrire quelque chose...",
+                    "Pas d'inspiration !",
+                    "Mon chat a mangé mon clavier.",
+                    "Je réfléchis encore...",
+                    "Erreur 404 : Cerveau introuvable."
+                ];
+
+                foreach ($missingPlayers as $mp) {
+                    $randAns = $defaultAnswers[array_rand($defaultAnswers)];
+                    $stmtIns = $db->prepare("INSERT INTO tribunal_submissions (lobby_id, round_number, user_id, answer_text) VALUES (?, ?, ?, ?)");
+                    $stmtIns->execute([$lobby['id'], $round, $mp['user_id'], $randAns]);
+                }
+                
+                if ($hasMoreWriting) {
+                    $lobby['current_question_index'] = $nextRound;
+                    $lobby['tribunal_phase'] = 'writing';
+                    $lobby['tribunal_phase_ends_at'] = $newEndsAt;
+                    
+                    // Update player index so players screen syncs
+                    $stmtPIdx = $db->prepare("UPDATE lobby_players SET current_question_index = ? WHERE lobby_id = ?");
+                    $stmtPIdx->execute([$nextRound, $lobby['id']]);
+                } else {
+                    $lobby['current_question_index'] = 0;
+                    $lobby['tribunal_phase'] = 'voting';
+                    $lobby['tribunal_phase_ends_at'] = $newEndsAt;
+                    
+                    // Reset player index to 0
+                    $stmtPIdx = $db->prepare("UPDATE lobby_players SET current_question_index = 0 WHERE lobby_id = ?");
+                    $stmtPIdx->execute([$lobby['id']]);
+                }
+            }
+        } elseif ($phase === 'voting') {
+            // Count votes (votes are set when voted_for_user_id is not null)
+            $stmtV = $db->prepare("SELECT COUNT(*) FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ? AND voted_for_user_id IS NOT NULL");
+            $stmtV->execute([$lobby['id'], $round]);
+            $votedCount = intval($stmtV->fetchColumn());
+
+            $timeExpired = ($nowMs >= $endsAt);
+            $allVoted = ($votedCount >= $playerCount);
+
+            if ($allVoted || $timeExpired) {
+                // Atomic transition update to prevent duplicate calculation of scores
+                $newEndsAt = $nowMs + 15000; // 15 seconds of results display
+                $stmtUp = $db->prepare("UPDATE lobbies SET tribunal_phase = 'results', tribunal_phase_ends_at = ? WHERE id = ? AND tribunal_phase = 'voting'");
+                $stmtUp->execute([$newEndsAt, $lobby['id']]);
+
+                if ($stmtUp->rowCount() === 0) {
+                    $stmtReload = $db->prepare("SELECT tribunal_phase, tribunal_phase_ends_at, current_question_index, status FROM lobbies WHERE id = ?");
+                    $stmtReload->execute([$lobby['id']]);
+                    $reloaded = $stmtReload->fetch();
+                    if ($reloaded) {
+                        $lobby['tribunal_phase'] = $reloaded['tribunal_phase'];
+                        $lobby['tribunal_phase_ends_at'] = $reloaded['tribunal_phase_ends_at'];
+                        $lobby['current_question_index'] = $reloaded['current_question_index'];
+                        $lobby['status'] = $reloaded['status'];
+                    }
+                    return;
+                }
+
+                // Calculate round scores
+                $this->calculateTribunalRoundScores($db, $lobby, $round);
+
+                $lobby['tribunal_phase'] = 'results';
+                $lobby['tribunal_phase_ends_at'] = $newEndsAt;
+            }
+        } elseif ($phase === 'results') {
+            $timeExpired = ($nowMs >= $endsAt);
+            if ($timeExpired) {
+                $questionIds = explode(',', $lobby['questions_list']);
+                $nextRound = $round + 1;
+
+                if ($nextRound < count($questionIds)) {
+                    // Start next round's voting phase (atomic check to avoid multiple round increments)
+                    $newEndsAt = $nowMs + 30000; // 30s to vote
+                    $stmtUp = $db->prepare("
+                        UPDATE lobbies 
+                        SET current_question_index = ?, 
+                            tribunal_phase = 'voting', 
+                            tribunal_phase_ends_at = ? 
+                        WHERE id = ? AND tribunal_phase = 'results' AND current_question_index = ?
+                    ");
+                    $stmtUp->execute([$nextRound, $newEndsAt, $lobby['id'], $round]);
+
+                    if ($stmtUp->rowCount() === 0) {
+                        $stmtReload = $db->prepare("SELECT tribunal_phase, tribunal_phase_ends_at, current_question_index, status FROM lobbies WHERE id = ?");
+                        $stmtReload->execute([$lobby['id']]);
+                        $reloaded = $stmtReload->fetch();
+                        if ($reloaded) {
+                            $lobby['tribunal_phase'] = $reloaded['tribunal_phase'];
+                            $lobby['tribunal_phase_ends_at'] = $reloaded['tribunal_phase_ends_at'];
+                            $lobby['current_question_index'] = $reloaded['current_question_index'];
+                            $lobby['status'] = $reloaded['status'];
+                        }
+                        return;
+                    }
+
+                    $lobby['current_question_index'] = $nextRound;
+                    $lobby['tribunal_phase'] = 'voting';
+                    $lobby['tribunal_phase_ends_at'] = $newEndsAt;
+
+                    // Update player index so players screen syncs
+                    $stmtPIdx = $db->prepare("UPDATE lobby_players SET current_question_index = ? WHERE lobby_id = ?");
+                    $stmtPIdx->execute([$nextRound, $lobby['id']]);
+                } else {
+                    // Finish game (atomic check to prevent duplicate finish calculations)
+                    $stmtUp = $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ? AND status = 'playing'");
+                    $stmtUp->execute([$lobby['id']]);
+                    if ($stmtUp->rowCount() > 0) {
+                        $this->calculateFinalRankings($db, $lobby);
+                    } else {
+                        $stmtReload = $db->prepare("SELECT status FROM lobbies WHERE id = ?");
+                        $stmtReload->execute([$lobby['id']]);
+                        $reloaded = $stmtReload->fetch();
+                        if ($reloaded) {
+                            $lobby['status'] = $reloaded['status'];
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private function calculateTribunalRoundScores($db, $lobby, $round)
+    {
+        // Fetch all submissions for the round
+        $stmt = $db->prepare("SELECT * FROM tribunal_submissions WHERE lobby_id = ? AND round_number = ?");
+        $stmt->execute([$lobby['id'], $round]);
+        $submissions = $stmt->fetchAll();
+
+        // Map of votes received by each user
+        $votesReceived = [];
+        foreach ($submissions as $sub) {
+            $votedFor = $sub['voted_for_user_id'];
+            if ($votedFor !== null) {
+                $votedFor = (int) $votedFor;
+                if (!isset($votesReceived[$votedFor])) {
+                    $votesReceived[$votedFor] = 0;
+                }
+                $votesReceived[$votedFor]++;
+            }
+        }
+
+        // Award points: +100 XP and +50 coins per vote received
+        foreach ($submissions as $sub) {
+            $authorId = (int) $sub['user_id'];
+            $votes = $votesReceived[$authorId] ?? 0;
+            $points = $votes * 100;
+
+            if ($points > 0) {
+                // Update lobby player score
+                $stmtUp = $db->prepare("UPDATE lobby_players SET current_score = current_score + ? WHERE lobby_id = ? AND user_id = ?");
+                $stmtUp->execute([$points, $lobby['id'], $authorId]);
+
+                // Award XP and coins (50% of XP)
+                $coins = intval($points / 2);
+                $stmtXP = $db->prepare("UPDATE users SET global_score = global_score + ?, coins = coins + ? WHERE id = ?");
+                $stmtXP->execute([$points, $coins, $authorId]);
+            }
+        }
     }
 }

@@ -75,10 +75,13 @@ class AuthController {
         // Generate 6-digit code
         $code = strval(rand(100000, 999999));
 
+        $seed = bin2hex(random_bytes(8));
+        $avatarUrl = "https://api.dicebear.com/10.x/glyphs/svg?seed=" . $seed;
+
         // Hash password and insert user
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-        $stmtInsert = $db->prepare("INSERT INTO users (username, discriminator, email, password_hash, is_verified, verification_code) VALUES (?, ?, ?, ?, 0, ?)");
-        $stmtInsert->execute([$username, $discriminator, $email, $passwordHash, $code]);
+        $stmtInsert = $db->prepare("INSERT INTO users (username, discriminator, email, password_hash, is_verified, verification_code, avatar_url) VALUES (?, ?, ?, ?, 0, ?, ?)");
+        $stmtInsert->execute([$username, $discriminator, $email, $passwordHash, $code, $avatarUrl]);
 
         http_response_code(201);
         echo json_encode([

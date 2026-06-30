@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
-import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2 } from 'lucide-react';
+import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel } from 'lucide-react';
 
 export default function MultiplayerArena({ roomCode, user, onBack }) {
   // === LOBBY STATE (from polling) ===
@@ -22,10 +22,21 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [answerToken, setAnswerToken] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
+  const [openAnswer, setOpenAnswer] = useState('');
   const [answerFeedback, setAnswerFeedback] = useState(null);
   const [playerScore, setPlayerScore] = useState(0);
   const [questionTimer, setQuestionTimer] = useState(15000);
   const [fetchingQuestion, setFetchingQuestion] = useState(false);
+
+  // === TRIBUNAL STATES ===
+  const [tribunalInput, setTribunalInput] = useState('');
+  const [submittingTribunal, setSubmittingTribunal] = useState(false);
+  const [selectedSubId, setSelectedSubId] = useState(null);
+  const [votingTribunal, setVotingTribunal] = useState(false);
+  const [tribunalTimer, setTribunalTimer] = useState(0);
+
+  const lastPhaseRef = useRef('');
+  const lastRoundRef = useRef(-1);
 
   // === REFS ===
   const pollRef = useRef(null);
@@ -89,11 +100,92 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
     }
   }, [roomCode]);
 
+  const fetchStatusLoop = useCallback(async () => {
+    try {
+      await fetchStatus();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      clearTimeout(pollRef.current);
+      pollRef.current = setTimeout(fetchStatusLoop, 2000);
+    }
+  }, [fetchStatus]);
+
   useEffect(() => {
-    fetchStatus();
-    pollRef.current = setInterval(fetchStatus, 1000);
+    fetchStatusLoop();
     return () => clearAllTimers();
-  }, [roomCode]);
+  }, [roomCode, fetchStatusLoop]);
+
+  useEffect(() => {
+    if (!lobbyState || !lobbyState.tribunal) return;
+    const currentPhase = lobbyState.tribunal.phase;
+    const currentRound = lobbyState.tribunal.round;
+    const serverRemainingMs = lobbyState.tribunal.phase_remaining_ms;
+
+    // Synchronize local timer with authoritative server remaining time
+    setTribunalTimer(serverRemainingMs);
+
+    if (currentPhase !== lastPhaseRef.current || currentRound !== lastRoundRef.current) {
+      setTribunalInput('');
+      setSelectedSubId(null);
+      
+      lastPhaseRef.current = currentPhase;
+      lastRoundRef.current = currentRound;
+    }
+  }, [lobbyState]);
+
+  // Local tick effect for high-precision countdown ticks (100ms)
+  useEffect(() => {
+    if (lobbyState?.game_mode !== 'tribunal' || gamePhase !== 'playing') {
+      return;
+    }
+    
+    const tickInterval = setInterval(() => {
+      setTribunalTimer(prev => {
+        if (prev <= 100) {
+          return 0;
+        }
+        return prev - 100;
+      });
+    }, 100);
+
+    return () => clearInterval(tickInterval);
+  }, [lobbyState?.game_mode, gamePhase, lobbyState?.tribunal?.phase, lobbyState?.tribunal?.round]);
+
+  const handleTribunalSubmit = async (e) => {
+    e.preventDefault();
+    if (!tribunalInput.trim() || submittingTribunal) return;
+    setSubmittingTribunal(true);
+    try {
+      await api.post('/lobby/tribunal/submit', {
+        room_code: roomCode,
+        answer: tribunalInput.trim()
+      });
+      fetchStatus();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Erreur de soumission");
+    } finally {
+      setSubmittingTribunal(false);
+    }
+  };
+
+  const handleTribunalVote = async () => {
+    if (!selectedSubId || votingTribunal) return;
+    setVotingTribunal(true);
+    try {
+      await api.post('/lobby/tribunal/vote', {
+        room_code: roomCode,
+        submission_id: selectedSubId
+      });
+      fetchStatus();
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Erreur lors du vote");
+    } finally {
+      setVotingTribunal(false);
+    }
+  };
 
   // ============================================================
   // COUNTDOWN: 3... 2... 1... GO! (Synchronized via 100ms high-precision ticks)
@@ -185,10 +277,12 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
     setFetchingQuestion(true);
     setSelectedOption(null);
+    setOpenAnswer('');
     setAnswerFeedback(null);
     setQuestionError('');
+    const timeLimit = (lobbyState && lobbyState.game_mode === 'speed_blitz') ? 5000 : 15000;
     setCurrentQuestionIndex(index);
-    setQuestionTimer(15000);
+    setQuestionTimer(timeLimit);
 
     try {
       const data = await api.get('/lobby/my-question', {
@@ -207,14 +301,15 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
       setQuestionError('Impossible de charger la question. Connexion interrompue.');
       setFetchingQuestion(false);
     }
-  }, [roomCode]);
+  }, [roomCode, lobbyState]);
 
   // ============================================================
   // QUESTION TIMER (15s countdown, smooth 100ms ticks)
   // ============================================================
   const startQuestionTimer = useCallback(() => {
+    const timeLimit = (lobbyState && lobbyState.game_mode === 'speed_blitz') ? 5000 : 15000;
     clearInterval(timerRef.current);
-    setQuestionTimer(15000);
+    setQuestionTimer(timeLimit);
 
     timerRef.current = setInterval(() => {
       setQuestionTimer(prev => {
@@ -226,7 +321,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
         return prev - 100;
       });
     }, 100);
-  }, []);
+  }, [lobbyState]);
 
   // Update refs on every render to bind current callbacks scope
   fetchQuestionRef.current = fetchQuestion;
@@ -259,7 +354,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   };
 
   const clearAllTimers = () => {
-    clearInterval(pollRef.current);
+    clearTimeout(pollRef.current);
     clearInterval(timerRef.current);
     clearInterval(countdownRef.current);
     clearTimeout(feedbackRef.current);
@@ -317,7 +412,16 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <span style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>
-                Mode En Ligne — Classique
+                Mode En Ligne — 
+{
+                  lobbyState.game_mode === 'classic' && "Classique"
+                }{
+                  lobbyState.game_mode === 'speed_blitz' && "Speed Blitz"
+                }{
+                  lobbyState.game_mode === 'sudden_death' && "Mort Subite"
+                }{
+                  lobbyState.game_mode === 'guess_number' && "Le Juste Nombre"
+                }
               </span>
               <h2 style={{ fontSize: '1.5rem', marginTop: '4px' }}>Thème : {lobbyState.pack_name}</h2>
             </div>
@@ -441,11 +545,322 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   }
 
   // ============================================================
+  // RENDER: TRIBUNAL
+  // ============================================================
+  const renderTribunalGame = () => {
+    const tribunal = lobbyState.tribunal;
+    if (!tribunal) return null;
+
+    const phase = tribunal.phase;
+    const timeLimit = phase === 'writing' ? 45000 : (phase === 'voting' ? 30000 : 15000);
+    const timeRatio = tribunalTimer / timeLimit;
+    const secondsLeft = Math.ceil(tribunalTimer / 1000);
+
+    return (
+      <div className="container animate-fade-in"
+        style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px', alignItems: 'start' }}>
+
+        {/* LEFT: Game Area */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+          {/* Phase Header & Timer */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Manche {tribunal.round + 1} — {
+                phase === 'writing' ? 'Saisie des réponses' : (phase === 'voting' ? 'Vote du Tribunal' : 'Résultats de la manche')
+              }
+            </span>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px',
+              backgroundColor: phase === 'results' ? 'var(--success-glow)' : (tribunalTimer <= 5000 ? 'var(--error-glow)' : 'var(--bg-card)'),
+              color: phase === 'results' ? 'var(--success)' : (tribunalTimer <= 5000 ? 'var(--error)' : 'var(--accent)'),
+              border: `1px solid ${phase === 'results' ? 'var(--success)' : (tribunalTimer <= 5000 ? 'var(--error)' : 'var(--border-color)')}`,
+              fontWeight: 700, fontSize: '0.9rem'
+            }}>
+              <Clock size={14} />
+              {secondsLeft}s
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ width: '100%', height: '4px', backgroundColor: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{
+              width: `${timeRatio * 100}%`,
+              height: '100%',
+              backgroundColor: phase === 'results' ? 'var(--success)' : (tribunalTimer <= 5000 ? 'var(--error)' : 'var(--accent)'),
+              transition: 'width 0.1s linear'
+            }} />
+          </div>
+
+          {/* Prompt Card */}
+          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '32px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>
+              Le Dilemme du Jour
+            </span>
+            <h2 style={{ fontSize: '1.6rem', lineHeight: 1.4, fontWeight: 600, margin: 0 }}>
+              {tribunal.prompt_text}
+            </h2>
+
+            {/* PHASE 1: WRITING */}
+            {phase === 'writing' && (
+              <div style={{ marginTop: '12px' }}>
+                {tribunal.my_submission ? (
+                  <div style={{
+                    padding: '20px', borderRadius: '12px', border: '1px solid var(--success)',
+                    backgroundColor: 'rgba(0, 255, 157, 0.03)', textAlign: 'center'
+                  }}>
+                    <CheckCircle2 size={32} style={{ color: 'var(--success)', margin: '0 auto 12px' }} />
+                    <p style={{ fontWeight: 600, fontSize: '1.1rem', margin: 0 }}>Votre réponse a été enregistrée :</p>
+                    <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', marginTop: '8px', fontSize: '1.05rem' }}>
+                      "{tribunal.my_submission}"
+                    </p>
+                    <small style={{ display: 'block', marginTop: '12px', color: 'var(--text-secondary)' }}>
+                      En attente de la saisie des autres joueurs...
+                    </small>
+                  </div>
+                ) : (
+                  <form onSubmit={handleTribunalSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <textarea
+                      value={tribunalInput}
+                      onChange={(e) => setTribunalInput(e.target.value)}
+                      placeholder="Tapez votre réponse secrète ici... Soyez drôle, créatif ou machiavélique !"
+                      maxLength={180}
+                      disabled={submittingTribunal}
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        padding: '16px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        backgroundColor: 'var(--bg-input)',
+                        color: 'var(--text-primary)',
+                        fontSize: '1.1rem',
+                        outline: 'none',
+                        resize: 'none',
+                        fontFamily: 'inherit'
+                      }}
+                      autoFocus
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {180 - tribunalInput.length} caractères restants
+                      </span>
+                      <button type="submit" className="btn-primary" disabled={submittingTribunal || !tribunalInput.trim()} style={{ padding: '12px 28px' }}>
+                        {submittingTribunal ? 'Envoi...' : 'Valider ma réponse'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+
+            {/* PHASE 2: VOTING */}
+            {phase === 'voting' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+                {tribunal.has_voted ? (
+                  <div style={{
+                    padding: '20px', borderRadius: '12px', border: '1px solid var(--success)',
+                    backgroundColor: 'rgba(0, 255, 157, 0.03)', textAlign: 'center'
+                  }}>
+                    <CheckCircle2 size={32} style={{ color: 'var(--success)', margin: '0 auto 12px' }} />
+                    <p style={{ fontWeight: 600, fontSize: '1.1rem', margin: 0 }}>Votre vote a été pris en compte !</p>
+                    <small style={{ display: 'block', marginTop: '8px', color: 'var(--text-secondary)' }}>
+                      En attente des autres votes...
+                    </small>
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: 0 }}>
+                      Sélectionnez la réponse qui mérite de gagner cette manche (vous ne pouvez pas voter pour vous-même) :
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {tribunal.submissions.map((sub) => (
+                        <button
+                          key={sub.id}
+                          disabled={sub.is_mine || votingTribunal}
+                          onClick={() => setSelectedSubId(sub.id)}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            width: '100%',
+                            padding: '16px 20px',
+                            backgroundColor: selectedSubId === sub.id ? 'var(--bg-hover)' : 'var(--bg-card)',
+                            border: `2px solid ${
+                              selectedSubId === sub.id ? 'var(--accent)' : 'var(--border-color)'
+                            }`,
+                            borderRadius: '12px',
+                            cursor: sub.is_mine ? 'not-allowed' : 'pointer',
+                            textAlign: 'left',
+                            color: 'var(--text-primary)',
+                            fontSize: '1.05rem',
+                            opacity: sub.is_mine ? 0.5 : 1,
+                            transition: 'var(--transition)'
+                          }}
+                        >
+                          <span style={{ fontStyle: 'italic', marginRight: '16px' }}>"{sub.answer_text}"</span>
+                          {sub.is_mine ? (
+                            <span style={{ fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', color: 'var(--text-secondary)' }}>
+                              Votre réponse
+                            </span>
+                          ) : (
+                            <div style={{
+                              width: '20px', height: '20px', borderRadius: '50%',
+                              border: `2px solid ${selectedSubId === sub.id ? 'var(--accent)' : 'var(--border-color)'}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              backgroundColor: selectedSubId === sub.id ? 'var(--accent)' : 'transparent'
+                            }}>
+                              {selectedSubId === sub.id && <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#000' }} />}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    {!tribunal.has_voted && selectedSubId && (
+                      <button
+                        onClick={handleTribunalVote}
+                        disabled={votingTribunal}
+                        className="btn-primary"
+                        style={{ alignSelf: 'flex-end', padding: '12px 28px', marginTop: '8px' }}
+                      >
+                        {votingTribunal ? 'Envoi...' : 'Confirmer mon vote 🗳️'}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* PHASE 3: RESULTS */}
+            {phase === 'results' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '12px' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', margin: 0 }}>
+                  Résultats des votes :
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {tribunal.submissions.map((sub, idx) => {
+                    const isWinner = idx === 0 && sub.vote_count > 0;
+                    return (
+                      <div
+                        key={sub.id}
+                        style={{
+                          padding: '20px',
+                          backgroundColor: isWinner ? 'rgba(255,247,0,0.02)' : 'var(--bg-input)',
+                          border: `1px solid ${isWinner ? 'var(--accent)' : 'var(--border-color)'}`,
+                          borderRadius: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '12px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                          <span style={{ fontSize: '1.1rem', fontStyle: 'italic', fontWeight: 600 }}>
+                            "{sub.answer_text}"
+                          </span>
+                          <span style={{
+                            fontSize: '0.9rem',
+                            fontWeight: 800,
+                            color: sub.vote_count > 0 ? 'var(--accent)' : 'var(--text-secondary)',
+                            backgroundColor: 'rgba(255,255,255,0.02)',
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            🗳️ {sub.vote_count} vote{sub.vote_count > 1 ? 's':''}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
+                          <span>
+                            Auteur : <strong style={{ color: sub.is_mine ? 'var(--accent)' : 'var(--text-primary)' }}>
+                              {sub.author_username} {sub.is_mine ? '(Vous)' : ''}
+                            </strong>
+                          </span>
+                          {sub.vote_count > 0 && (
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                              Voté par : {sub.votes.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* RIGHT: Live Scoreboard */}
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'sticky', top: '24px' }}>
+          <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Users size={16} style={{ color: 'var(--accent)' }} /> Classement Live
+            </h3>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {lobbyState.players.map((p, i) => {
+              const isMe = p.user_id === user.id;
+              
+              // Status text in writing/voting phase
+              let statusLabel = null;
+              if (phase === 'writing') {
+                statusLabel = p.has_submitted ? (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 600 }}>✅ Prêt</span>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', animation: 'pulse 1.5s infinite' }}>✍️ Écrit...</span>
+                );
+              } else if (phase === 'voting') {
+                statusLabel = p.has_voted ? (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 600 }}>🗳️ Voté</span>
+                ) : (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', animation: 'pulse 1.5s infinite' }}>🤔 Vote...</span>
+                );
+              }
+
+              return (
+                <div key={p.user_id} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  backgroundColor: isMe ? 'rgba(255,247,0,0.04)' : 'var(--bg-input)',
+                  border: `1px solid ${isMe ? 'rgba(255,247,0,0.2)' : 'var(--border-color)'}`,
+                  borderRadius: '6px', fontSize: '0.85rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>#{i + 1}</span>
+                    <span style={{ ...getUsernameStyle(p.global_score), fontWeight: isMe ? 700 : 500 }}>
+                      {p.username}{isMe ? ' (Vous)' : ''}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{p.score} pts</span>
+                    {statusLabel}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
   // RENDER: PLAYING (question + answer)
   // ============================================================
   if (gamePhase === 'playing' || gamePhase === 'feedback') {
+    if (lobbyState.game_mode === 'tribunal') {
+      return renderTribunalGame();
+    }
     const isFeedback = gamePhase === 'feedback';
-    const timeRatio = questionTimer / 15000;
+    const myPlayerInfo = lobbyState?.players.find(p => p.user_id === user.id);
+    const isEliminated = myPlayerInfo?.is_eliminated;
+
+    const timeLimit = (lobbyState && lobbyState.game_mode === 'speed_blitz') ? 5000 : 15000;
+    const timeRatio = questionTimer / timeLimit;
 
     return (
       <div className="container animate-fade-in"
@@ -508,7 +923,13 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
           {/* Question Card */}
           <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {fetchingQuestion ? (
+            {isEliminated ? (
+               <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--error)' }}>
+                  <XCircle size={48} style={{ margin: '0 auto 16px' }} />
+                  <h2 style={{ fontSize: '1.2rem' }}>Vous êtes éliminé</h2>
+                  <p>Vous pouvez toujours suivre la partie en spectateur.</p>
+               </div>
+            ) : fetchingQuestion ? (
               <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
                 <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 12px auto', display: 'block' }} />
                 Chargement de la question...
@@ -519,6 +940,33 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                   {currentQuestion.question_text}
                 </h2>
 
+                {currentQuestion.question_type === 'guess_number' || currentQuestion.question_type === 'open' ? (
+                  <form onSubmit={(e) => { e.preventDefault(); handleAnswer(openAnswer.trim()); }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <input 
+                      type={currentQuestion.question_type === 'guess_number' ? 'number' : 'text'}
+                      value={openAnswer} 
+                      onChange={(e) => setOpenAnswer(e.target.value)}
+                      placeholder={currentQuestion.question_type === 'guess_number' ? 'Entrez votre estimation...' : 'Entrez votre réponse...'}
+                      disabled={!!selectedOption || isFeedback} 
+                      style={{
+                        width: '100%',
+                        padding: '16px',
+                        borderRadius: '12px',
+                        border: '1px solid var(--border-color)',
+                        backgroundColor: 'var(--bg-input)',
+                        color: '#fff',
+                        fontSize: '1.1rem',
+                        outline: 'none'
+                      }}
+                      autoFocus
+                    />
+                    {!selectedOption && !isFeedback && (
+                      <button type="submit" className="btn-primary" disabled={!openAnswer.trim()} style={{ alignSelf: 'flex-start', padding: '12px 24px' }}>
+                        Valider
+                      </button>
+                    )}
+                  </form>
+                ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {Object.entries(currentQuestion.options).map(([key, text]) => {
                     const isSelected = selectedOption === key;
@@ -547,6 +995,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     );
                   })}
                 </div>
+                )}
 
                 {/* Feedback message */}
                 {isFeedback && answerFeedback && (
@@ -567,7 +1016,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                       <>
                         <XCircle size={20} style={{ color: 'var(--error)' }} />
                         <span style={{ color: 'var(--error)', fontWeight: 700 }}>
-                          Incorrect — Réponse : {answerFeedback.correct_option}. {answerFeedback.correct_text}
+                          Incorrect — Réponse : {answerFeedback.correct_option || answerFeedback.correct_value}. {answerFeedback.correct_text}
                         </span>
                       </>
                     )}
@@ -604,15 +1053,17 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>#{i + 1}</span>
                     <span style={{ ...getUsernameStyle(p.global_score), fontWeight: isMe ? 700 : 500 }}>
-                      {p.username}{isMe ? ' (Vous)' : ''}
+                      {p.username}{isMe ? ' (Vous)' : ''} {p.is_eliminated ? '💀' : ''}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.8rem' }}>{p.score} pts</span>
-                    {p.finished ? (
+                    {p.is_eliminated ? (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--error)', fontWeight: 'bold' }}>Éliminé</span>
+                    ) : p.finished ? (
                       <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
                     ) : (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                         Q{p.current_question_index + 1}
                       </span>
                     )}

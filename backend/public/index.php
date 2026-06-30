@@ -217,6 +217,57 @@ try {
             }
             break;
 
+        // --- Daily Quiz ---
+        case '/api/quiz/daily/status':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuizController())->getDailyStatus();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/quiz/daily/questions':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuizController())->getDailyQuestions();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/quiz/daily/submit':
+            if ($method === 'POST') {
+                (new \App\Controllers\QuizController())->submitDailyAnswer(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        // --- Admin Daily Quiz Scheduling ---
+        case '/api/admin/daily-quizzes':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuizController())->getDailyQuizzes();
+            } elseif ($method === 'POST') {
+                (new \App\Controllers\QuizController())->scheduleDailyQuiz(getRequestBody());
+            } elseif ($method === 'DELETE') {
+                (new \App\Controllers\QuizController())->deleteDailyQuiz(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/admin/questions':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuizController())->getAdminQuestions();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         // --- Multiplayer Lobby ---
         case '/api/lobby/create':
             if ($method === 'POST') {
@@ -266,6 +317,24 @@ try {
         case '/api/lobby/answer':
             if ($method === 'POST') {
                 (new \App\Controllers\LobbyController())->submitAnswer();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/lobby/tribunal/submit':
+            if ($method === 'POST') {
+                (new \App\Controllers\LobbyController())->submitTribunalAnswer(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/lobby/tribunal/vote':
+            if ($method === 'POST') {
+                (new \App\Controllers\LobbyController())->submitTribunalVote(getRequestBody());
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);

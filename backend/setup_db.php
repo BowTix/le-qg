@@ -183,7 +183,7 @@ try {
     $stmt->execute();
     if (!$stmt->fetch()) {
         $admin_pass = password_hash('admin123', PASSWORD_DEFAULT);
-        $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES ('admin', ?, 'admin')")
+        $pdo->prepare("INSERT INTO users (username, discriminator, password_hash, role, is_verified) VALUES ('admin', '0001', ?, 'admin', 1)")
             ->execute([$admin_pass]);
         echo "Admin user created (username: admin, password: admin123).\n";
     }
@@ -193,7 +193,7 @@ try {
     $stmt->execute();
     if (!$stmt->fetch()) {
         $alice_pass = password_hash('alice123', PASSWORD_DEFAULT);
-        $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES ('alice', ?, 'user')")
+        $pdo->prepare("INSERT INTO users (username, discriminator, password_hash, role, is_verified) VALUES ('alice', '0002', ?, 'user', 1)")
             ->execute([$alice_pass]);
         echo "User 'alice' created (password: alice123).\n";
     }
@@ -202,7 +202,7 @@ try {
     $stmt->execute();
     if (!$stmt->fetch()) {
         $bob_pass = password_hash('bob123', PASSWORD_DEFAULT);
-        $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES ('bob', ?, 'user')")
+        $pdo->prepare("INSERT INTO users (username, discriminator, password_hash, role, is_verified) VALUES ('bob', '0003', ?, 'user', 1)")
             ->execute([$bob_pass]);
         echo "User 'bob' created (password: bob123).\n";
     }

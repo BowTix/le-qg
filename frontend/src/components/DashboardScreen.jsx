@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
-import { LogOut, Trophy, Play, Plus, Users, User, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award } from 'lucide-react';
+import { LogOut, Trophy, Play, Plus, Users, User, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award, Zap, Skull, Calculator, Gavel } from 'lucide-react';
 import { getLevel, getUsernameStyle, getLevelBadge, getLevelProgressDetails } from '../utils/progression';
 
-export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator, onOpenLeaderboard, onOpenProfile }) {
+export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator, onOpenLeaderboard, onOpenProfile, onStartDailyQuiz }) {
   const [packs, setPacks] = useState([]);
   const [selectedPackSolo, setSelectedPackSolo] = useState('');
   const [selectedPackLobby, setSelectedPackLobby] = useState('');
@@ -16,13 +16,28 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
 
   // Redesign State
   const [mode, setMode] = useState('solo'); // 'solo' or 'online'
+  const [gameMode, setGameMode] = useState('classic'); // 'classic' | 'speed_blitz' | 'sudden_death' | 'guess_number'
   const [activePackIndex, setActivePackIndex] = useState(0);
   const [animateClass, setAnimateClass] = useState('animate-fade-in');
 
+  // Daily Quiz State
+  const [dailyStatus, setDailyStatus] = useState({ scheduled: false, completed: false });
 
   useEffect(() => {
     fetchPacks();
+    fetchDailyStatus();
   }, []);
+
+  const fetchDailyStatus = async () => {
+    try {
+      const res = await api.get('/quiz/daily/status');
+      if (res.success) {
+        setDailyStatus(res);
+      }
+    } catch (err) {
+      console.error("Failed to fetch daily quiz status", err);
+    }
+  };
 
   const fetchPacks = async () => {
     setLoadingPacks(true);
@@ -71,6 +86,36 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
     }
   }, [mode, packs]);
 
+  // Lock logic for "Le Juste Nombre" theme when guess_number mode is active
+  useEffect(() => {
+    if (gameMode === 'guess_number' && filteredPacks.length > 0) {
+      const targetIdx = filteredPacks.findIndex(p => 
+        p.name.toLowerCase().includes("juste nombre") || 
+        p.name.toLowerCase().includes("estimation") || 
+        parseInt(p.id) === 3 || 
+        parseInt(p.id) === 4
+      );
+      if (targetIdx !== -1) {
+        setActivePackIndex(targetIdx);
+        setSelectedPackSolo(filteredPacks[targetIdx].id.toString());
+        setSelectedPackLobby(filteredPacks[targetIdx].id.toString());
+        triggerAnimation();
+      }
+    }
+    if (gameMode === 'tribunal' && filteredPacks.length > 0) {
+      const targetIdx = filteredPacks.findIndex(p => 
+        p.name.toLowerCase().includes("tribunal") || 
+        parseInt(p.id) === 5
+      );
+      if (targetIdx !== -1) {
+        setActivePackIndex(targetIdx);
+        setSelectedPackSolo(filteredPacks[targetIdx].id.toString());
+        setSelectedPackLobby(filteredPacks[targetIdx].id.toString());
+        triggerAnimation();
+      }
+    }
+  }, [gameMode, filteredPacks]);
+
   const triggerAnimation = () => {
     setAnimateClass('');
     setTimeout(() => {
@@ -79,7 +124,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   };
 
   const handlePrevPack = () => {
-    if (filteredPacks.length === 0) return;
+    if (filteredPacks.length === 0 || gameMode === 'guess_number') return;
     const nextIdx = (activePackIndex - 1 + filteredPacks.length) % filteredPacks.length;
     setActivePackIndex(nextIdx);
     
@@ -90,7 +135,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   };
 
   const handleNextPack = () => {
-    if (filteredPacks.length === 0) return;
+    if (filteredPacks.length === 0 || gameMode === 'guess_number') return;
     const nextIdx = (activePackIndex + 1) % filteredPacks.length;
     setActivePackIndex(nextIdx);
     
@@ -114,7 +159,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
 
   const handleStartSolo = () => {
     if (selectedPackSolo) {
-      onStartSolo(parseInt(selectedPackSolo));
+      onStartSolo(parseInt(selectedPackSolo), gameMode);
     }
   };
 
@@ -125,7 +170,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
     try {
       const data = await api.post('/lobby/create', { 
         pack_id: parseInt(selectedPackLobby),
-        game_mode: 'classic'
+        game_mode: gameMode
       });
       if (data.success && data.room_code) {
         onCreateLobby(data.room_code);
@@ -159,9 +204,151 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   };
 
   return (
-    <div className="container animate-slide-up">
+    <div className="container animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
+      {/* 📅 DAILY QUIZ PANEL */}
+      {dailyStatus.scheduled && (
+        <div 
+          className="glass-card max-w-2xl w-full mx-auto" 
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '16px', 
+            padding: '24px 36px', 
+            background: 'linear-gradient(135deg, rgba(255, 247, 0, 0.03) 0%, rgba(255, 255, 255, 0.02) 100%)',
+            borderLeft: '4px solid var(--accent)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+            marginBottom: '-8px'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.4rem' }}>📅</span>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', margin: 0 }}>
+                Le Quiz du Jour
+              </h3>
+            </div>
+            
+            {dailyStatus.completed ? (
+              <span style={{ 
+                backgroundColor: 'rgba(0, 255, 157, 0.1)', 
+                color: 'var(--success)', 
+                fontSize: '0.75rem', 
+                fontWeight: 700, 
+                padding: '4px 10px', 
+                borderRadius: '20px',
+                border: '1px solid rgba(0, 255, 157, 0.2)'
+              }}>
+                Complété
+              </span>
+            ) : (
+              <span style={{ 
+                backgroundColor: 'rgba(255, 247, 0, 0.1)', 
+                color: 'var(--accent)', 
+                fontSize: '0.75rem', 
+                fontWeight: 700, 
+                padding: '4px 10px', 
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 247, 0, 0.2)'
+              }}>
+                Disponible
+              </span>
+            )}
+          </div>
 
+          {dailyStatus.completed ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>Votre résultat aujourd'hui :</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)' }}>
+                      {(() => {
+                        const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
+                        return `${correctCount}/3`;
+                      })()}
+                    </span>
+                    <span style={{ fontSize: '1.2rem', letterSpacing: '2px' }}>
+                      {dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}
+                      {dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}
+                      {dailyStatus.attempt.q3_correct ? '🟩' : '🟥'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Share Button */}
+                <button 
+                  className="btn-primary" 
+                  onClick={() => {
+                    const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
+                    const dateObj = new Date();
+                    const d = String(dateObj.getDate()).padStart(2, '0');
+                    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    const shareText = `Le QG - Quiz du Jour #${d}-${m} 📅\n${dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q3_correct ? '🟩' : '🟥'} (${correctCount}/3)\nJouez vous aussi sur : ${window.location.origin}`;
+                    
+                    navigator.clipboard.writeText(shareText);
+                    alert("Résultats copiés dans le presse-papiers !");
+                  }}
+                  style={{ alignSelf: 'center', padding: '10px 20px', fontSize: '0.9rem' }}
+                >
+                  Partager mon résultat
+                </button>
+              </div>
+
+              {/* Stats Section */}
+              {dailyStatus.stats && (
+                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Taux de réussite global ({dailyStatus.stats.total} participants) :
+                  </span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                        <span>Q1</span>
+                        <strong>{dailyStatus.stats.q1_pct}%</strong>
+                      </div>
+                      <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: `${dailyStatus.stats.q1_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                        <span>Q2</span>
+                        <strong>{dailyStatus.stats.q2_pct}%</strong>
+                      </div>
+                      <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: `${dailyStatus.stats.q2_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                        <span>Q3</span>
+                        <strong>{dailyStatus.stats.q3_pct}%</strong>
+                      </div>
+                      <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: `${dailyStatus.stats.q3_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0, maxWidth: '400px' }}>
+                Un nouveau défi vous attend ! 3 questions uniques partagées par tous les joueurs. Une seule tentative possible.
+              </p>
+              <button 
+                className="btn-primary" 
+                onClick={onStartDailyQuiz}
+                style={{ padding: '10px 24px', fontSize: '0.9rem' }}
+              >
+                Lancer le Quiz
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Central Control Hub Card */}
       <div className="glass-card max-w-2xl w-full mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '28px', padding: '36px' }}>
@@ -170,7 +357,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
         <div className="tab-group">
           <button
             className={`tab-btn${mode === 'solo' ? ' active' : ''}`}
-            onClick={() => setMode('solo')}
+            onClick={() => { setMode('solo'); if (gameMode === 'tribunal') setGameMode('classic'); }}
           >
             <BookOpen size={17} />
             Mode Entraînement
@@ -182,6 +369,126 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
             <Globe size={17} />
             Mode En Ligne
           </button>
+        </div>
+
+        {/* Game Mode Selector Cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <span className="section-label">Choisir un Mode de Jeu</span>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+            
+            {/* Mode Classique */}
+            <div 
+              onClick={() => setGameMode('classic')}
+              style={{
+                padding: '16px 12px',
+                borderRadius: '10px',
+                border: `2.5px solid ${gameMode === 'classic' ? 'var(--accent)' : 'var(--border-color)'}`,
+                backgroundColor: gameMode === 'classic' ? 'var(--bg-hover)' : 'var(--bg-card)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'var(--transition)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Gamepad2 size={22} style={{ color: gameMode === 'classic' ? 'var(--accent)' : 'var(--text-secondary)' }} />
+              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Classique</div>
+              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>10 QCM standard avec bonus de vitesse.</p>
+            </div>
+
+            {/* Mode Speed Blitz */}
+            <div 
+              onClick={() => setGameMode('speed_blitz')}
+              style={{
+                padding: '16px 12px',
+                borderRadius: '10px',
+                border: `2.5px solid ${gameMode === 'speed_blitz' ? 'var(--accent)' : 'var(--border-color)'}`,
+                backgroundColor: gameMode === 'speed_blitz' ? 'var(--bg-hover)' : 'var(--bg-card)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'var(--transition)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Zap size={22} style={{ color: gameMode === 'speed_blitz' ? 'var(--accent)' : 'var(--text-secondary)' }} />
+              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Speed Blitz</div>
+              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>Chrono réduit à 5s. Rapidité maximale.</p>
+            </div>
+
+            {/* Mode Mort Subite */}
+            <div 
+              onClick={() => setGameMode('sudden_death')}
+              style={{
+                padding: '16px 12px',
+                borderRadius: '10px',
+                border: `2.5px solid ${gameMode === 'sudden_death' ? 'var(--accent)' : 'var(--border-color)'}`,
+                backgroundColor: gameMode === 'sudden_death' ? 'var(--bg-hover)' : 'var(--bg-card)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'var(--transition)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Skull size={22} style={{ color: gameMode === 'sudden_death' ? 'var(--accent)' : 'var(--text-secondary)' }} />
+              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Mort Subite</div>
+              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>La moindre erreur vous élimine.</p>
+            </div>
+
+            {/* Mode Le Juste Nombre */}
+            <div 
+              onClick={() => setGameMode('guess_number')}
+              style={{
+                padding: '16px 12px',
+                borderRadius: '10px',
+                border: `2.5px solid ${gameMode === 'guess_number' ? 'var(--accent)' : 'var(--border-color)'}`,
+                backgroundColor: gameMode === 'guess_number' ? 'var(--bg-hover)' : 'var(--bg-card)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'var(--transition)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <Calculator size={22} style={{ color: gameMode === 'guess_number' ? 'var(--accent)' : 'var(--text-secondary)' }} />
+              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Juste Nombre</div>
+              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>Estimez de tête les valeurs chiffrées.</p>
+            </div>
+
+            {/* Mode Le Tribunal */}
+            {mode === 'online' && (
+              <div 
+                onClick={() => setGameMode('tribunal')}
+                style={{
+                  padding: '16px 12px',
+                  borderRadius: '10px',
+                  border: `2.5px solid ${gameMode === 'tribunal' ? 'var(--accent)' : 'var(--border-color)'}`,
+                  backgroundColor: gameMode === 'tribunal' ? 'var(--bg-hover)' : 'var(--bg-card)',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  transition: 'var(--transition)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Gavel size={22} style={{ color: gameMode === 'tribunal' ? 'var(--accent)' : 'var(--text-secondary)' }} />
+                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Le Tribunal</div>
+                <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>Dilemmes ouverts. Rédigez et votez.</p>
+              </div>
+            )}
+
+          </div>
         </div>
 
         {/* Theme Selection Section */}
@@ -204,6 +511,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
               {/* Carousel Left button */}
               <button
                 onClick={handlePrevPack}
+                disabled={gameMode === 'guess_number'}
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -214,17 +522,22 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#ffffff',
-                  cursor: 'pointer',
+                  cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
+                  opacity: gameMode === 'guess_number' ? 0.3 : 1,
                   transition: 'var(--transition-smooth)',
                   flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.borderColor = 'var(--accent)';
+                  if (gameMode !== 'guess_number') {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.borderColor = 'var(--accent)';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                  if (gameMode !== 'guess_number') {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                  }
                 }}
               >
                 <ChevronLeft size={18} />
@@ -329,6 +642,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
               {/* Carousel Right button */}
               <button
                 onClick={handleNextPack}
+                disabled={gameMode === 'guess_number'}
                 style={{
                   background: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -339,17 +653,22 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: '#ffffff',
-                  cursor: 'pointer',
+                  cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
+                  opacity: gameMode === 'guess_number' ? 0.3 : 1,
                   transition: 'var(--transition-smooth)',
                   flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.borderColor = 'var(--accent)';
+                  if (gameMode !== 'guess_number') {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.borderColor = 'var(--accent)';
+                  }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                  if (gameMode !== 'guess_number') {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                  }
                 }}
               >
                 <ChevronRight size={18} />
@@ -379,8 +698,16 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
           /* SOLO MODE ACTIONS */
           <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.4' }}>
-              Entraînez-vous sans stress sur un pack de questions aléatoires. <br />
-              Remportez <strong style={{ color: '#fff' }}>10 points de score global</strong> pour chaque bonne réponse !
+              Mode sélectionné : <strong style={{ color: 'var(--accent)' }}>
+                {gameMode === 'classic' && "Classique"}
+                {gameMode === 'speed_blitz' && "Speed Blitz"}
+                {gameMode === 'sudden_death' && "Mort Subite"}
+                {gameMode === 'guess_number' && "Le Juste Nombre"}
+              </strong>. <br />
+              {gameMode === 'classic' && "Entraînez-vous avec 15s par question."}
+              {gameMode === 'speed_blitz' && "Chrono ultra rapide de 5s par question !"}
+              {gameMode === 'sudden_death' && "La moindre erreur termine la partie."}
+              {gameMode === 'guess_number' && "Saisissez votre estimation au clavier."}
             </p>
             <button 
               className="btn-primary" 
@@ -389,7 +716,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
               style={{ padding: '14px', fontSize: '1rem', width: '100%', maxWidth: '320px', margin: '0 auto' }}
             >
               <Play size={18} />
-              Commencer l'Entraînement
+              Lancer la partie Solo
             </button>
           </div>
         ) : (
@@ -403,10 +730,14 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                 Créer une Partie
               </h4>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', lineHeight: '1.4', marginBottom: '8px' }}>
-                Générez un salon de jeu en direct sur le thème sélectionné et invitez vos amis.
+                Créer un salon en mode <strong style={{ color: 'var(--accent)' }}>
+                  {gameMode === 'classic' && "Classique"}
+                  {gameMode === 'speed_blitz' && "Speed Blitz"}
+                  {gameMode === 'sudden_death' && "Mort Subite"}
+                  {gameMode === 'guess_number' && "Le Juste Nombre"}
+                  {gameMode === 'tribunal' && "Le Tribunal"}
+                </strong>.
               </p>
-
-
 
               <button 
                 className="btn-primary" 
@@ -414,7 +745,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                 disabled={creating || filteredPacks.length === 0}
                 style={{ padding: '12px', fontSize: '0.9rem' }}
               >
-                Créer un Salon
+                Créer le Salon
               </button>
               {createError && <div style={{ color: 'var(--error)', fontSize: '0.8rem', marginTop: '4px' }}>{createError}</div>}
             </div>

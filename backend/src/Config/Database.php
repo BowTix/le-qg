@@ -59,9 +59,11 @@ class Database {
 
                 self::$connection = new PDO($dsn, $user, $pass, $options);
             } catch (PDOException $e) {
-                // Return a clean 500 server error
-                http_response_code(500);
-                echo json_encode(["error" => "Database connection failure: " . $e->getMessage()]);
+                http_response_code(503);
+                echo json_encode([
+                    "error" => "Serveur BDD injoignable ou en veille",
+                    "details" => $e->getMessage()
+                ]);
                 exit(1);
             }
         }

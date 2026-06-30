@@ -7,6 +7,7 @@ import AdminScreen from './components/AdminScreen';
 import CreatorScreen from './components/CreatorScreen';
 import LeaderboardScreen from './components/LeaderboardScreen';
 import ProfileScreen from './components/ProfileScreen';
+import DailyQuizScreen from './components/DailyQuizScreen';
 import { api, PUBLIC_BASE } from './utils/api';
 import { Trophy, Plus, User, LogOut, ShieldAlert, ChevronDown, Sun, Moon, Coins, Gamepad2 } from 'lucide-react';
 import { getEloRank } from './utils/progression';
@@ -27,7 +28,7 @@ export default function App() {
 
   // Theme state
   const [theme, setTheme] = useState(() => {
-    return localStorage.getItem('quiz_theme') || 'dark';
+    return localStorage.getItem('quiz_theme') || 'light';
   });
 
   // Sync theme to <html> attribute
@@ -40,6 +41,7 @@ export default function App() {
 
   // Navigation state
   const [soloPackId, setSoloPackId] = useState(null);
+  const [soloGameMode, setSoloGameMode] = useState('classic');
   const [roomCode, setRoomCode] = useState('');
 
   // 1. Restore Auth Session on Mount
@@ -259,19 +261,28 @@ export default function App() {
           <DashboardScreen
             user={user}
             onLogout={handleLogout}
-            onStartSolo={(packId) => { setSoloPackId(packId); setView('solo'); }}
+            onStartSolo={(packId, mode) => { setSoloPackId(packId); setSoloGameMode(mode); setView('solo'); }}
             onCreateLobby={(code) => { setRoomCode(code); setView('lobby'); }}
             onJoinLobby={(code) => { setRoomCode(code); setView('lobby'); }}
             onOpenAdmin={() => setView('admin')}
             onOpenCreator={() => setView('creator')}
             onOpenLeaderboard={() => setView('leaderboard')}
             onOpenProfile={() => setView('profile')}
+            onStartDailyQuiz={() => setView('daily_quiz')}
+          />
+        )}
+
+        {view === 'daily_quiz' && (
+          <DailyQuizScreen
+            onBack={() => setView('dashboard')}
+            onUpdateUserStats={updateUserStats}
           />
         )}
 
         {view === 'solo' && (
           <SoloQuizScreen
             packId={soloPackId}
+            gameMode={soloGameMode}
             onBack={() => setView('dashboard')}
             onUpdateUserStats={updateUserStats}
           />
