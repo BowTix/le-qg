@@ -7,10 +7,6 @@ use App\Utils\JWT;
 
 class LobbyController
 {
-    private function broadcastLobbyUpdate($roomCode)
-    {
-        \App\Utils\Pusher::trigger("lobby-" . $roomCode, "lobby_updated", ["room_code" => $roomCode]);
-    }
     // ================================================================
     // CREATE LOBBY
     // ================================================================
@@ -128,8 +124,9 @@ class LobbyController
             $stmtReset->execute([$lobby['id'], $user['user_id']]);
         }
 
-        $this->broadcastLobbyUpdate($roomCode);
         echo json_encode(['success' => true, 'room_code' => $roomCode, 'lobby_id' => intval($lobby['id'])]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     // ================================================================
@@ -178,6 +175,21 @@ class LobbyController
             $this->checkTribunalStateTransition($db, $lobby, $nowMs, $playerIds);
         }
 
+        $response = $this->buildLobbyState($db, $lobby, $playersRaw, $user['user_id']);
+
+        echo json_encode($response);
+    }
+
+    // ================================================================
+    // BUILD LOBBY STATE (shared between HTTP /status and Pusher broadcast)
+    // ================================================================
+    // $currentUserId is used only to compute per-user fields like
+    // "is_mine" / "my_submission" / "has_voted". When this is built for
+    // a broadcast (sent to everyone on the channel, not a single user),
+    // pass null and the frontend will derive those fields itself from
+    // its own user_id, since it already knows who it is.
+    private function buildLobbyState($db, $lobby, $playersRaw, $currentUserId)
+    {
         $nowMs = round(microtime(true) * 1000);
 
         // Build players array
@@ -253,7 +265,7 @@ class LobbyController
 
             $questionIds = explode(',', $lobby['questions_list']);
             $currentQuestionId = intval($questionIds[$round]);
-            
+
             $stmtQ = $db->prepare("SELECT question_text FROM questions WHERE id = ?");
             $stmtQ->execute([$currentQuestionId]);
             $promptText = $stmtQ->fetchColumn();
@@ -273,10 +285,12 @@ class LobbyController
                 }
 
                 $mySubmission = null;
-                foreach ($subsRaw as $sub) {
-                    if (intval($sub['user_id']) === $user['user_id']) {
-                        $mySubmission = $sub['answer_text'];
-                        break;
+                if ($currentUserId !== null) {
+                    foreach ($subsRaw as $sub) {
+                        if (intval($sub['user_id']) === $currentUserId) {
+                            $mySubmission = $sub['answer_text'];
+                            break;
+                        }
                     }
                 }
 
@@ -288,19 +302,31 @@ class LobbyController
                 $subsRaw = $stmtSubs->fetchAll();
 
                 $hasVoted = false;
-                foreach ($subsRaw as $sub) {
-                    if (intval($sub['user_id']) === $user['user_id'] && $sub['voted_for_user_id'] !== null) {
-                        $hasVoted = true;
-                        break;
+                if ($currentUserId !== null) {
+                    foreach ($subsRaw as $sub) {
+                        if (intval($sub['user_id']) === $currentUserId && $sub['voted_for_user_id'] !== null) {
+                            $hasVoted = true;
+                            break;
+                        }
                     }
                 }
 
                 foreach ($subsRaw as $sub) {
-                    $submissions[] = [
+                    // IMPORTANT: never include user_id/author identity here.
+                    // During voting, authorship must stay anonymous. When
+                    // $currentUserId is null (broadcast payload, shared by
+                    // everyone), we simply omit is_mine — each client adds
+                    // it locally by comparing against the user_id it knows
+                    // about itself (its own last-submitted answer text),
+                    // which the frontend already tracks after submitting.
+                    $entry = [
                         'id' => intval($sub['id']),
-                        'answer_text' => $sub['answer_text'],
-                        'is_mine' => (intval($sub['user_id']) === $user['user_id'])
+                        'answer_text' => $sub['answer_text']
                     ];
+                    if ($currentUserId !== null) {
+                        $entry['is_mine'] = (intval($sub['user_id']) === $currentUserId);
+                    }
+                    $submissions[] = $entry;
                 }
 
                 // Deterministic sort using a seed based on lobby ID and round number.
@@ -342,7 +368,7 @@ class LobbyController
                         'author_username' => $sub['username'],
                         'votes' => $votes,
                         'vote_count' => count($votes),
-                        'is_mine' => ($authorId === $user['user_id'])
+                        'is_mine' => ($currentUserId !== null && $authorId === $currentUserId)
                     ];
                 }
 
@@ -362,7 +388,62 @@ class LobbyController
             ];
         }
 
-        echo json_encode($response);
+        return $response;
+    }
+
+    // ================================================================
+    // BROADCAST: Build + push the full lobby/tribunal state over Pusher
+    // ================================================================
+    // Unlike broadcastLobbyUpdate() (a bare "something changed" ping that
+    // forces every client to re-fetch /lobby/status), this pushes the
+    // actual state in the event payload. Clients apply it directly and
+    // skip the HTTP round-trip entirely — this is what makes actions
+    // (submit/vote) feel instant to OTHER players in the room.
+    private function broadcastLobbyState($db, $lobby)
+    {
+        // Callers reach this from several endpoints, and not all of them
+        // SELECT with the host_username/pack_name JOIN that /status uses
+        // (most just do `SELECT * FROM lobbies`). Re-fetch with the full
+        // JOIN here so the broadcast never sends null for those fields —
+        // this one extra query is worth the correctness guarantee, and
+        // it's still far cheaper than a full client-side re-fetch + the
+        // rest of /status's work for every player in the room.
+        $stmtLobby = $db->prepare("
+            SELECT l.*, u.username as host_username, p.name as pack_name
+            FROM lobbies l
+            JOIN users u ON l.host_id = u.id
+            JOIN packs p ON l.pack_id = p.id
+            WHERE l.id = ?
+        ");
+        $stmtLobby->execute([$lobby['id']]);
+        $freshLobby = $stmtLobby->fetch();
+        if ($freshLobby) {
+            // Merge: keep any in-memory fields the caller just patched
+            // locally (e.g. status='playing' right after an UPDATE) that
+            // might not be reflected by this re-fetch under rare race
+            // conditions, but prefer the fresh DB row otherwise.
+            $lobby = array_merge($freshLobby, $lobby);
+        }
+
+        $stmtPlayers = $db->prepare("
+            SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
+                   lp.elo_change, lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
+                   u.username, u.global_score, u.elo
+            FROM lobby_players lp
+            JOIN users u ON lp.user_id = u.id
+            WHERE lp.lobby_id = ?
+            ORDER BY lp.current_score DESC
+        ");
+        $stmtPlayers->execute([$lobby['id']]);
+        $playersRaw = $stmtPlayers->fetchAll();
+
+        // currentUserId = null: this payload is shared by everyone on the
+        // channel, so it must not contain any single user's private fields
+        // (is_mine, my_submission, has_voted are omitted/neutral — see
+        // buildLobbyState for details).
+        $state = $this->buildLobbyState($db, $lobby, $playersRaw, null);
+
+        \App\Utils\Pusher::triggerAsync("lobby-" . $lobby['room_code'], "lobby_state", $state);
     }
 
     // ================================================================
@@ -457,12 +538,24 @@ class LobbyController
         ");
         $stmtReset->execute([$lobby['id']]);
 
-        $this->broadcastLobbyUpdate($roomCode);
+        // $lobby in memory still reflects the pre-update row (status='waiting',
+        // old tribunal_phase, etc). Patch it locally so the broadcast carries
+        // the real, just-written state instead of stale data.
+        $lobby['status'] = 'playing';
+        $lobby['questions_list'] = $questionsList;
+        $lobby['game_started_at'] = $gameStartedAt;
+        $lobby['current_question_index'] = 0;
+        $lobby['current_question_id'] = null;
+        $lobby['tribunal_phase'] = $tribunalPhase;
+        $lobby['tribunal_phase_ends_at'] = $tribunalEndsAt;
+
         echo json_encode([
             'success' => true,
             'message' => 'La partie commence !',
             'countdown_ms' => 3000
         ]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     // ================================================================
@@ -772,7 +865,6 @@ class LobbyController
         $optMap = ['A' => 'opt_a', 'B' => 'opt_b', 'C' => 'opt_c', 'D' => 'opt_d'];
         $correctText = $question[$optMap[$correctOpt]] ?? '';
 
-        $this->broadcastLobbyUpdate($roomCode);
         echo json_encode([
             'success' => true,
             'correct' => $isCorrect,
@@ -783,6 +875,8 @@ class LobbyController
             'next_index' => $newIndex,
             'response_time_ms' => intval($elapsedMs)
         ]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     // ================================================================
@@ -856,13 +950,19 @@ class LobbyController
 
         if ($allFinished) {
             $this->calculateFinalRankings($db, $lobby);
+            // calculateFinalRankings() receives $lobby by value, so our
+            // local copy still says status='playing' even though the DB
+            // row is now 'finished'. Patch it so the broadcast reflects
+            // the real state.
+            $lobby['status'] = 'finished';
         }
 
-        $this->broadcastLobbyUpdate($roomCode);
         echo json_encode([
             'success' => true,
             'all_finished' => $allFinished
         ]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     // ================================================================
@@ -997,13 +1097,15 @@ class LobbyController
         // If the host leaves, close the lobby
         if (intval($lobby['host_id']) === $user['user_id']) {
             $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ?")->execute([$lobby['id']]);
+            $lobby['status'] = 'finished';
         } else {
             // Non-host: just remove from players
             $db->prepare("DELETE FROM lobby_players WHERE lobby_id = ? AND user_id = ?")->execute([$lobby['id'], $user['user_id']]);
         }
 
-        $this->broadcastLobbyUpdate($roomCode);
         echo json_encode(['success' => true]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     private static function cleanText($text) {
@@ -1067,8 +1169,17 @@ class LobbyController
         $stmtInsert = $db->prepare("INSERT INTO tribunal_submissions (lobby_id, round_number, user_id, answer_text) VALUES (?, ?, ?, ?)");
         $stmtInsert->execute([$lobby['id'], $round, $user['user_id'], $answerText]);
 
-        $this->broadcastLobbyUpdate($roomCode);
+        // Fetch players and trigger transition check
+        $stmtPlayers = $db->prepare("SELECT user_id FROM lobby_players WHERE lobby_id = ?");
+        $stmtPlayers->execute([$lobby['id']]);
+        $playerIds = $stmtPlayers->fetchAll(\PDO::FETCH_COLUMN);
+
+        $nowMs = round(microtime(true) * 1000);
+        $this->checkTribunalStateTransition($db, $lobby, $nowMs, $playerIds);
+
         echo json_encode(['success' => true]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     // ================================================================
@@ -1132,8 +1243,17 @@ class LobbyController
         ");
         $stmtUpdate->execute([$targetSub['user_id'], $lobby['id'], $round, $user['user_id']]);
 
-        $this->broadcastLobbyUpdate($roomCode);
+        // Fetch players and trigger transition check
+        $stmtPlayers = $db->prepare("SELECT user_id FROM lobby_players WHERE lobby_id = ?");
+        $stmtPlayers->execute([$lobby['id']]);
+        $playerIds = $stmtPlayers->fetchAll(\PDO::FETCH_COLUMN);
+
+        $nowMs = round(microtime(true) * 1000);
+        $this->checkTribunalStateTransition($db, $lobby, $nowMs, $playerIds);
+
         echo json_encode(['success' => true]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     // ================================================================
@@ -1239,7 +1359,7 @@ class LobbyController
                     $stmtPIdx->execute([$lobby['id']]);
                 }
 
-                $this->broadcastLobbyUpdate($lobby['room_code']);
+                $this->broadcastLobbyState($db, $lobby);
             }
         } elseif ($phase === 'voting') {
             // Count votes (votes are set when voted_for_user_id is not null)
@@ -1275,7 +1395,7 @@ class LobbyController
                 $lobby['tribunal_phase'] = 'results';
                 $lobby['tribunal_phase_ends_at'] = $newEndsAt;
 
-                $this->broadcastLobbyUpdate($lobby['room_code']);
+                $this->broadcastLobbyState($db, $lobby);
             }
         } elseif ($phase === 'results') {
             $timeExpired = ($nowMs >= $endsAt);
@@ -1316,14 +1436,15 @@ class LobbyController
                     $stmtPIdx = $db->prepare("UPDATE lobby_players SET current_question_index = ? WHERE lobby_id = ?");
                     $stmtPIdx->execute([$nextRound, $lobby['id']]);
 
-                    $this->broadcastLobbyUpdate($lobby['room_code']);
+                    $this->broadcastLobbyState($db, $lobby);
                 } else {
                     // Finish game (atomic check to prevent duplicate finish calculations)
                     $stmtUp = $db->prepare("UPDATE lobbies SET status = 'finished' WHERE id = ? AND status = 'playing'");
                     $stmtUp->execute([$lobby['id']]);
                     if ($stmtUp->rowCount() > 0) {
+                        $lobby['status'] = 'finished';
                         $this->calculateFinalRankings($db, $lobby);
-                        $this->broadcastLobbyUpdate($lobby['room_code']);
+                        $this->broadcastLobbyState($db, $lobby);
                     } else {
                         $stmtReload = $db->prepare("SELECT status FROM lobbies WHERE id = ?");
                         $stmtReload->execute([$lobby['id']]);

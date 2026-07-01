@@ -48,7 +48,12 @@ class Pusher {
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        
+        // Short, hard timeouts: this call must never become the bottleneck
+        // for the player's own request. If Pusher is slow/down, we fail
+        // fast and the requesting player still gets their response on time.
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT_MS, 1000);
+        curl_setopt($ch, CURLOPT_TIMEOUT_MS, 1500);
+
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
@@ -59,5 +64,43 @@ class Pusher {
         }
 
         return true;
+    }
+
+    /**
+     * Flushes the HTTP response to the client now (if running under
+     * PHP-FPM), so any code that runs after this call (e.g. a Pusher
+     * broadcast) does not make the requesting player wait for it.
+     *
+     * IMPORTANT: call this AFTER echo-ing the JSON response, never before
+     * — otherwise the response gets cut off before it's even generated.
+     * On non-FPM setups (Apache mod_php, php -S) this is a no-op; the
+     * short timeouts on trigger()/triggerAsync() keep the extra wait
+     * bounded to ~1-1.5s in that case.
+     */
+    public static function finishResponse(): void {
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } else {
+            if (!headers_sent()) {
+                header("Connection: close");
+            }
+            while (ob_get_level() > 0) {
+                ob_end_flush();
+            }
+            flush();
+        }
+    }
+
+    /**
+     * Alias for trigger(), used at every broadcast call site in the
+     * controller. The actual "don't make the player wait" behavior comes
+     * from calling Pusher::finishResponse() right after echo-ing the
+     * response and BEFORE calling this — see broadcastLobbyState() call
+     * sites in LobbyController. This method itself stays synchronous;
+     * its short timeouts (set in trigger()) just guarantee it can never
+     * hang indefinitely if Pusher is slow or unreachable.
+     */
+    public static function triggerAsync(string $channel, string $event, $data): void {
+        self::trigger($channel, $event, $data);
     }
 }
