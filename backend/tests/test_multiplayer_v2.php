@@ -87,7 +87,7 @@ sleep(4);
 // 5. Each player independently answers all questions
 echo "[5/6] Chaque joueur répond aux 10 questions indépendamment...\n";
 
-require_once __DIR__ . '/src/Config/Database.php';
+require_once __DIR__ . '/../src/Config/Database.php';
 $db = \App\Config\Database::getConnection();
 
 // Reset Elos for clean test

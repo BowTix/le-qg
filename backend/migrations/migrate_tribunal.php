@@ -3,7 +3,7 @@
  * Database Migration: Le Tribunal Game Mode & Seeds
  */
 
-require_once __DIR__ . '/src/Config/Database.php';
+require_once __DIR__ . '/../src/Config/Database.php';
 
 use App\Config\Database;
 

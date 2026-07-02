@@ -3,7 +3,7 @@
  * Database Migration: QG Mini-Games & Quiz HQ Expansion
  */
 
-require_once __DIR__ . '/src/Config/Database.php';
+require_once __DIR__ . '/../src/Config/Database.php';
 
 use App\Config\Database;
 

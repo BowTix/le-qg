@@ -39,7 +39,7 @@ class Pusher {
         $stringToSign = "POST\n$path\n$queryString";
         $signature = hash_hmac('sha256', $stringToSign, $appSecret);
 
-        $url = "https://api-$cluster.pusher.com$path?$queryString&auth_signature=$signature";
+        $url = "http://api-$cluster.pusher.com$path?$queryString&auth_signature=$signature";
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -48,6 +48,8 @@ class Pusher {
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        // Force IPv4 resolution to prevent slow IPv6 lookup on Windows local dev
+        curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         // Short, hard timeouts: this call must never become the bottleneck
         // for the player's own request. If Pusher is slow/down, we fail
         // fast and the requesting player still gets their response on time.

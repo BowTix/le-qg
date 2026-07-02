@@ -9,13 +9,28 @@ import LeaderboardScreen from './components/LeaderboardScreen';
 import ProfileScreen from './components/ProfileScreen';
 import DailyQuizScreen from './components/DailyQuizScreen';
 import { api, PUBLIC_BASE } from './utils/api';
-import { Trophy, Plus, User, LogOut, ShieldAlert, ChevronDown, Sun, Moon, Coins, Gamepad2 } from 'lucide-react';
+import {
+  Trophy,
+  Plus,
+  User,
+  LogOut,
+  ShieldAlert,
+  ChevronDown,
+  Sun,
+  Moon,
+  Coins,
+  Gamepad2,
+  Calendar,
+  Share2
+} from 'lucide-react';
 import { getEloRank } from './utils/progression';
 
 export default function App() {
   const [view, setView] = useState('auth');
   const [user, setUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [dailyStatus, setDailyStatus] = useState({ scheduled: false, completed: false });
+  const [showDailyModal, setShowDailyModal] = useState(false);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -80,6 +95,23 @@ export default function App() {
     }
   }, [view]);
 
+  const fetchDailyStatus = async () => {
+    try {
+      const res = await api.get('/quiz/daily/status');
+      if (res.success) {
+        setDailyStatus(res);
+      }
+    } catch (err) {
+      console.error("Failed to fetch daily quiz status", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchDailyStatus();
+    }
+  }, [user, view]);
+
   const handleAuthSuccess = (userData) => {
     setUser(userData);
     setView('dashboard');
@@ -143,6 +175,33 @@ export default function App() {
                 >
                   <Plus size={14} style={{ color: 'var(--accent)' }} />
                   <span className="hide-mobile">Créer Thème</span>
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setShowDailyModal(true)}
+                  style={{ 
+                    padding: '7px 12px', 
+                    fontSize: '0.825rem',
+                    position: 'relative',
+                    border: '1px solid rgba(255, 247, 0, 0.25)',
+                    background: 'linear-gradient(135deg, rgba(255, 247, 0, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)'
+                  }}
+                  title="Quiz du Jour"
+                >
+                  <Calendar size={14} style={{ color: 'var(--accent)' }} />
+                  <span className="hide-mobile">Quiz du Jour</span>
+                  {dailyStatus.scheduled && !dailyStatus.completed && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-3px',
+                      right: '-3px',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: '#ef4444',
+                      boxShadow: '0 0 6px #ef4444'
+                    }} />
+                  )}
                 </button>
               </div>
 
@@ -316,6 +375,174 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* 📅 DAILY QUIZ MODAL */}
+      {showDailyModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }} onClick={() => setShowDailyModal(false)}>
+          <div 
+            className="glass-card" 
+            style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '20px', 
+              padding: '36px', 
+              background: 'var(--bg-card)',
+              color: 'var(--text-primary)',
+              borderLeft: '4px solid var(--accent)',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
+              position: 'relative',
+              maxWidth: '500px',
+              width: '100%'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.4rem' }}>📅</span>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', margin: 0, color: 'var(--text-primary)' }}>
+                  Le Quiz du Jour
+                </h3>
+              </div>
+              
+              {dailyStatus.completed ? (
+                <span style={{ 
+                  backgroundColor: 'rgba(0, 255, 157, 0.1)', 
+                  color: 'var(--success)', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 700, 
+                  padding: '4px 10px', 
+                  borderRadius: '20px',
+                  border: '1px solid rgba(0, 255, 157, 0.2)'
+                }}>
+                  Complété
+                </span>
+              ) : (
+                <span style={{ 
+                  backgroundColor: 'rgba(255, 247, 0, 0.1)', 
+                  color: 'var(--accent)', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 700, 
+                  padding: '4px 10px', 
+                  borderRadius: '20px',
+                  border: '1px solid rgba(255, 247, 0, 0.2)'
+                }}>
+                  Disponible
+                </span>
+              )}
+            </div>
+
+            {dailyStatus.completed ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', textAlign: 'center', backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Votre résultat aujourd'hui :</p>
+                  <span style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--accent)', margin: '4px 0 0 0' }}>
+                    {(() => {
+                      const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
+                      return `${correctCount}/3`;
+                    })()}
+                  </span>
+                  <span style={{ fontSize: '1.4rem', letterSpacing: '4px' }}>
+                    {dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}
+                    {dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}
+                    {dailyStatus.attempt.q3_correct ? '🟩' : '🟥'}
+                  </span>
+                  
+                  {/* Share Button */}
+                  <button 
+                    className="btn-primary" 
+                    onClick={() => {
+                      const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
+                      const dateObj = new Date();
+                      const d = String(dateObj.getDate()).padStart(2, '0');
+                      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+                      const shareText = `Le QG - Quiz du Jour #${d}-${m} 📅\n${dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q3_correct ? '🟩' : '🟥'} (${correctCount}/3)\nJouez vous aussi sur : ${window.location.origin}`;
+                      
+                      navigator.clipboard.writeText(shareText);
+                      alert("Résultats copiés dans le presse-papiers !");
+                    }}
+                    style={{ marginTop: '12px', padding: '10px 20px', fontSize: '0.85rem' }}
+                  >
+                    <Share2 size={16} />
+                    Partager mon résultat (Copier)
+                  </button>
+                </div>
+
+                {/* Stats Section */}
+                {dailyStatus.stats && (
+                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Taux de réussite global ({dailyStatus.stats.total} participants) :
+                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                          <span>Q1</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{dailyStatus.stats.q1_pct}%</strong>
+                        </div>
+                        <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: `${dailyStatus.stats.q1_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                          <span>Q2</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{dailyStatus.stats.q2_pct}%</strong>
+                        </div>
+                        <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: `${dailyStatus.stats.q2_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                          <span>Q3</span>
+                          <strong style={{ color: 'var(--text-primary)' }}>{dailyStatus.stats.q3_pct}%</strong>
+                        </div>
+                        <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: `${dailyStatus.stats.q3_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center' }}>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                  Un défi quotidien unique vous attend ! Répondez correctement à 3 questions partagées par toute la communauté. Attention, vous n'avez qu'une seule tentative par jour.
+                </p>
+                <button 
+                  className="btn-primary" 
+                  onClick={() => {
+                    setShowDailyModal(false);
+                    setView('daily_quiz');
+                  }}
+                  style={{ padding: '12px 28px', fontSize: '0.9rem', marginTop: '8px' }}
+                >
+                  Lancer le Quiz du Jour
+                </button>
+              </div>
+            )}
+
+            <button 
+              className="btn-secondary" 
+              onClick={() => setShowDailyModal(false)}
+              style={{ width: '100%', padding: '12px', marginTop: '8px' }}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

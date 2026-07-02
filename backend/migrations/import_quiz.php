@@ -7,7 +7,7 @@
 // Register autoloader
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
-    $base_dir = __DIR__ . '/src/';
+    $base_dir = __DIR__ . '/../src/';
     $len = strlen($prefix);
     
     if (strncmp($prefix, $class, $len) !== 0) {
@@ -23,7 +23,7 @@ spl_autoload_register(function ($class) {
 });
 
 // Load environment variables
-$envFile = __DIR__ . '/.env';
+$envFile = __DIR__ . '/../.env';
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {

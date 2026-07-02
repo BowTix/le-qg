@@ -24,8 +24,29 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
   const [results, setResults] = useState(null); // { attempt, stats, points_earned, coins_earned }
 
   useEffect(() => {
+    let active = true;
+
+    const fetchQuestions = async () => {
+      try {
+        const data = await api.get('/quiz/daily/questions');
+        if (data.success && active) {
+          setQuestions(data.questions);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err.message || "Impossible de charger le quiz du jour. Veuillez réessayer plus tard.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchQuestions();
+
     return () => {
+      active = false;
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
@@ -51,19 +72,6 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
       }, 1000);
     }
   }, [currentIndex, questions, results]);
-
-  const fetchQuestions = async () => {
-    try {
-      const data = await api.get('/quiz/daily/questions');
-      if (data.success) {
-        setQuestions(data.questions);
-      }
-    } catch (err) {
-      setError(err.message || "Impossible de charger le quiz du jour. Veuillez réessayer plus tard.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleNext = (finalAnswer) => {
     if (timerRef.current) clearInterval(timerRef.current);
@@ -137,8 +145,8 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
 
   if (error) {
     return (
-      <div className="container">
-        <div className="glass-card max-w-md mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '36px', textAlign: 'center' }}>
+      <div className="container" style={{ maxWidth: '800px' }}>
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '36px', textAlign: 'center', color: 'var(--text-primary)', width: '100%' }}>
           <div style={{ fontSize: '2.5rem' }}>⚠️</div>
           <h3 style={{ color: 'var(--error)', fontWeight: 700 }}>Une erreur est survenue</h3>
           <p style={{ color: 'var(--text-secondary)' }}>{error}</p>
@@ -167,8 +175,8 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
     const correctCount = [results.attempt.q1_correct, results.attempt.q2_correct, results.attempt.q3_correct].filter(Boolean).length;
     
     return (
-      <div className="container">
-        <div className="glass-card max-w-xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '28px', padding: '36px' }}>
+      <div className="container" style={{ maxWidth: '800px' }}>
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '28px', padding: '36px', color: 'var(--text-primary)', width: '100%' }}>
           
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <span style={{ fontSize: '2.5rem' }}>📅</span>
@@ -275,8 +283,12 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
   const currentQuestion = questions[currentIndex];
   
   return (
-    <div className="container">
-      <div className="glass-card max-w-xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '36px' }}>
+    <div className="container" style={{ maxWidth: '800px' }}>
+      <div 
+        key={currentQuestion.id}
+        className="glass-card animate-slide-up" 
+        style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '36px', color: 'var(--text-primary)', width: '100%' }}
+      >
         
         {/* Progress header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -340,42 +352,17 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
           </form>
         ) : (
           // Multiple Choice QCM
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px', marginTop: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
             {['A', 'B', 'C', 'D'].map(optKey => {
               const optionText = currentQuestion.options[optKey];
               return (
                 <button
                   key={optKey}
                   onClick={() => handleNext(optKey)}
-                  style={{
-                    width: '100%',
-                    padding: '16px 20px',
-                    borderRadius: '12px',
-                    border: '1.5px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-card)',
-                    textAlign: 'left',
-                    fontSize: '1rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}
-                  className="option-button-hover"
+                  className="option-btn"
+                  style={{ justifyContent: 'flex-start' }}
                 >
-                  <span style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    backgroundColor: 'var(--bg-input)',
-                    border: '1px solid var(--border-color)',
-                    fontSize: '0.85rem',
-                    fontWeight: 700
-                  }}>
+                  <span className="option-badge">
                     {optKey}
                   </span>
                   <span>{optionText}</span>

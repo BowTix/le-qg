@@ -614,7 +614,7 @@ label {
   gap: 7px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  border: none;
+  border: 1px solid transparent;
   font-family: var(--font-sans);
   font-weight: 600;
   font-size: 0.9rem;
@@ -623,6 +623,11 @@ label {
   color: var(--text-secondary);
   background: transparent;
   white-space: nowrap;
+  outline: none;
+}
+
+.tab-btn:focus {
+  outline: none;
 }
 
 .tab-btn.active {
@@ -1122,3 +1127,157 @@ label {
     display: none !important;
   }
 }
+
+/* ============================================
+   SKELETON LOADER & SHIMMER
+   ============================================ */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--bg-surface) 25%, var(--border-color) 50%, var(--bg-surface) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.skeleton-text {
+  height: 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.skeleton-title {
+  height: 24px;
+  width: 60%;
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+}
+
+/* ============================================
+   GAME CARD SELECTION REDESIGN
+   ============================================ */
+.game-category-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.game-card {
+  padding: 24px;
+  background: var(--bg-card);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--card-shadow);
+}
+
+.game-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(42, 157, 143, 0.12), 0 0 0 1px var(--accent);
+}
+
+[data-theme="dark"] .game-card:hover {
+  box-shadow: 0 8px 24px rgba(61, 189, 173, 0.18), 0 0 0 1px var(--accent);
+}
+
+.game-card.active {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  box-shadow: 0 4px 16px rgba(42, 157, 143, 0.15), 0 0 0 1px var(--accent);
+}
+
+.game-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(0, 0, 0, 0.05);
+}
+.game-card.disabled:hover {
+  transform: none;
+  border-color: var(--border-color);
+  box-shadow: var(--card-shadow);
+}
+
+.game-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  transition: var(--transition);
+}
+
+.game-card:hover .game-card-icon,
+.game-card.active .game-card-icon {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.game-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.game-card-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.game-card-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.game-card.active .game-card-badge {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+/* Options Expansion Container */
+.options-panel-container {
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  margin-top: 12px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Setup Screen Layout Responsiveness */
+@media (max-width: 768px) {
+  .grid-auto {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+  }
+}
+

@@ -62,7 +62,7 @@ if (isset($alice['body']['token']) && isset($bob['body']['token']) && isset($cha
 
 // 2. Initialize Elo database values for clean test run
 echo "[2/4] Initialisation des Elos de référence à 1000 dans la base...\n";
-require_once 'c:/Users/Mathis/OneDrive/Documents/Programmation/quiz/backend/src/Config/Database.php';
+require_once __DIR__ . '/../src/Config/Database.php';
 $db = \App\Config\Database::getConnection();
 $db->exec("UPDATE users SET elo = 1000 WHERE username IN ('alice', 'bob', 'charlie')");
 echo "✅ SUCCÈS : Elos réinitialisés.\n\n";

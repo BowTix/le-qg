@@ -6,7 +6,7 @@
 
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
-    $base_dir = __DIR__ . '/src/';
+    $base_dir = __DIR__ . '/../src/';
     $len = strlen($prefix);
     if (strncmp($prefix, $class, $len) !== 0) return;
     $relative_class = substr($class, $len);
@@ -15,7 +15,7 @@ spl_autoload_register(function ($class) {
 });
 
 // Load Env manually by triggering Database connection or reading .env
-require_once __DIR__ . '/src/Config/Database.php';
+require_once __DIR__ . '/../src/Config/Database.php';
 // This loads env vars into $_ENV and getenv
 App\Config\Database::getConnection();
 

@@ -4,7 +4,7 @@
  * Run: php migrate_coins.php
  */
 
-require_once __DIR__ . '/src/Config/Database.php';
+require_once __DIR__ . '/../src/Config/Database.php';
 
 $db = \App\Config\Database::getConnection();
 

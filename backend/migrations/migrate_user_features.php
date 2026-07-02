@@ -4,7 +4,7 @@
  * Run this from the CLI: php backend/migrate_user_features.php
  */
 
-require_once __DIR__ . '/src/Config/Database.php';
+require_once __DIR__ . '/../src/Config/Database.php';
 
 use App\Config\Database;
 

@@ -6,7 +6,7 @@
 
 // Load environment variables if .env exists
 function loadEnv() {
-    $envFile = __DIR__ . '/.env';
+    $envFile = __DIR__ . '/../.env';
     if (file_exists($envFile)) {
         $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
@@ -43,8 +43,8 @@ $options = [
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES => false,
 ];
-if ($sslCa && file_exists(__DIR__ . '/' . $sslCa)) {
-    $options[PDO::MYSQL_ATTR_SSL_CA] = __DIR__ . '/' . $sslCa;
+if ($sslCa && file_exists(__DIR__ . '/../' . $sslCa)) {
+    $options[PDO::MYSQL_ATTR_SSL_CA] = __DIR__ . '/../' . $sslCa;
 }
 
 try {

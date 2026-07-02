@@ -11,7 +11,7 @@ echo "=== STARTING LE TRIBUNAL INTEGRATION TEST ===\n";
 
 // 1. Start a temporary PHP server
 echo "-> Starting temporary PHP server on port $port...\n";
-$serverCmd = "php -S 127.0.0.1:$port -t public";
+$serverCmd = "php -S 127.0.0.1:$port -t " . escapeshellarg(__DIR__ . '/../public');
 $descriptorspec = [
     0 => ["pipe", "r"],
     1 => ["pipe", "w"],

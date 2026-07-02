@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../utils/api';
-import { LogOut, Trophy, Play, Plus, Users, User, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award, Zap, Skull, Calculator, Gavel } from 'lucide-react';
+import { LogOut, Trophy, Play, Plus, Users, User, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award, Zap, Skull, Calculator, Gavel, Lock } from 'lucide-react';
 import { getLevel, getUsernameStyle, getLevelBadge, getLevelProgressDetails } from '../utils/progression';
 
 export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator, onOpenLeaderboard, onOpenProfile, onStartDailyQuiz }) {
@@ -17,27 +17,13 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   // Redesign State
   const [mode, setMode] = useState('solo'); // 'solo' or 'online'
   const [gameMode, setGameMode] = useState('classic'); // 'classic' | 'speed_blitz' | 'sudden_death' | 'guess_number'
+  const [selectedGame, setSelectedGame] = useState(null);
   const [activePackIndex, setActivePackIndex] = useState(0);
   const [animateClass, setAnimateClass] = useState('animate-fade-in');
 
-  // Daily Quiz State
-  const [dailyStatus, setDailyStatus] = useState({ scheduled: false, completed: false });
-
   useEffect(() => {
     fetchPacks();
-    fetchDailyStatus();
   }, []);
-
-  const fetchDailyStatus = async () => {
-    try {
-      const res = await api.get('/quiz/daily/status');
-      if (res.success) {
-        setDailyStatus(res);
-      }
-    } catch (err) {
-      console.error("Failed to fetch daily quiz status", err);
-    }
-  };
 
   const fetchPacks = async () => {
     setLoadingPacks(true);
@@ -203,599 +189,510 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
     }
   };
 
+  const gameDetails = {
+    classic: {
+      title: "Classique",
+      icon: <Gamepad2 size={36} style={{ color: 'var(--accent)' }} />,
+      desc: "Le mode classique du QG. Vous devez répondre à 10 questions de culture générale à choix multiples. Plus vous répondez vite, plus vous marquez de points !",
+      rules: [
+        "10 questions à choix multiples (QCM).",
+        "15 secondes maximum par question.",
+        "Score calculé sur la vitesse (jusqu'à 100 points par question).",
+        "Idéal pour s'échauffer en solo ou s'affronter en groupe."
+      ]
+    },
+    speed_blitz: {
+      title: "Speed Blitz",
+      icon: <Zap size={36} style={{ color: 'var(--accent)' }} />,
+      desc: "Un mode survitaminé pour tester vos réflexes et votre intuition. Pas le temps de douter, il faut cliquer !",
+      rules: [
+        "10 questions à choix multiples.",
+        "Seulement 5 secondes de réflexion par question.",
+        "Pression temporelle maximale !",
+        "Parfait pour tester votre culture générale spontanée."
+      ]
+    },
+    sudden_death: {
+      title: "Mort Subite",
+      icon: <Skull size={36} style={{ color: 'var(--accent)' }} />,
+      desc: "La moindre erreur vous élimine de la partie. Serez-vous capable de réaliser le sans-faute parfait ?",
+      rules: [
+        "Enchaînement de questions à choix multiples.",
+        "La première réponse fausse met fin à votre partie (élimination).",
+        "Le vainqueur est le dernier survivant ou celui avec le plus de points.",
+        "Gros enjeu intellectuel et tactique."
+      ]
+    },
+    guess_number: {
+      title: "Le Juste Nombre",
+      icon: <Calculator size={36} style={{ color: 'var(--accent)' }} />,
+      desc: "Pas de QCM ici. Vous devez estimer une valeur numérique exacte et saisir votre réponse au clavier. La réponse la plus proche l'emporte !",
+      rules: [
+        "Saisie numérique libre.",
+        "Questions basées sur des estimations (années, tailles, statistiques).",
+        "Calcul des points selon la marge d'erreur par rapport à la bonne réponse.",
+        "Faites chauffer votre logique mathématique."
+      ]
+    },
+    tribunal: {
+      title: "Le Tribunal",
+      icon: <Gavel size={36} style={{ color: 'var(--accent)' }} />,
+      desc: "Un jeu social et délirant où l'imagination et l'humour priment. Écrivez les réponses les plus drôles à des dilemmes absurdes et votez pour vos favorites.",
+      rules: [
+        "Phase 1 : Rédigez une réponse secrète (limite de 180 caractères) à 5 dilemmes ouverts.",
+        "Phase 2 : Votez anonymement pour la meilleure réponse parmi celles du salon.",
+        "Phase 3 : Découvrez qui a écrit quoi et récoltez les points du jury.",
+        "Exclusivement multijoueur (3 joueurs minimum recommandés)."
+      ]
+    }
+  };
+
+  const selectedCategory = gameMode === 'tribunal' ? 'party' : 'quiz';
+
+  const cultureQuizGames = [
+    {
+      id: 'classic',
+      title: 'Classique',
+      desc: '10 QCM standard avec bonus de rapidité pour marquer un maximum de points.',
+      icon: <Play size={20} />,
+      onClick: () => {
+        setGameMode('classic');
+        setSelectedGame('classic');
+        if (mode === 'online') setMode('solo');
+      }
+    },
+    {
+      id: 'speed_blitz',
+      title: 'Speed Blitz',
+      desc: 'Le temps de réflexion est réduit à 5 secondes. Rapidité et intuition exigées !',
+      icon: <Zap size={20} />,
+      onClick: () => {
+        setGameMode('speed_blitz');
+        setSelectedGame('speed_blitz');
+        if (mode === 'online') setMode('solo');
+      }
+    },
+    {
+      id: 'sudden_death',
+      title: 'Mort Subite',
+      desc: 'Chaque erreur est fatale. Répondez correctement ou vous serez éliminé.',
+      icon: <Skull size={20} />,
+      onClick: () => {
+        setGameMode('sudden_death');
+        setSelectedGame('sudden_death');
+        if (mode === 'online') setMode('solo');
+      }
+    },
+    {
+      id: 'guess_number',
+      title: 'Juste Nombre',
+      desc: 'Estimez des valeurs chiffrées précises et tapez votre réponse au clavier.',
+      icon: <Calculator size={20} />,
+      onClick: () => {
+        setGameMode('guess_number');
+        setSelectedGame('guess_number');
+        if (mode === 'online') setMode('solo');
+      }
+    }
+  ];
+
+  const partyGames = [
+    {
+      id: 'tribunal',
+      title: 'Le Tribunal',
+      desc: 'Rédigez des réponses absurdes à des dilemmes ouverts et votez anonymement.',
+      icon: <Gavel size={20} />,
+      badge: 'Multijoueur 👥',
+      onClick: () => {
+        setGameMode('tribunal');
+        setSelectedGame('tribunal');
+        setMode('online');
+      }
+    },
+    {
+      id: 'imposteur',
+      title: "L'Imposteur",
+      desc: 'Un jeu de bluff et de déduction sociale. Trouvez qui cache son mot secret.',
+      icon: <Lock size={20} />,
+      badge: 'Bientôt 🚀',
+      disabled: true
+    },
+    {
+      id: 'decodeur',
+      title: 'Décodeur',
+      desc: 'Faites deviner des codes chiffrés à vos coéquipiers en transmettant des indices.',
+      icon: <Lock size={20} />,
+      badge: 'Bientôt 🚀',
+      disabled: true
+    }
+  ];
+
   return (
     <div className="container animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       
-      {/* 📅 DAILY QUIZ PANEL */}
-      {dailyStatus.scheduled && (
-        <div 
-          className="glass-card max-w-2xl w-full mx-auto" 
-          style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '16px', 
-            padding: '24px 36px', 
-            background: 'linear-gradient(135deg, rgba(255, 247, 0, 0.03) 0%, rgba(255, 255, 255, 0.02) 100%)',
-            borderLeft: '4px solid var(--accent)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
-            marginBottom: '-8px'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.4rem' }}>📅</span>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', margin: 0 }}>
-                Le Quiz du Jour
-              </h3>
-            </div>
-            
-            {dailyStatus.completed ? (
-              <span style={{ 
-                backgroundColor: 'rgba(0, 255, 157, 0.1)', 
-                color: 'var(--success)', 
-                fontSize: '0.75rem', 
-                fontWeight: 700, 
-                padding: '4px 10px', 
-                borderRadius: '20px',
-                border: '1px solid rgba(0, 255, 157, 0.2)'
-              }}>
-                Complété
-              </span>
-            ) : (
-              <span style={{ 
-                backgroundColor: 'rgba(255, 247, 0, 0.1)', 
-                color: 'var(--accent)', 
-                fontSize: '0.75rem', 
-                fontWeight: 700, 
-                padding: '4px 10px', 
-                borderRadius: '20px',
-                border: '1px solid rgba(255, 247, 0, 0.2)'
-              }}>
-                Disponible
-              </span>
-            )}
+
+      {selectedGame === null ? (
+        /* ============================================================
+           STAGE 1: CATALOG VIEW
+           ============================================================ */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+          
+          {/* CATEGORY 1: QUIZ CULTURE */}
+          <div>
+            <h3 className="game-category-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <Gamepad2 size={16} /> Quiz de Culture & Connaissances
+            </h3>
+            <GameCarousel3D items={cultureQuizGames} />
           </div>
 
-          {dailyStatus.completed ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>Votre résultat aujourd'hui :</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent)' }}>
-                      {(() => {
-                        const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
-                        return `${correctCount}/3`;
-                      })()}
-                    </span>
-                    <span style={{ fontSize: '1.2rem', letterSpacing: '2px' }}>
-                      {dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}
-                      {dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}
-                      {dailyStatus.attempt.q3_correct ? '🟩' : '🟥'}
-                    </span>
-                  </div>
-                </div>
+          {/* CATEGORY 2: JEUX DE SOIREE */}
+          <div>
+            <h3 className="game-category-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <Users size={16} /> Jeux de Soirée & Rôles Sociaux
+            </h3>
+            <GameCarousel3D items={partyGames} />
+          </div>
 
-                {/* Share Button */}
-                <button 
-                  className="btn-primary" 
-                  onClick={() => {
-                    const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
-                    const dateObj = new Date();
-                    const d = String(dateObj.getDate()).padStart(2, '0');
-                    const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-                    const shareText = `Le QG - Quiz du Jour #${d}-${m} 📅\n${dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q3_correct ? '🟩' : '🟥'} (${correctCount}/3)\nJouez vous aussi sur : ${window.location.origin}`;
-                    
-                    navigator.clipboard.writeText(shareText);
-                    alert("Résultats copiés dans le presse-papiers !");
-                  }}
-                  style={{ alignSelf: 'center', padding: '10px 20px', fontSize: '0.9rem' }}
-                >
-                  Partager mon résultat
-                </button>
+        </div>
+      ) : (
+        /* ============================================================
+           STAGE 2: GAME SETUP VIEW (TWO COLUMNS)
+           ============================================================ */
+        <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Back button */}
+          <button 
+            onClick={() => setSelectedGame(null)}
+            className="btn-secondary"
+            style={{ 
+              alignSelf: 'flex-start', 
+              padding: '8px 16px', 
+              fontSize: '0.85rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              border: 'none',
+              background: 'rgba(255,255,255,0.05)'
+            }}
+          >
+            <ChevronLeft size={16} />
+            Retour au catalogue
+          </button>
+
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: '1fr 1fr', 
+            gap: '32px',
+            marginTop: '8px',
+            alignItems: 'start'
+          }} className="grid-auto">
+            
+            {/* Left Column: Game Presentation */}
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '32px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <div style={{ 
+                  width: '64px', height: '64px', borderRadius: '12px',
+                  backgroundColor: 'var(--bg-surface)', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center'
+                }}>
+                  {gameDetails[selectedGame]?.icon}
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                    {selectedCategory === 'quiz' ? "Quiz de culture" : "Jeu de Soirée"}
+                  </span>
+                  <h2 style={{ fontSize: '1.6rem', fontWeight: 800, margin: 0 }}>
+                    {gameDetails[selectedGame]?.title}
+                  </h2>
+                </div>
               </div>
 
-              {/* Stats Section */}
-              {dailyStatus.stats && (
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Taux de réussite global ({dailyStatus.stats.total} participants) :
-                  </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
-                        <span>Q1</span>
-                        <strong>{dailyStatus.stats.q1_pct}%</strong>
-                      </div>
-                      <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ width: `${dailyStatus.stats.q1_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
-                        <span>Q2</span>
-                        <strong>{dailyStatus.stats.q2_pct}%</strong>
-                      </div>
-                      <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ width: `${dailyStatus.stats.q2_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
-                        <span>Q3</span>
-                        <strong>{dailyStatus.stats.q3_pct}%</strong>
-                      </div>
-                      <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ width: `${dailyStatus.stats.q3_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
-                      </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', lineHeight: 1.5, margin: 0 }}>
+                {gameDetails[selectedGame]?.desc}
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-primary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Règles du jeu :
+                </span>
+                <ul style={{ paddingLeft: '18px', margin: 0, display: 'flex', flexDirection: 'column', gap: '6px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  {gameDetails[selectedGame]?.rules.map((rule, idx) => (
+                    <li key={idx}>{rule}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Right Column: Game Setup Options */}
+            <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '32px' }}>
+              
+              {selectedCategory === 'quiz' ? (
+                /* OPTION VIEW FOR STANDARD QUIZ */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {/* Mode Tabs */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span className="section-label">Choix de la formule</span>
+                    <div className="tab-group">
+                      <button
+                        className={`tab-btn${mode === 'solo' ? ' active' : ''}`}
+                        onClick={() => setMode('solo')}
+                      >
+                        <BookOpen size={16} />
+                        Entraînement (Solo)
+                      </button>
+                      <button
+                        className={`tab-btn${mode === 'online' ? ' active' : ''}`}
+                        onClick={() => setMode('online')}
+                      >
+                        <Globe size={16} />
+                        En Ligne (Multi)
+                      </button>
                     </div>
                   </div>
+
+                  {/* Theme Select */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="section-label">Sélectionner un Thème</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {mode === 'online' ? 'Thèmes officiels' : 'Tous les thèmes'}
+                      </span>
+                    </div>
+
+                    {loadingPacks ? (
+                      <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        <div className="spinner" style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.05)', borderTopColor: 'var(--accent)', borderRadius: '50%', display: 'inline-block' }} />
+                        <div style={{ marginTop: '8px', fontSize: '0.85rem' }}>Chargement des thèmes...</div>
+                      </div>
+                    ) : filteredPacks.length > 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button
+                          onClick={handlePrevPack}
+                          disabled={gameMode === 'guess_number'}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '50%', width: '36px', height: '36px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#ffffff', cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
+                            opacity: gameMode === 'guess_number' ? 0.3 : 1
+                          }}
+                        >
+                          <ChevronLeft size={16} />
+                        </button>
+
+                        <div
+                          className={animateClass}
+                          style={{
+                            flex: 1, height: '130px',
+                            background: `linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.85)), url(${getPackBg(filteredPacks[activePackIndex])}) center/cover no-repeat`,
+                            borderRadius: '10px', padding: '16px 20px', position: 'relative', overflow: 'hidden',
+                            display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                            border: '1px solid rgba(255, 255, 255, 0.08)', boxShadow: '0 6px 20px rgba(0, 0, 0, 0.3)'
+                          }}
+                        >
+                          <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, background: 'radial-gradient(circle at top right, rgba(255, 255, 255, 0.12) 0%, transparent 60%)', pointerEvents: 'none' }} />
+
+                          <span style={{
+                            position: 'absolute', top: '12px', right: '12px', backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                            color: 'var(--accent)', fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: '20px'
+                          }}>
+                            {filteredPacks[activePackIndex].question_count} Questions
+                          </span>
+
+                          {parseInt(filteredPacks[activePackIndex].is_validated) === 0 && (
+                            <span style={{
+                              position: 'absolute', bottom: '12px', right: '12px', backgroundColor: 'rgba(255, 247, 0, 0.1)',
+                              color: 'var(--accent)', fontSize: '0.62rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--accent)'
+                            }}>
+                              En attente
+                            </span>
+                          )}
+
+                          <div>
+                            <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff', margin: '0 0 2px 0' }}>
+                              {filteredPacks[activePackIndex].name}
+                            </h4>
+                            <p style={{
+                              fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.3,
+                              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', marginRight: '60px'
+                            }}>
+                              {filteredPacks[activePackIndex].description || "Aucune description."}
+                            </p>
+                          </div>
+
+                          <span style={{ fontSize: '0.62rem', color: 'rgba(255, 255, 255, 0.4)', fontWeight: 600 }}>
+                            Thème {activePackIndex + 1} sur {filteredPacks.length}
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={handleNextPack}
+                          disabled={gameMode === 'guess_number'}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.08)',
+                            borderRadius: '50%', width: '36px', height: '36px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#ffffff', cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
+                            opacity: gameMode === 'guess_number' ? 0.3 : 1
+                          }}
+                        >
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)', backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: '8px', border: '1px dashed var(--border-color)', fontSize: '0.85rem' }}>
+                        Aucun thème disponible pour ce mode.
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ height: '1px', backgroundColor: 'var(--border-color)', marginTop: '8px' }} />
+
+                  {/* Actions (Solo / Lobby) */}
+                  {mode === 'solo' ? (
+                    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'center' }}>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.4', margin: 0 }}>
+                        Lancer une session d'entraînement solo sur ce thème.
+                      </p>
+                      <button 
+                        className="btn-primary" 
+                        onClick={handleStartSolo}
+                        disabled={filteredPacks.length === 0}
+                        style={{ padding: '12px 24px', fontSize: '0.95rem', width: '100%', maxWidth: '280px', margin: '0 auto' }}
+                      >
+                        <Play size={16} />
+                        Jouer Solo
+                      </button>
+                    </div>
+                  ) : (
+                    /* ONLINE LOBBY */
+                    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      
+                      {/* Create */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span className="section-label">Création d'une salle</span>
+                        <button 
+                          className="btn-primary" 
+                          onClick={handleCreateLobby}
+                          disabled={creating || filteredPacks.length === 0}
+                          style={{ padding: '12px', fontSize: '0.9rem', width: '100%' }}
+                        >
+                          {creating ? 'Création...' : 'Créer un salon en ligne'}
+                        </button>
+                        {createError && <div style={{ color: 'var(--error)', fontSize: '0.78rem', marginTop: '2px' }}>{createError}</div>}
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <div style={{ height: '1px', backgroundColor: 'var(--border-color)', flex: 1 }} />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>ou</span>
+                        <div style={{ height: '1px', backgroundColor: 'var(--border-color)', flex: 1 }} />
+                      </div>
+
+                      {/* Join */}
+                      <form onSubmit={handleJoinLobby} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <span className="section-label">Rejoindre via un code</span>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="text"
+                            maxLength={5}
+                            placeholder="CODE (ex: W9H0L)"
+                            value={roomCode}
+                            onChange={(e) => setRoomCode(e.target.value)}
+                            style={{
+                              textTransform: 'uppercase', textAlign: 'center',
+                              fontSize: '0.9rem', letterSpacing: '1px', fontWeight: 700,
+                              padding: '10px'
+                            }}
+                            required
+                          />
+                          <button 
+                            type="submit" 
+                            className="btn-secondary" 
+                            style={{ display: 'flex', gap: '4px', padding: '0 16px', fontSize: '0.9rem' }}
+                            disabled={joining}
+                          >
+                            Rejoindre
+                            <ArrowRight size={16} />
+                          </button>
+                        </div>
+                        {joinError && <div style={{ color: 'var(--error)', fontSize: '0.78rem', marginTop: '2px' }}>{joinError}</div>}
+                      </form>
+
+                    </div>
+                  )}
+
+                </div>
+              ) : (
+                /* OPTION VIEW FOR PARTY SOCIAL GAMES (Le Tribunal) */
+                <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  
+                  {/* Create */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span className="section-label">Création d'une salle</span>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '0 0 4px 0' }}>
+                      Générez un code de salon et invitez vos amis à vous rejoindre en ligne.
+                    </p>
+                    <button 
+                      className="btn-primary" 
+                      onClick={handleCreateLobby}
+                      disabled={creating || filteredPacks.length === 0}
+                      style={{ padding: '12px', fontSize: '0.9rem', width: '100%' }}
+                    >
+                      {creating ? 'Création...' : 'Créer un salon Le Tribunal'}
+                    </button>
+                    {createError && <div style={{ color: 'var(--error)', fontSize: '0.78rem', marginTop: '2px' }}>{createError}</div>}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <div style={{ height: '1px', backgroundColor: 'var(--border-color)', flex: 1 }} />
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>ou</span>
+                    <div style={{ height: '1px', backgroundColor: 'var(--border-color)', flex: 1 }} />
+                  </div>
+
+                  {/* Join */}
+                  <form onSubmit={handleJoinLobby} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span className="section-label">Rejoindre un salon</span>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '0 0 4px 0' }}>
+                      Saisissez le code de salon fourni par l'hôte.
+                    </p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="text"
+                        maxLength={5}
+                        placeholder="CODE (ex: W9H0L)"
+                        value={roomCode}
+                        onChange={(e) => setRoomCode(e.target.value)}
+                        style={{
+                          textTransform: 'uppercase', textAlign: 'center',
+                          fontSize: '0.9rem', letterSpacing: '1px', fontWeight: 700,
+                          padding: '10px'
+                        }}
+                        required
+                      />
+                      <button 
+                        type="submit" 
+                        className="btn-secondary" 
+                        style={{ display: 'flex', gap: '4px', padding: '0 16px', fontSize: '0.9rem' }}
+                        disabled={joining}
+                      >
+                        Rejoindre
+                        <ArrowRight size={16} />
+                      </button>
+                    </div>
+                    {joinError && <div style={{ color: 'var(--error)', fontSize: '0.78rem', marginTop: '2px' }}>{joinError}</div>}
+                  </form>
+
                 </div>
               )}
+
             </div>
-          ) : (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0, maxWidth: '400px' }}>
-                Un nouveau défi vous attend ! 3 questions uniques partagées par tous les joueurs. Une seule tentative possible.
-              </p>
-              <button 
-                className="btn-primary" 
-                onClick={onStartDailyQuiz}
-                style={{ padding: '10px 24px', fontSize: '0.9rem' }}
-              >
-                Lancer le Quiz
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       )}
-
-      {/* Central Control Hub Card */}
-      <div className="glass-card max-w-2xl w-full mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '28px', padding: '36px' }}>
-        
-        {/* Segmented Tab Control */}
-        <div className="tab-group">
-          <button
-            className={`tab-btn${mode === 'solo' ? ' active' : ''}`}
-            onClick={() => { setMode('solo'); if (gameMode === 'tribunal') setGameMode('classic'); }}
-          >
-            <BookOpen size={17} />
-            Mode Entraînement
-          </button>
-          <button
-            className={`tab-btn${mode === 'online' ? ' active' : ''}`}
-            onClick={() => setMode('online')}
-          >
-            <Globe size={17} />
-            Mode En Ligne
-          </button>
-        </div>
-
-        {/* Game Mode Selector Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <span className="section-label">Choisir un Mode de Jeu</span>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
-            
-            {/* Mode Classique */}
-            <div 
-              onClick={() => setGameMode('classic')}
-              style={{
-                padding: '16px 12px',
-                borderRadius: '10px',
-                border: `2.5px solid ${gameMode === 'classic' ? 'var(--accent)' : 'var(--border-color)'}`,
-                backgroundColor: gameMode === 'classic' ? 'var(--bg-hover)' : 'var(--bg-card)',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'var(--transition)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <Gamepad2 size={22} style={{ color: gameMode === 'classic' ? 'var(--accent)' : 'var(--text-secondary)' }} />
-              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Classique</div>
-              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>10 QCM standard avec bonus de vitesse.</p>
-            </div>
-
-            {/* Mode Speed Blitz */}
-            <div 
-              onClick={() => setGameMode('speed_blitz')}
-              style={{
-                padding: '16px 12px',
-                borderRadius: '10px',
-                border: `2.5px solid ${gameMode === 'speed_blitz' ? 'var(--accent)' : 'var(--border-color)'}`,
-                backgroundColor: gameMode === 'speed_blitz' ? 'var(--bg-hover)' : 'var(--bg-card)',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'var(--transition)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <Zap size={22} style={{ color: gameMode === 'speed_blitz' ? 'var(--accent)' : 'var(--text-secondary)' }} />
-              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Speed Blitz</div>
-              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>Chrono réduit à 5s. Rapidité maximale.</p>
-            </div>
-
-            {/* Mode Mort Subite */}
-            <div 
-              onClick={() => setGameMode('sudden_death')}
-              style={{
-                padding: '16px 12px',
-                borderRadius: '10px',
-                border: `2.5px solid ${gameMode === 'sudden_death' ? 'var(--accent)' : 'var(--border-color)'}`,
-                backgroundColor: gameMode === 'sudden_death' ? 'var(--bg-hover)' : 'var(--bg-card)',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'var(--transition)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <Skull size={22} style={{ color: gameMode === 'sudden_death' ? 'var(--accent)' : 'var(--text-secondary)' }} />
-              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Mort Subite</div>
-              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>La moindre erreur vous élimine.</p>
-            </div>
-
-            {/* Mode Le Juste Nombre */}
-            <div 
-              onClick={() => setGameMode('guess_number')}
-              style={{
-                padding: '16px 12px',
-                borderRadius: '10px',
-                border: `2.5px solid ${gameMode === 'guess_number' ? 'var(--accent)' : 'var(--border-color)'}`,
-                backgroundColor: gameMode === 'guess_number' ? 'var(--bg-hover)' : 'var(--bg-card)',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'var(--transition)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <Calculator size={22} style={{ color: gameMode === 'guess_number' ? 'var(--accent)' : 'var(--text-secondary)' }} />
-              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Juste Nombre</div>
-              <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>Estimez de tête les valeurs chiffrées.</p>
-            </div>
-
-            {/* Mode Le Tribunal */}
-            {mode === 'online' && (
-              <div 
-                onClick={() => setGameMode('tribunal')}
-                style={{
-                  padding: '16px 12px',
-                  borderRadius: '10px',
-                  border: `2.5px solid ${gameMode === 'tribunal' ? 'var(--accent)' : 'var(--border-color)'}`,
-                  backgroundColor: gameMode === 'tribunal' ? 'var(--bg-hover)' : 'var(--bg-card)',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  transition: 'var(--transition)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <Gavel size={22} style={{ color: gameMode === 'tribunal' ? 'var(--accent)' : 'var(--text-secondary)' }} />
-                <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>Le Tribunal</div>
-                <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>Dilemmes ouverts. Rédigez et votez.</p>
-              </div>
-            )}
-
-          </div>
-        </div>
-
-        {/* Theme Selection Section */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className="section-label">Choisir un Thème</span>
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              {mode === 'online' ? 'Thèmes validés uniquement' : 'Thèmes publics & privés'}
-            </span>
-          </div>
-
-          {loadingPacks ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <div className="spinner" style={{ width: '24px', height: '24px', border: '2px solid rgba(255,255,255,0.05)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.6s linear infinite', display: 'inline-block', marginBottom: '8px' }} />
-              <div>Chargement des thèmes...</div>
-            </div>
-          ) : filteredPacks.length > 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              
-              {/* Carousel Left button */}
-              <button
-                onClick={handlePrevPack}
-                disabled={gameMode === 'guess_number'}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '50%',
-                  width: '38px',
-                  height: '38px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
-                  cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
-                  opacity: gameMode === 'guess_number' ? 0.3 : 1,
-                  transition: 'var(--transition-smooth)',
-                  flexShrink: 0
-                }}
-                onMouseEnter={(e) => {
-                  if (gameMode !== 'guess_number') {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                    e.currentTarget.style.borderColor = 'var(--accent)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (gameMode !== 'guess_number') {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                  }
-                }}
-              >
-                <ChevronLeft size={18} />
-              </button>
-
-              {/* Theme card */}
-              <div
-                className={animateClass}
-                style={{
-                  flex: 1,
-                  height: '150px',
-                  background: `linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.85)), url(${getPackBg(filteredPacks[activePackIndex])}) center/cover no-repeat`,
-                  borderRadius: '12px',
-                  padding: '20px',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  transition: 'transform 0.2s ease'
-                }}
-              >
-                <div style={{
-                  position: 'absolute',
-                  top: 0, right: 0, bottom: 0, left: 0,
-                  background: 'radial-gradient(circle at top right, rgba(255, 255, 255, 0.12) 0%, transparent 60%)',
-                  pointerEvents: 'none'
-                }} />
-
-                {/* Badge Top-Right */}
-                <span style={{
-                  position: 'absolute',
-                  top: '16px',
-                  right: '16px',
-                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
-                  color: 'var(--accent)',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  padding: '4px 10px',
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 255, 255, 0.05)'
-                }}>
-                  {filteredPacks[activePackIndex].question_count} Questions
-                </span>
-
-                {/* Status indicator for unvalidated packs (Solo only) */}
-                {parseInt(filteredPacks[activePackIndex].is_validated) === 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    bottom: '16px',
-                    right: '16px',
-                    backgroundColor: 'rgba(255, 247, 0, 0.1)',
-                    color: 'var(--accent)',
-                    fontSize: '0.65rem',
-                    fontWeight: 700,
-                    padding: '3px 8px',
-                    borderRadius: '4px',
-                    border: '1px solid var(--accent)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    En attente
-                  </span>
-                )}
-
-                {/* Text Content */}
-                <div>
-                  <h4 style={{
-                    fontSize: '1.2rem',
-                    fontWeight: 700,
-                    color: '#ffffff',
-                    marginBottom: '4px',
-                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
-                  }}>
-                    {filteredPacks[activePackIndex].name}
-                  </h4>
-                  <p style={{
-                    fontSize: '0.8rem',
-                    color: 'rgba(255, 255, 255, 0.75)',
-                    lineHeight: '1.35',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    marginRight: '60px' // Leave room for status badge
-                  }}>
-                    {filteredPacks[activePackIndex].description || "Aucune description fournie pour ce thème."}
-                  </p>
-                </div>
-
-                <span style={{
-                  fontSize: '0.65rem',
-                  color: 'rgba(255, 255, 255, 0.4)',
-                  fontWeight: 600
-                }}>
-                  Thème {activePackIndex + 1} sur {filteredPacks.length}
-                </span>
-              </div>
-
-              {/* Carousel Right button */}
-              <button
-                onClick={handleNextPack}
-                disabled={gameMode === 'guess_number'}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '50%',
-                  width: '38px',
-                  height: '38px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
-                  cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
-                  opacity: gameMode === 'guess_number' ? 0.3 : 1,
-                  transition: 'var(--transition-smooth)',
-                  flexShrink: 0
-                }}
-                onMouseEnter={(e) => {
-                  if (gameMode !== 'guess_number') {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                    e.currentTarget.style.borderColor = 'var(--accent)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (gameMode !== 'guess_number') {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                  }
-                }}
-              >
-                <ChevronRight size={18} />
-              </button>
-
-            </div>
-          ) : (
-            <div style={{
-              padding: '32px',
-              textAlign: 'center',
-              color: 'var(--text-secondary)',
-              backgroundColor: 'rgba(0,0,0,0.1)',
-              borderRadius: '12px',
-              border: '1px dashed var(--border-color)',
-              fontSize: '0.9rem'
-            }}>
-              Aucun thème disponible pour ce mode.
-            </div>
-          )}
-        </div>
-
-        {/* Action Panel Divider */}
-        <div style={{ height: '1px', backgroundColor: 'var(--border-color)' }} />
-
-        {/* Contextual Action Areas */}
-        {mode === 'solo' ? (
-          /* SOLO MODE ACTIONS */
-          <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.4' }}>
-              Mode sélectionné : <strong style={{ color: 'var(--accent)' }}>
-                {gameMode === 'classic' && "Classique"}
-                {gameMode === 'speed_blitz' && "Speed Blitz"}
-                {gameMode === 'sudden_death' && "Mort Subite"}
-                {gameMode === 'guess_number' && "Le Juste Nombre"}
-              </strong>. <br />
-              {gameMode === 'classic' && "Entraînez-vous avec 15s par question."}
-              {gameMode === 'speed_blitz' && "Chrono ultra rapide de 5s par question !"}
-              {gameMode === 'sudden_death' && "La moindre erreur termine la partie."}
-              {gameMode === 'guess_number' && "Saisissez votre estimation au clavier."}
-            </p>
-            <button 
-              className="btn-primary" 
-              onClick={handleStartSolo}
-              disabled={filteredPacks.length === 0}
-              style={{ padding: '14px', fontSize: '1rem', width: '100%', maxWidth: '320px', margin: '0 auto' }}
-            >
-              <Play size={18} />
-              Lancer la partie Solo
-            </button>
-          </div>
-        ) : (
-          /* ONLINE MODE ACTIONS (SIDE-BY-SIDE ON LARGE, STACKED ON MOBILE) */
-          <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '28px' }}>
-            
-            {/* Create Room */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '12px', borderRight: '1px solid var(--border-color)', borderRightColor: window.innerWidth < 640 ? 'transparent' : 'var(--border-color)' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Plus size={16} style={{ color: 'var(--accent)' }} />
-                Créer une Partie
-              </h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', lineHeight: '1.4', marginBottom: '8px' }}>
-                Créer un salon en mode <strong style={{ color: 'var(--accent)' }}>
-                  {gameMode === 'classic' && "Classique"}
-                  {gameMode === 'speed_blitz' && "Speed Blitz"}
-                  {gameMode === 'sudden_death' && "Mort Subite"}
-                  {gameMode === 'guess_number' && "Le Juste Nombre"}
-                  {gameMode === 'tribunal' && "Le Tribunal"}
-                </strong>.
-              </p>
-
-              <button 
-                className="btn-primary" 
-                onClick={handleCreateLobby}
-                disabled={creating || filteredPacks.length === 0}
-                style={{ padding: '12px', fontSize: '0.9rem' }}
-              >
-                Créer le Salon
-              </button>
-              {createError && <div style={{ color: 'var(--error)', fontSize: '0.8rem', marginTop: '4px' }}>{createError}</div>}
-            </div>
-
-            {/* Join Room */}
-            <form onSubmit={handleJoinLobby} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Users size={16} style={{ color: 'var(--accent)' }} />
-                Rejoindre une Partie
-              </h4>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '0.825rem', lineHeight: '1.4', flexGrow: 1, marginBottom: '8px' }}>
-                Entrez le code à 5 caractères communiqué par vos amis.
-              </p>
-              
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  maxLength={5}
-                  placeholder="CODE (ex: X9A2B)"
-                  value={roomCode}
-                  onChange={(e) => setRoomCode(e.target.value)}
-                  style={{
-                    textTransform: 'uppercase',
-                    textAlign: 'center',
-                    fontSize: '1rem',
-                    letterSpacing: '1px',
-                    fontWeight: 700,
-                    padding: '10px'
-                  }}
-                  required
-                />
-                <button 
-                  type="submit" 
-                  className="btn-secondary" 
-                  style={{ display: 'flex', gap: '4px', padding: '0 16px', fontSize: '0.9rem' }}
-                  disabled={joining}
-                >
-                  Go
-                  <ArrowRight size={16} />
-                </button>
-              </div>
-              {joinError && <div style={{ color: 'var(--error)', fontSize: '0.8rem', marginTop: '4px' }}>{joinError}</div>}
-            </form>
-
-          </div>
-        )}
-
-      </div>
-
-      {/* Spinner keyframes inject */}
+      {/* Spinner and pulse keyframes inject */}
       <style>{`
         @keyframes spin {
           to { transform: rotate(360deg); }
@@ -803,7 +700,282 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
         .spinner {
           animation: spin 0.6s linear infinite;
         }
+        @keyframes pulse {
+          0%, 100% { opacity: 0.6; transform: translateX(0); }
+          50% { opacity: 1; transform: translateX(3px); }
+        }
+        
+        /* 3D Carousel perspective fixes for mobile */
+        @media (max-width: 768px) {
+          .active-3d {
+            transform: scale(0.9) !important;
+          }
+        }
       `}</style>
+    </div>
+  );
+}
+
+// 📅 3D COVER FLOW CAROUSEL COMPONENT
+function GameCarousel3D({ items }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [startX, setStartX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef(null);
+
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleMouseDown = (e) => {
+    setStartX(e.clientX);
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    const diff = e.clientX - startX;
+    if (diff > 60) {
+      setActiveIndex(prev => (prev - 1 + items.length) % items.length);
+      setStartX(e.clientX);
+      setIsDragging(false);
+    } else if (diff < -60) {
+      setActiveIndex(prev => (prev + 1) % items.length);
+      setStartX(e.clientX);
+      setIsDragging(false);
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleTouchStart = (e) => {
+    setStartX(e.touches[0].clientX);
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging) return;
+    const diff = e.touches[0].clientX - startX;
+    if (diff > 50) {
+      setActiveIndex(prev => (prev - 1 + items.length) % items.length);
+      setStartX(e.touches[0].clientX);
+      setIsDragging(false);
+    } else if (diff < -50) {
+      setActiveIndex(prev => (prev + 1) % items.length);
+      setStartX(e.touches[0].clientX);
+      setIsDragging(false);
+    }
+  };
+
+  const next = () => setActiveIndex(prev => (prev + 1) % items.length);
+  const prev = () => setActiveIndex(prev => (prev - 1 + items.length) % items.length);
+
+  const isMobile = windowWidth < 768;
+  const translateXVal = isMobile ? 120 : 260;
+  const translateZVal = isMobile ? -100 : -150;
+  const rotateYVal = isMobile ? -25 : -35;
+  const cardWidth = isMobile ? '240px' : '320px';
+  const cardHeight = isMobile ? '220px' : '240px';
+
+  return (
+    <div 
+      ref={containerRef}
+      style={{
+        perspective: '1200px',
+        position: 'relative',
+        width: '100%',
+        height: isMobile ? '290px' : '350px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        userSelect: 'none',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        marginTop: '8px',
+        marginBottom: '16px'
+      }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleMouseUp}
+    >
+      {/* 3D CARDS WRAPPER */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transformStyle: 'preserve-3d',
+      }}>
+        {items.map((item, index) => {
+          let offset = index - activeIndex;
+          
+          // Compute circular offset
+          if (offset < -items.length / 2) offset += items.length;
+          if (offset > items.length / 2) offset -= items.length;
+
+          const absOffset = Math.abs(offset);
+          const isActive = offset === 0;
+
+          // 3D calculation
+          const rotateY = offset * rotateYVal;
+          const translateZ = absOffset * translateZVal;
+          const translateX = offset * translateXVal;
+          const scale = 1 - absOffset * 0.15;
+          const opacity = 1 - absOffset * 0.45;
+          const zIndex = 100 - absOffset;
+
+          return (
+            <div
+              key={index}
+              className={`game-card${item.disabled ? ' disabled' : ''}${isActive ? ' active-3d' : ''}`}
+              onClick={(e) => {
+                if (!isActive) {
+                  setActiveIndex(index);
+                  e.stopPropagation();
+                } else if (!item.disabled && item.onClick) {
+                  item.onClick();
+                }
+              }}
+              style={{
+                position: 'absolute',
+                width: cardWidth,
+                height: cardHeight,
+                padding: isMobile ? '20px' : '28px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+                transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
+                opacity: opacity > 0 ? opacity : 0,
+                zIndex: zIndex,
+                pointerEvents: opacity > 0 ? 'auto' : 'none',
+                boxShadow: isActive ? '0 15px 35px rgba(255, 247, 0, 0.12)' : '0 5px 15px rgba(0, 0, 0, 0.3)',
+                borderColor: isActive ? 'var(--accent)' : 'var(--border-color)',
+                cursor: item.disabled ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {/* Card content */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="game-card-icon" style={{
+                    backgroundColor: isActive ? 'var(--accent)' : 'var(--bg-surface)',
+                    color: isActive ? '#000' : 'var(--accent)',
+                    width: isMobile ? '34px' : '42px',
+                    height: isMobile ? '34px' : '42px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.3s ease'
+                  }}>
+                    {item.icon}
+                  </div>
+                  {item.badge && (
+                    <div className="game-card-badge" style={{
+                      margin: 0,
+                      backgroundColor: isActive ? 'rgba(255, 247, 0, 0.15)' : 'rgba(255,255,255,0.05)',
+                      color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                      fontSize: isMobile ? '0.6rem' : '0.68rem',
+                      padding: '2px 6px'
+                    }}>
+                      {item.badge}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <h4 style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 800, margin: '0 0 4px 0', color: isActive ? '#fff' : 'var(--text-primary)' }}>
+                    {item.title}
+                  </h4>
+                  <p style={{ 
+                    fontSize: isMobile ? '0.75rem' : '0.82rem', 
+                    color: isActive ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)', 
+                    margin: 0, 
+                    lineHeight: 1.4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: isMobile ? 2 : 3,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}>
+                    {item.desc}
+                  </p>
+                </div>
+              </div>
+
+              {isActive && !item.disabled && (
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  color: 'var(--accent)', 
+                  fontSize: isMobile ? '0.78rem' : '0.85rem', 
+                  fontWeight: 700, 
+                  alignSelf: 'flex-start',
+                  marginTop: '8px',
+                  animation: 'pulse 1.5s infinite'
+                }}>
+                  <span>Configurer la partie</span>
+                  <ArrowRight size={isMobile ? 12 : 14} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Nav Controls */}
+      <button 
+        onClick={(e) => { e.stopPropagation(); prev(); }}
+        className="btn-secondary" 
+        style={{
+          position: 'absolute',
+          left: '10px',
+          zIndex: 200,
+          borderRadius: '50%',
+          width: '32px',
+          height: '32px',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid var(--border-color)',
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(5px)'
+        }}
+      >
+        <ChevronLeft size={16} />
+      </button>
+      <button 
+        onClick={(e) => { e.stopPropagation(); next(); }}
+        className="btn-secondary" 
+        style={{
+          position: 'absolute',
+          right: '10px',
+          zIndex: 200,
+          borderRadius: '50%',
+          width: '32px',
+          height: '32px',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1px solid var(--border-color)',
+          background: 'rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(5px)'
+        }}
+      >
+        <ChevronRight size={16} />
+      </button>
     </div>
   );
 }

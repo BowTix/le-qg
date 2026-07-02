@@ -1056,7 +1056,7 @@ class LobbyController
         $roomCode = strtoupper(trim($data['room_code'] ?? ''));
         $db = Database::getConnection();
 
-        $stmtLobby = $db->prepare("SELECT id FROM lobbies WHERE room_code = ?");
+        $stmtLobby = $db->prepare("SELECT * FROM lobbies WHERE room_code = ?");
         $stmtLobby->execute([$roomCode]);
         $lobby = $stmtLobby->fetch();
 
@@ -1071,6 +1071,8 @@ class LobbyController
         $stmtReaction->execute([$reaction, $nowMs, $lobby['id'], $user['user_id']]);
 
         echo json_encode(['success' => true]);
+        \App\Utils\Pusher::finishResponse();
+        $this->broadcastLobbyState($db, $lobby);
     }
 
     // ================================================================

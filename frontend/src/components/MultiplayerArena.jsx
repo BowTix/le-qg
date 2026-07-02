@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
-import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel } from 'lucide-react';
+import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins } from 'lucide-react';
 import Pusher from 'pusher-js';
 
 export default function MultiplayerArena({ roomCode, user, onBack }) {
@@ -56,8 +56,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   // broadcast payload deliberately omits author identity (to keep votes
   // anonymous), so we recognize "our" submission client-side by matching
   // its answer_text against what we submitted — no extra request needed.
-  const myTribunalAnswerRef = useRef(null);
+  const myTribunalAnswersRef = useRef({});
   const myTribunalVotedRef = useRef(false);
+  const transitionTriggerRef = useRef(null);
 
   const fetchQuestionRef = useRef(null);
   const handleAnswerRef = useRef(null);
@@ -101,25 +102,64 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   // converge here.
   // ============================================================
   const applyLobbyState = useCallback((data) => {
-    // Keep our own answer text in sync with what the server confirms,
+    clearTimeout(transitionTriggerRef.current);
+
+    const round = data?.tribunal?.round ?? 0;
+
+    // Keep our own answer text/vote status in sync with what the server confirms,
     // useful on reconnect/refresh when we didn't just submit it ourselves.
     if (data?.tribunal?.my_submission) {
-      myTribunalAnswerRef.current = data.tribunal.my_submission;
+      myTribunalAnswersRef.current[round] = data.tribunal.my_submission;
+    }
+    if (data?.tribunal?.has_voted) {
+      myTribunalVotedRef.current = true;
     }
 
     if (data?.tribunal) {
-      // Restore personal fields if omitted in the broadcast payload
-      if (!data.tribunal.my_submission && myTribunalAnswerRef.current) {
-        data.tribunal.my_submission = myTribunalAnswerRef.current;
+      const currentRound = data.tribunal.round;
+      const currentPhase = data.tribunal.phase;
+
+      // Reset refs and input states immediately if round or phase changed during the active session
+      if (currentRound !== lastRoundRef.current) {
+        myTribunalVotedRef.current = false;
+        setTribunalInput('');
+        setSelectedSubId(null);
+        lastRoundRef.current = currentRound;
       }
-      if (!data.tribunal.has_voted && myTribunalVotedRef.current) {
+      if (currentPhase !== lastPhaseRef.current) {
+        myTribunalVotedRef.current = false;
+        setTribunalInput('');
+        setSelectedSubId(null);
+        lastPhaseRef.current = currentPhase;
+      }
+
+      // Force personal fields from local refs if the broadcast payload anonymized them
+      const mySubmissionText = myTribunalAnswersRef.current[currentRound] || null;
+      if (mySubmissionText) {
+        data.tribunal.my_submission = mySubmissionText;
+      }
+      if (myTribunalVotedRef.current) {
         data.tribunal.has_voted = true;
+      }
+
+      // Also force the local player's status (has_submitted / has_voted) in the players list
+      if (data.players && Array.isArray(data.players)) {
+        data.players = data.players.map(p => {
+          if (p.user_id === user.id) {
+            return {
+              ...p,
+              has_submitted: mySubmissionText ? true : p.has_submitted,
+              has_voted: myTribunalVotedRef.current ? true : p.has_voted
+            };
+          }
+          return p;
+        });
       }
 
       // During the tribunal voting/results phase, we add back "is_mine" client-side.
       const phase = data.tribunal.phase;
       if ((phase === 'voting' || phase === 'results') && Array.isArray(data.tribunal.submissions)) {
-        const mine = myTribunalAnswerRef.current;
+        const mine = mySubmissionText;
         data = {
           ...data,
           tribunal: {
@@ -176,7 +216,10 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   // INITIALIZE PUSHER (once we know the credentials from /status)
   // ============================================================
   const initPusher = useCallback((data) => {
-    if (!data.pusher_key || pusherActiveRef.current) return;
+    if (!data.pusher_key) return;
+    if (pusherRef.current && (pusherActiveRef.current || pusherRef.current.connection.state === 'connecting')) {
+      return;
+    }
 
     console.log('Pusher configuration found. Initializing WebSocket connection...');
     try {
@@ -205,23 +248,16 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
       // Stop the HTTP polling fallback once the WebSocket is confirmed
       // connected — polling resumes automatically (see fetchStatusLoop)
       // if the connection drops.
-      pusher.connection.bind('connected', () => {
-        pusherActiveRef.current = true;
-        clearTimeout(pollRef.current);
-      });
-
-      pusher.connection.bind('disconnected', () => {
-        console.warn('Pusher disconnected — falling back to HTTP polling.');
-        pusherActiveRef.current = false;
-        clearTimeout(pollRef.current);
-        pollRef.current = setTimeout(fetchStatusLoopRef.current, 1000);
-      });
-
-      pusher.connection.bind('unavailable', () => {
-        console.warn('Pusher connection unavailable — falling back to HTTP polling.');
-        pusherActiveRef.current = false;
-        clearTimeout(pollRef.current);
-        pollRef.current = setTimeout(fetchStatusLoopRef.current, 1000);
+      pusher.connection.bind('state_change', (states) => {
+        console.log(`Pusher connection state changed from ${states.previous} to ${states.current}`);
+        const active = states.current === 'connected';
+        pusherActiveRef.current = active;
+        if (active) {
+          clearTimeout(pollRef.current);
+        } else if (states.current === 'disconnected' || states.current === 'unavailable' || states.current === 'failed') {
+          clearTimeout(pollRef.current);
+          pollRef.current = setTimeout(fetchStatusLoopRef.current, 1000);
+        }
       });
     } catch (pusherErr) {
       console.error('Failed to init Pusher client:', pusherErr);
@@ -279,28 +315,10 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
   useEffect(() => {
     if (!lobbyState || !lobbyState.tribunal) return;
-    const currentPhase = lobbyState.tribunal.phase;
-    const currentRound = lobbyState.tribunal.round;
     const serverRemainingMs = lobbyState.tribunal.phase_remaining_ms;
 
     // Synchronize local timer with authoritative server remaining time
     setTribunalTimer(serverRemainingMs);
-
-    if (currentPhase !== lastPhaseRef.current || currentRound !== lastRoundRef.current) {
-      setTribunalInput('');
-      setSelectedSubId(null);
-      myTribunalVotedRef.current = false;
-
-      // New round/phase: clear the remembered answer so 'is_mine' matching
-      // (used only as a client-side fallback during voting, see
-      // applyLobbyState) can't accidentally match a previous round's text.
-      if (currentRound !== lastRoundRef.current) {
-        myTribunalAnswerRef.current = null;
-      }
-
-      lastPhaseRef.current = currentPhase;
-      lastRoundRef.current = currentRound;
-    }
   }, [lobbyState]);
 
   // Local tick effect for high-precision countdown ticks (100ms)
@@ -325,42 +343,62 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   useEffect(() => {
     if (lobbyState?.game_mode !== 'tribunal' || gamePhase !== 'playing') return;
     if (tribunalTimer === 0 && lobbyState.tribunal?.phase_remaining_ms > 0) {
-      console.log('Local timer expired. Triggering server phase transition...');
-      if (fetchStatusRef.current) {
-        fetchStatusRef.current();
-      }
+      console.log('Local timer expired. Scheduling transition check with jitter...');
+      clearTimeout(transitionTriggerRef.current);
+      transitionTriggerRef.current = setTimeout(() => {
+        if (fetchStatusRef.current) {
+          fetchStatusRef.current();
+        }
+      }, 100 + Math.random() * 800); // 100ms to 900ms random delay
     }
   }, [tribunalTimer, lobbyState, gamePhase]);
 
   const handleTribunalSubmit = async (e) => {
     e.preventDefault();
     if (!tribunalInput.trim() || submittingTribunal) return;
-    setSubmittingTribunal(true);
     const answerText = tribunalInput.trim();
+    const round = lobbyState?.tribunal?.round ?? 0;
+
+    // Optimistic Update: Set the local ref and state immediately before making the API call
+    // to prevent any race conditions with incoming Pusher broadcasts.
+    myTribunalAnswersRef.current[round] = answerText;
+    setLobbyState(prev => {
+      if (!prev || !prev.tribunal) return prev;
+      return {
+        ...prev,
+        players: prev.players.map(p => 
+          p.user_id === user.id ? { ...p, has_submitted: true } : p
+        ),
+        tribunal: {
+          ...prev.tribunal,
+          my_submission: answerText
+        }
+      };
+    });
+
+    setSubmittingTribunal(true);
     try {
       await api.post('/lobby/tribunal/submit', {
         room_code: roomCode,
         answer: answerText
       });
-      // No fetchStatus() here: the lobby_state broadcast (Pusher) updates
-      // everyone, including us, the moment the server processes this.
-      // We just remember our own answer locally so the UI can show
-      // "Votre réponse" immediately without waiting for the round-trip,
-      // and so the voting phase can recognize it's ours (the shared
-      // broadcast payload anonymizes authorship during voting).
-      myTribunalAnswerRef.current = answerText;
+    } catch (err) {
+      console.error(err);
+      // Rollback on error
+      myTribunalAnswersRef.current[round] = null;
       setLobbyState(prev => {
         if (!prev || !prev.tribunal) return prev;
         return {
           ...prev,
+          players: prev.players.map(p => 
+            p.user_id === user.id ? { ...p, has_submitted: false } : p
+          ),
           tribunal: {
             ...prev.tribunal,
-            my_submission: answerText
+            my_submission: null
           }
         };
       });
-    } catch (err) {
-      console.error(err);
       alert(err.message || "Erreur de soumission");
     } finally {
       setSubmittingTribunal(false);
@@ -369,26 +407,47 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
   const handleTribunalVote = async () => {
     if (!selectedSubId || votingTribunal) return;
+
+    // Optimistic Update: Set the local ref and state immediately before making the API call
+    // to prevent any race conditions with incoming Pusher broadcasts.
+    myTribunalVotedRef.current = true;
+    setLobbyState(prev => {
+      if (!prev || !prev.tribunal) return prev;
+      return {
+        ...prev,
+        players: prev.players.map(p => 
+          p.user_id === user.id ? { ...p, has_voted: true } : p
+        ),
+        tribunal: {
+          ...prev.tribunal,
+          has_voted: true
+        }
+      };
+    });
+
     setVotingTribunal(true);
     try {
       await api.post('/lobby/tribunal/vote', {
         room_code: roomCode,
         submission_id: selectedSubId
       });
-      // Same as above: no fetchStatus(), the broadcast carries the update.
-      myTribunalVotedRef.current = true;
+    } catch (err) {
+      console.error(err);
+      // Rollback on error
+      myTribunalVotedRef.current = false;
       setLobbyState(prev => {
         if (!prev || !prev.tribunal) return prev;
         return {
           ...prev,
+          players: prev.players.map(p => 
+            p.user_id === user.id ? { ...p, has_voted: false } : p
+          ),
           tribunal: {
             ...prev.tribunal,
-            has_voted: true
+            has_voted: false
           }
         };
       });
-    } catch (err) {
-      console.error(err);
       alert(err.message || "Erreur lors du vote");
     } finally {
       setVotingTribunal(false);
@@ -544,8 +603,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
     clearInterval(timerRef.current);
     clearInterval(countdownRef.current);
     clearTimeout(feedbackRef.current);
+    clearTimeout(transitionTriggerRef.current);
 
-    myTribunalAnswerRef.current = null;
+    myTribunalAnswersRef.current = {};
     myTribunalVotedRef.current = false;
 
     if (pusherRef.current) {
@@ -694,7 +754,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                   backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px',
                   border: '1px dashed var(--border-color)', fontSize: '0.9rem'
                 }}>
-                  En attente du lancement par <strong style={{ color: '#fff' }}>{lobbyState.host_username}</strong>...
+                  En attente du lancement par <strong style={{ color: 'var(--accent)' }}>{lobbyState.host_username}</strong>...
                 </div>
             )}
           </div>
@@ -798,7 +858,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
             <span style={{ fontSize: '0.75rem', color: 'var(--accent)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>
               Le Dilemme du Jour
             </span>
-              <h2 style={{ fontSize: '1.6rem', lineHeight: 1.4, fontWeight: 600, margin: 0 }}>
+              <h2 style={{ fontSize: '1.6rem', lineHeight: 1.4, fontWeight: 600, margin: 0, wordBreak: 'break-word' }}>
                 {tribunal.prompt_text}
               </h2>
 
@@ -899,7 +959,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                                       transition: 'var(--transition)'
                                     }}
                                 >
-                                  <span style={{ fontStyle: 'italic', marginRight: '16px' }}>"{sub.answer_text}"</span>
+                                  <span style={{ fontStyle: 'italic', marginRight: '16px', wordBreak: 'break-word' }}>"{sub.answer_text}"</span>
                                   {sub.is_mine ? (
                                       <span style={{ fontSize: '0.75rem', backgroundColor: 'rgba(255,255,255,0.05)', padding: '4px 8px', borderRadius: '4px', color: 'var(--text-secondary)' }}>
                               Votre réponse
@@ -956,7 +1016,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                                 }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                          <span style={{ fontSize: '1.1rem', fontStyle: 'italic', fontWeight: 600 }}>
+                          <span style={{ fontSize: '1.1rem', fontStyle: 'italic', fontWeight: 600, wordBreak: 'break-word' }}>
                             "{sub.answer_text}"
                           </span>
                                 <span style={{
@@ -1010,15 +1070,23 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                 let statusLabel = null;
                 if (phase === 'writing') {
                   statusLabel = p.has_submitted ? (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 600 }}>✅ Prêt</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle2 size={13} /> Prêt
+                      </span>
                   ) : (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', animation: 'pulse 1.5s infinite' }}>✍️ Écrit...</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', animation: 'pulse 1.5s infinite' }}>
+                        <Pencil size={13} /> Écrit...
+                      </span>
                   );
                 } else if (phase === 'voting') {
                   statusLabel = p.has_voted ? (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 600 }}>🗳️ Voté</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--success)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Vote size={13} /> Voté
+                      </span>
                   ) : (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', animation: 'pulse 1.5s infinite' }}>🤔 Vote...</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', animation: 'pulse 1.5s infinite' }}>
+                        <HelpCircle size={13} /> Vote...
+                      </span>
                   );
                 }
 
@@ -1253,8 +1321,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>#{i + 1}</span>
-                        <span style={{ ...getUsernameStyle(p.global_score), fontWeight: isMe ? 700 : 500 }}>
-                      {p.username}{isMe ? ' (Vous)' : ''} {p.is_eliminated ? '💀' : ''}
+                        <span style={{ ...getUsernameStyle(p.global_score), fontWeight: isMe ? 700 : 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {p.username}{isMe ? ' (Vous)' : ''}
+                      {p.is_eliminated && <Skull size={13} style={{ color: 'var(--error)' }} />}
                     </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1308,7 +1377,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
           <div className="glass-card" style={{ maxWidth: '550px', width: '100%', display: 'flex', flexDirection: 'column', gap: '24px', textAlign: 'center' }}>
 
             <div>
-              <span style={{ fontSize: '3rem' }}>🏁</span>
+              <Trophy size={48} style={{ color: 'var(--accent)', margin: '0 auto 8px' }} />
               <h2 style={{ fontSize: '1.5rem', marginTop: '8px' }}>Vous avez terminé !</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px' }}>
                 Votre score : <strong style={{ color: 'var(--accent)' }}>{playerScore} pts</strong>
@@ -1432,8 +1501,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                         </span>
                             )}
                             {p.coin_bonus !== undefined && (
-                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffb300' }}>
-                          +{p.coin_bonus} 🪙
+                                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffb300', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          +{p.coin_bonus} <Coins size={12} />
                         </span>
                             )}
                           </div>
@@ -1472,8 +1541,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     </span>
                       )}
                       {p.coin_bonus !== undefined && (
-                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffb300', minWidth: '50px', textAlign: 'right' }}>
-                      +{p.coin_bonus} 🪙
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffb300', minWidth: '60px', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                      +{p.coin_bonus} <Coins size={13} />
                     </span>
                       )}
                     </div>
