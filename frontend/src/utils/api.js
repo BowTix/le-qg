@@ -1,7 +1,11 @@
 // Dynamic API base URL: switches to PHP development server in dev mode, or falls back to local Laragon
-const API_BASE = window.location.port && window.location.port !== '80'
-  ? 'http://127.0.0.1:8000/api'
-  : `${window.location.origin}/quiz/backend/public/api`;
+const ENV_API_URL = import.meta.env.VITE_API_URL;
+
+const API_BASE = ENV_API_URL
+    ? `${ENV_API_URL}/api`
+    : (window.location.port && window.location.port !== '80'
+        ? 'http://127.0.0.1:8000/api'
+        : `${window.location.origin}/quiz/backend/public/api`);
 
 export const PUBLIC_BASE = API_BASE.replace('/api', '');
 
