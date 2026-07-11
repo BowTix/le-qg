@@ -253,7 +253,7 @@ export default function CreatorScreen({ onBack }) {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <strong style={{ fontSize: '1rem', color: '#fff' }}>{p.name}</strong>
+                        <strong style={{ fontSize: '1rem', color: 'var(--text-primary)' }}>{p.name}</strong>
                         <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                           {p.question_count} questions
                         </span>
@@ -499,3 +499,4 @@ export default function CreatorScreen({ onBack }) {
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
-import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins } from 'lucide-react';
+import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import Pusher from 'pusher-js';
 
 export default function MultiplayerArena({ roomCode, user, onBack }) {
@@ -35,6 +35,10 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   const [selectedSubId, setSelectedSubId] = useState(null);
   const [votingTribunal, setVotingTribunal] = useState(false);
   const [tribunalTimer, setTribunalTimer] = useState(0);
+
+  // === IMPOSTEUR STATES ===
+  const [revealWord, setRevealWord] = useState(false);
+  const [votingImposteur, setVotingImposteur] = useState(false);
 
   const lastPhaseRef = useRef('');
   const lastRoundRef = useRef(-1);
@@ -178,7 +182,35 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
       }
     }
 
+    if (data?.imposteur) {
+      const currentPhase = data.imposteur.phase;
+      if (currentPhase !== lastPhaseRef.current) {
+        setRevealWord(false);
+        setVotingImposteur(false);
+        lastPhaseRef.current = currentPhase;
+      }
+      // Restore personal fields from existing React state if Pusher broadcast anonymized them
+      if (lobbyState && lobbyState.imposteur && lobbyState.game_mode === 'imposteur') {
+        if (!data.imposteur.my_role && lobbyState.imposteur.my_role) {
+          data.imposteur.my_role = lobbyState.imposteur.my_role;
+        }
+        if (!data.imposteur.my_word && lobbyState.imposteur.my_word) {
+          data.imposteur.my_word = lobbyState.imposteur.my_word;
+        }
+        if (data.imposteur.my_vote === null && lobbyState.imposteur.my_vote !== null) {
+          data.imposteur.my_vote = lobbyState.imposteur.my_vote;
+        }
+      }
+    }
+
     setLobbyState(data);
+    
+    if (data.status === 'playing' && data.game_mode === 'imposteur' && data.imposteur && !data.imposteur.my_word) {
+      setTimeout(() => {
+        if (fetchStatusRef.current) fetchStatusRef.current();
+      }, 50);
+    }
+
     setLoading(false);
     setError('');
 
@@ -1118,11 +1150,495 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   };
 
   // ============================================================
+  // L'IMPOSTEUR GAME MODE RENDERING
+  // ============================================================
+  const renderImposteurGame = () => {
+    const imposteurData = lobbyState?.imposteur;
+    if (!imposteurData) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent)' }} />
+          <span style={{ marginLeft: '12px', color: 'var(--text-secondary)' }}>Chargement du mode de jeu...</span>
+        </div>
+      );
+    }
+
+    const { phase, theme, my_role, my_word, my_vote, eliminated_user_id } = imposteurData;
+    const players = lobbyState?.players || [];
+    const hostId = lobbyState?.host_id;
+    const isHost = (hostId === user.id);
+    const myPlayerInfo = players.find(p => p.user_id === user.id);
+    const isEliminated = !!myPlayerInfo?.is_eliminated;
+
+    // Helper: submit vote to backend
+    const handleImposteurVote = async (targetId) => {
+      if (votingImposteur) return;
+      setVotingImposteur(true);
+      try {
+        await api.post('/lobby/imposteur/vote', {
+          room_code: roomCode,
+          voted_for_user_id: targetId
+        });
+      } catch (err) {
+        console.error('Failed to submit imposteur vote:', err);
+        alert(err.message || 'Erreur lors du vote.');
+      } finally {
+        setVotingImposteur(false);
+      }
+    };
+
+    // Helper: start voting phase (host only)
+    const handleStartVoting = async () => {
+      try {
+        await api.post('/lobby/imposteur/start-voting', { room_code: roomCode });
+      } catch (err) {
+        console.error('Failed to start voting phase:', err);
+        alert(err.message || 'Erreur.');
+      }
+    };
+
+    // Helper: start next round (host only)
+    const handleNextRound = async () => {
+      try {
+        await api.post('/lobby/imposteur/next-round', { room_code: roomCode });
+      } catch (err) {
+        console.error('Failed to start next round:', err);
+        alert(err.message || 'Erreur.');
+      }
+    };
+
+    return (
+      <div className="flex-1 flex flex-col p-4 animate-fade-in" style={{ maxWidth: '800px', width: '100%', margin: '0 auto', gap: '20px' }}>
+        
+        {/* PHASE 1: DEBATE (IRL) */}
+        {phase === 'debate' && (
+          <div className="glass-card flex flex-col gap-6" style={{ padding: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <MessageSquare size={26} style={{ color: 'var(--accent)' }} />
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>Débat en cours (IRL)</h2>
+              </div>
+              <span style={{ padding: '6px 14px', backgroundColor: 'rgba(255, 42, 133, 0.1)', color: '#ff2a85', border: '1px solid rgba(255, 42, 133, 0.2)', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 700 }}>
+                Thème : {theme}
+              </span>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.5', margin: 0 }}>
+                💬 <strong>Règles du débat :</strong> Décrivez votre mot secret à tour de rôle sans le prononcer directement. L'imposteur a un mot légèrement différent et doit bluffer pour ne pas se faire repérer tout en essayant de deviner le mot des innocents. La discussion se fait entièrement <strong>face-à-face (IRL)</strong>.
+              </p>
+            </div>
+
+            {/* Secret Word Display Card */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255,0,127,0.06), rgba(127,0,255,0.06))',
+              border: '1px dashed rgba(255,0,127,0.2)', borderRadius: '16px', padding: '24px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px',
+              textAlign: 'center', minHeight: '160px', position: 'relative'
+            }}>
+              {isEliminated ? (
+                <>
+                  <Skull size={36} style={{ color: 'var(--error)' }} />
+                  <span style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--error)' }}>Vous avez été éliminé !</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Vous pouvez observer le reste du groupe débattre.</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
+                    Votre mot secret
+                  </span>
+                  
+                  {revealWord ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', animation: 'scale-up 0.2s ease-out' }}>
+                      <span style={{ fontSize: '2.2rem', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '2px', textTransform: 'uppercase' }}>
+                        {my_word}
+                      </span>
+                      <span style={{
+                        fontSize: '0.85rem', fontWeight: 700,
+                        color: my_role === 'imposteur' ? 'var(--error)' : 'var(--success)',
+                        padding: '4px 10px', backgroundColor: my_role === 'imposteur' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                        borderRadius: '6px'
+                      }}>
+                        {my_role === 'imposteur' ? 'Vous êtes l\'Imposteur 😈' : 'Vous êtes Innocent 😇'}
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: 'var(--text-muted)' }}>
+                      <EyeOff size={32} />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Mot masqué pour préserver le secret</span>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setRevealWord(!revealWord)}
+                    className="btn-secondary"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '8px 16px', fontSize: '0.8rem', borderRadius: '8px',
+                      backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)'
+                    }}
+                  >
+                    {revealWord ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {revealWord ? 'Masquer le mot' : 'Afficher le mot'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Players Status List */}
+            <div>
+              <h3 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                Statut des Joueurs ({players.filter(p => !p.is_eliminated).length} en vie)
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {players.map(p => {
+                  const dead = !!p.is_eliminated;
+                  return (
+                    <div key={p.user_id} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px',
+                      padding: '8px 14px', borderRadius: '8px',
+                      backgroundColor: dead ? 'rgba(255,255,255,0.02)' : 'var(--bg-input)',
+                      border: `1px solid ${dead ? 'rgba(255,68,68,0.1)' : 'var(--border-color)'}`,
+                      opacity: dead ? 0.5 : 1
+                    }}>
+                      <span style={{ ...getUsernameStyle(p.global_score), fontSize: '0.85rem', fontWeight: 600 }}>
+                        {p.username}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dead ? 'var(--error)' : 'var(--success)' }}>
+                        {dead ? '💀 Éliminé' : '💚 En vie'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Host Actions */}
+            {isHost && (
+              <div style={{ display: 'flex', justifyContent: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+                <button className="btn-primary" onClick={handleStartVoting} style={{ padding: '12px 28px', fontSize: '0.95rem' }}>
+                  <Vote size={18} style={{ marginRight: '6px' }} />
+                  Lancer la phase de vote 🗳️
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* PHASE 2: VOTING */}
+        {phase === 'voting' && (
+          <div className="glass-card flex flex-col gap-6" style={{ padding: '32px' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '6px' }}>
+                <Vote size={26} style={{ color: 'var(--accent)' }} />
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>Phase de Vote</h2>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+                Votez pour le joueur suspecté d'être l'Imposteur.
+              </p>
+            </div>
+
+            {/* Grid of Players to Vote For */}
+            {isEliminated ? (
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '32px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                <Skull size={32} style={{ color: 'var(--error)', marginBottom: '8px' }} />
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '1rem' }}>Vous êtes éliminé</h4>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: 0 }}>Vous ne pouvez pas participer au vote de cette manche.</p>
+              </div>
+            ) : my_vote ? (
+              <div style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.05), rgba(34,197,94,0.02))', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '12px', padding: '24px', textAlign: 'center' }}>
+                <CheckCircle2 size={32} style={{ color: 'var(--success)', marginBottom: '8px', display: 'inline-block' }} />
+                <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', fontWeight: 700 }}>Vote enregistré !</h4>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', margin: 0 }}>
+                  Vous avez voté pour <strong>{players.find(p => p.user_id === my_vote)?.username}</strong>. Attente des autres votes...
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <span className="section-label">Sélectionner un suspect :</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>
+                  {players.filter(p => !p.is_eliminated && p.user_id !== user.id).map(p => (
+                    <button
+                      key={p.user_id}
+                      onClick={() => handleImposteurVote(p.user_id)}
+                      disabled={votingImposteur}
+                      className="btn-secondary flex flex-col items-center justify-center"
+                      style={{
+                        padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)',
+                        backgroundColor: 'var(--bg-input)', cursor: 'pointer', gap: '8px', minHeight: '80px', transition: 'all 0.2s'
+                      }}
+                    >
+                      <span style={{ ...getUsernameStyle(p.global_score), fontSize: '0.9rem', fontWeight: 700 }}>
+                        {p.username}
+                      </span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Accuser
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Live Voting Progress */}
+            <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+              <h3 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                Suivi des votes ({players.filter(p => !p.is_eliminated && p.has_voted).length} / {players.filter(p => !p.is_eliminated).length} votes)
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {players.filter(p => !p.is_eliminated).map(p => (
+                  <div key={p.user_id} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '6px 12px', borderRadius: '6px',
+                    backgroundColor: p.has_voted ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${p.has_voted ? 'rgba(34,197,94,0.15)' : 'var(--border-color)'}`
+                  }}>
+                    <span style={{ ...getUsernameStyle(p.global_score), fontSize: '0.8rem', fontWeight: 600 }}>
+                      {p.username}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: p.has_voted ? 'var(--success)' : 'var(--text-muted)' }}>
+                      {p.has_voted ? 'A voté ✅' : 'Réfléchit... 💬'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PHASE 3: ROUND RESULTS */}
+        {phase === 'results' && (
+          <div className="glass-card flex flex-col gap-6" style={{ padding: '32px' }}>
+            <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px', textAlign: 'center' }}>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 4px 0' }}>Verdict du Groupe 📢</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', margin: 0 }}>
+                Le vote de la table est clos.
+              </p>
+            </div>
+
+            {/* Elimination Result Card */}
+            {(() => {
+              const elimPlayer = players.find(p => p.user_id === eliminated_user_id);
+              if (!elimPlayer) return null;
+              const wasImposteur = elimPlayer.imposteur_role === 'imposteur';
+
+              return (
+                <div style={{
+                  background: wasImposteur
+                    ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(0, 0, 0, 0.25))'
+                    : 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(0, 0, 0, 0.25))',
+                  border: `1px solid ${wasImposteur ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                  borderRadius: '16px', padding: '32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px'
+                }}>
+                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: wasImposteur ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {wasImposteur ? <Trophy size={32} style={{ color: 'var(--success)' }} /> : <Skull size={32} style={{ color: 'var(--error)' }} />}
+                  </div>
+                  
+                  <div>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '1.4rem', fontWeight: 800 }}>
+                      {elimPlayer.username} a été éliminé !
+                    </h3>
+                    <p style={{
+                      fontSize: '1.1rem', fontWeight: 700, margin: 0,
+                      color: wasImposteur ? 'var(--success)' : 'var(--error)'
+                    }}>
+                      {wasImposteur
+                        ? 'C\'était l\'Imposteur ! 🎉'
+                        : 'C\'était un Innocent... 😔'
+                      }
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Votes breakdown */}
+            <div>
+              <h3 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>
+                Détail des votes de ce tour :
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {players.filter(p => !p.is_eliminated || p.user_id === eliminated_user_id).map(p => {
+                  const votesReceived = p.imposteur_votes_received || 0;
+                  const votersList = players.filter(v => v.imposteur_voted_for_user_id === p.user_id).map(v => v.username);
+                  
+                  return (
+                    <div key={p.user_id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '12px 16px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '8px'
+                    }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ ...getUsernameStyle(p.global_score), fontWeight: 700, fontSize: '0.88rem' }}>
+                          {p.username} {p.user_id === eliminated_user_id ? '💀' : ''}
+                        </span>
+                        {votesReceived > 0 && (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            Voté par : {votersList.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: '0.8rem', fontWeight: 700, padding: '4px 10px',
+                        backgroundColor: votesReceived > 0 ? 'rgba(255,255,255,0.05)' : 'transparent',
+                        color: votesReceived > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+                        border: votesReceived > 0 ? '1px solid var(--border-color)' : 'none',
+                        borderRadius: '12px'
+                      }}>
+                        {votesReceived} vote{votesReceived > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Host actions if game still running */}
+            {lobbyState?.status === 'playing' && isHost && (
+              <div style={{ display: 'flex', justifyContent: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+                <button className="btn-primary" onClick={handleNextRound} style={{ padding: '12px 28px', fontSize: '0.95rem' }}>
+                  Lancer la manche suivante 🔄
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderImposteurFinalResults = () => {
+    const players = lobbyState?.players || [];
+    const imposteurPlayer = players.find(p => p.imposteur_role === 'imposteur');
+    
+    // Win calculation: if imposteur player is eliminated, innocents won!
+    const imposteurWon = imposteurPlayer ? !imposteurPlayer.is_eliminated : false;
+
+    return (
+      <div className="flex-1 flex items-center justify-center p-4 animate-slide-up">
+        <div className="glass-card" style={{ maxWidth: '650px', width: '100%', display: 'flex', flexDirection: 'column', gap: '28px', padding: '32px' }}>
+          
+          {/* Trophy Header */}
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%',
+              backgroundColor: 'rgba(255, 215, 0, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '1px solid rgba(255, 215, 0, 0.2)', marginBottom: '8px'
+            }}>
+              <Trophy size={36} style={{ color: '#ffd700' }} />
+            </div>
+            
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, margin: 0 }}>
+              {imposteurWon ? "Victoire de l'Imposteur ! 😈" : "Victoire des Innocents ! 🎉"}
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '400px', lineHeight: 1.4, margin: '4px 0 0 0' }}>
+              {imposteurWon
+                ? "L'Imposteur a réussi à éliminer tous les innocents ou à bluffer jusqu'à la fin !"
+                : "Les innocents ont démasqué et éliminé l'Imposteur avec succès !"
+              }
+            </p>
+          </div>
+
+          {/* Words recap */}
+          <div style={{
+            backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '12px',
+            padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', textAlign: 'center'
+          }}>
+            <div>
+              Thème : <strong style={{ color: 'var(--accent)' }}>{lobbyState.imposteur_theme}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-around', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '4px' }}>
+              <div>
+                Mot des Innocents : <strong style={{ color: 'var(--success)' }}>{lobbyState.imposteur_word_innocent}</strong>
+              </div>
+              <div style={{ width: '1px', backgroundColor: 'var(--border-color)' }} />
+              <div>
+                Mot de l'Imposteur : <strong style={{ color: 'var(--error)' }}>{lobbyState.imposteur_word_imposteur}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Leaderboard and ELO Changes */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h3 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+              Bilan des Joueurs & Elo
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {players.map((p) => {
+                const isWinner = (p.imposteur_role === 'imposteur' && imposteurWon) || (p.imposteur_role === 'innocent' && !imposteurWon);
+                
+                return (
+                  <div key={p.user_id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 16px', backgroundColor: p.user_id === user.id ? 'rgba(255,247,0,0.03)' : 'var(--bg-input)',
+                    borderRadius: '8px', border: `1px solid ${p.user_id === user.id ? 'rgba(255,247,0,0.15)' : 'var(--border-color)'}`
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ ...getUsernameStyle(p.global_score), fontWeight: p.user_id === user.id ? 700 : 500 }}>
+                        {p.username} {p.user_id === user.id ? ' (Vous)' : ''}
+                      </span>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px',
+                        backgroundColor: p.imposteur_role === 'imposteur' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.05)',
+                        color: p.imposteur_role === 'imposteur' ? 'var(--error)' : 'var(--text-secondary)'
+                      }}>
+                        {p.imposteur_role === 'imposteur' ? 'Imposteur' : 'Innocent'}
+                      </span>
+                      {p.is_eliminated === 1 && (
+                        <span style={{ fontSize: '0.65rem', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.2)', color: 'var(--text-muted)' }}>
+                          💀 Éliminé
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      {/* Win/Lose tag */}
+                      <span style={{
+                        fontSize: '0.75rem', fontWeight: 800,
+                        color: isWinner ? 'var(--success)' : 'var(--text-muted)'
+                      }}>
+                        {isWinner ? 'Victoire 🎉' : 'Défaite'}
+                      </span>
+
+                      {/* ELO changes */}
+                      {p.elo_change !== undefined && (
+                        <span style={{
+                          fontSize: '0.8rem', fontWeight: 800, minWidth: '55px', textAlign: 'right',
+                          color: p.elo_change > 0 ? 'var(--success)' : p.elo_change < 0 ? 'var(--error)' : 'var(--text-secondary)'
+                        }}>
+                          {p.elo_change > 0 ? '+' : ''}{p.elo_change} Elo
+                        </span>
+                      )}
+
+                      {/* Coins changes */}
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffb300', minWidth: '60px', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                        +{isWinner ? 100 : 10} <Coins size={13} />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Back button */}
+          <button className="btn-primary" onClick={() => { clearAllTimers(); onBack(); }}
+                  style={{ width: '100%', padding: '14px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <ArrowLeft size={18} /> Retour au Tableau de Bord
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
   // RENDER: PLAYING (question + answer)
   // ============================================================
   if (gamePhase === 'playing' || gamePhase === 'feedback') {
     if (lobbyState.game_mode === 'tribunal') {
       return renderTribunalGame();
+    }
+    if (lobbyState.game_mode === 'imposteur') {
+      return renderImposteurGame();
     }
     const isFeedback = gamePhase === 'feedback';
     const myPlayerInfo = lobbyState?.players.find(p => p.user_id === user.id);
@@ -1223,7 +1739,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                                 borderRadius: '12px',
                                 border: '1px solid var(--border-color)',
                                 backgroundColor: 'var(--bg-input)',
-                                color: '#fff',
+                                color: 'var(--text-primary)',
                                 fontSize: '1.1rem',
                                 outline: 'none'
                               }}
@@ -1327,7 +1843,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 700, color: '#fff', fontSize: '0.8rem' }}>{p.score} pts</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{p.score} pts</span>
                         {p.is_eliminated ? (
                             <span style={{ fontSize: '0.75rem', color: 'var(--error)', fontWeight: 'bold' }}>Éliminé</span>
                         ) : p.finished ? (
@@ -1443,6 +1959,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   // RENDER: FINAL RESULTS / PODIUM
   // ============================================================
   if (gamePhase === 'results' || lobbyState.status === 'finished') {
+    if (lobbyState.game_mode === 'imposteur') {
+      return renderImposteurFinalResults();
+    }
     const players = lobbyState.players;
     const podium = players.slice(0, 3);
     const podiumOrder = podium.length >= 3 ? [podium[1], podium[0], podium[2]] : podium;

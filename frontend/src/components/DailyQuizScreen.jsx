@@ -340,7 +340,7 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
                 borderRadius: '12px',
                 border: '1px solid var(--border-color)',
                 backgroundColor: 'var(--bg-input)',
-                color: '#fff',
+                color: 'var(--text-primary)',
                 fontSize: '1.1rem',
                 outline: 'none'
               }}
@@ -376,3 +376,4 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
     </div>
   );
 }
+

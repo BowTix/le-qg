@@ -262,7 +262,7 @@ export default function LeaderboardScreen({ onBack }) {
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: '2px' }}>
-                    <span>Thème : <strong style={{ color: '#fff' }}>{m.pack_name}</strong></span>
+                    <span>Thème : <strong style={{ color: 'var(--text-primary)' }}>{m.pack_name}</strong></span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Calendar size={12} />
                       {new Date(m.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -290,3 +290,4 @@ export default function LeaderboardScreen({ onBack }) {
     </div>
   );
 }
+

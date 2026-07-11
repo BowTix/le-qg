@@ -315,6 +315,33 @@ try {
             }
             break;
 
+        case '/api/lobby/imposteur/vote':
+            if ($method === 'POST') {
+                (new \App\Controllers\LobbyController())->submitImposteurVote(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/lobby/imposteur/start-voting':
+            if ($method === 'POST') {
+                (new \App\Controllers\LobbyController())->startImposteurVoting(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/lobby/imposteur/next-round':
+            if ($method === 'POST') {
+                (new \App\Controllers\LobbyController())->startImposteurNextRound(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         case '/api/lobby/finish':
             if ($method === 'POST') {
                 (new \App\Controllers\LobbyController())->finishGame();

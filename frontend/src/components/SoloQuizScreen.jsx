@@ -322,7 +322,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
             <Award size={16} />
-            Score : <strong style={{ color: '#fff' }}>{score} pts</strong>
+            Score : <strong style={{ color: 'var(--text-primary)' }}>{score} pts</strong>
           </div>
           
           <div style={{
@@ -405,7 +405,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
                     borderRadius: '12px',
                     border: '1px solid var(--border-color)',
                     backgroundColor: 'var(--bg-input)',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     fontSize: '1.1rem',
                     outline: 'none',
                     transition: 'border-color 0.2s'
@@ -503,7 +503,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
                   </p>
                   {!result.correct && result.correct_text && (
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '6px' }}>
-                      La bonne réponse était : <strong style={{ color: '#fff' }}>
+                      La bonne réponse était : <strong style={{ color: 'var(--text-primary)' }}>
                         {result.correct_option ? `(${result.correct_option}) ` : ''}{result.correct_text}
                       </strong>
                     </p>
@@ -522,3 +522,4 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
     </div>
   );
 }
+

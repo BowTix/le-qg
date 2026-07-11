@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../utils/api';
-import { LogOut, Trophy, Play, Plus, Users, User, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award, Zap, Skull, Calculator, Gavel, Lock } from 'lucide-react';
+import { LogOut, Trophy, Play, Plus, Users, User, ShieldAlert, BookOpen, ChevronLeft, ChevronRight, Gamepad2, Globe, ArrowRight, Award, Zap, Skull, Calculator, Gavel, Lock, EyeOff } from 'lucide-react';
 import { getLevel, getUsernameStyle, getLevelBadge, getLevelProgressDetails } from '../utils/progression';
 
 export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateLobby, onJoinLobby, onOpenAdmin, onOpenCreator, onOpenLeaderboard, onOpenProfile, onStartDailyQuiz }) {
@@ -150,12 +150,12 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   };
 
   const handleCreateLobby = async () => {
-    if (!selectedPackLobby) return;
+    if (!selectedPackLobby && gameMode !== 'imposteur') return;
     setCreating(true);
     setCreateError('');
     try {
       const data = await api.post('/lobby/create', { 
-        pack_id: parseInt(selectedPackLobby),
+        pack_id: gameMode === 'imposteur' ? 1 : parseInt(selectedPackLobby),
         game_mode: gameMode
       });
       if (data.success && data.room_code) {
@@ -247,7 +247,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
     }
   };
 
-  const selectedCategory = gameMode === 'tribunal' ? 'party' : 'quiz';
+  const selectedCategory = (gameMode === 'tribunal' || gameMode === 'imposteur') ? 'party' : 'quiz';
 
   const cultureQuizGames = [
     {
@@ -255,6 +255,9 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       title: 'Classique',
       desc: '10 QCM standard avec bonus de rapidité pour marquer un maximum de points.',
       icon: <Play size={20} />,
+      color: '#3dbdad',
+      glow: 'rgba(61, 189, 173, 0.12)',
+      gradient: 'linear-gradient(135deg, #3dbdad, #2a9d8f)',
       onClick: () => {
         setGameMode('classic');
         setSelectedGame('classic');
@@ -266,6 +269,9 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       title: 'Speed Blitz',
       desc: 'Le temps de réflexion est réduit à 5 secondes. Rapidité et intuition exigées !',
       icon: <Zap size={20} />,
+      color: '#ff9f1c',
+      glow: 'rgba(255, 159, 28, 0.12)',
+      gradient: 'linear-gradient(135deg, #ffd166, #ff9f1c)',
       onClick: () => {
         setGameMode('speed_blitz');
         setSelectedGame('speed_blitz');
@@ -277,6 +283,9 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       title: 'Mort Subite',
       desc: 'Chaque erreur est fatale. Répondez correctement ou vous serez éliminé.',
       icon: <Skull size={20} />,
+      color: '#e63946',
+      glow: 'rgba(230, 57, 70, 0.12)',
+      gradient: 'linear-gradient(135deg, #ff4d6d, #e63946)',
       onClick: () => {
         setGameMode('sudden_death');
         setSelectedGame('sudden_death');
@@ -288,6 +297,9 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       title: 'Juste Nombre',
       desc: 'Estimez des valeurs chiffrées précises et tapez votre réponse au clavier.',
       icon: <Calculator size={20} />,
+      color: '#00b4db',
+      glow: 'rgba(0, 180, 219, 0.12)',
+      gradient: 'linear-gradient(135deg, #00d2ff, #0083b0)',
       onClick: () => {
         setGameMode('guess_number');
         setSelectedGame('guess_number');
@@ -303,6 +315,9 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       desc: 'Rédigez des réponses absurdes à des dilemmes ouverts et votez anonymement.',
       icon: <Gavel size={20} />,
       badge: 'Multijoueur 👥',
+      color: '#9b5de5',
+      glow: 'rgba(155, 93, 229, 0.12)',
+      gradient: 'linear-gradient(135deg, #da22ff, #9733ee)',
       onClick: () => {
         setGameMode('tribunal');
         setSelectedGame('tribunal');
@@ -313,9 +328,16 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       id: 'imposteur',
       title: "L'Imposteur",
       desc: 'Un jeu de bluff et de déduction sociale. Trouvez qui cache son mot secret.',
-      icon: <Lock size={20} />,
-      badge: 'Bientôt 🚀',
-      disabled: true
+      icon: <EyeOff size={20} />,
+      badge: 'Multijoueur 👥',
+      color: '#ff2a85',
+      glow: 'rgba(255, 42, 133, 0.12)',
+      gradient: 'linear-gradient(135deg, #ff007f, #7f00ff)',
+      onClick: () => {
+        setGameMode('imposteur');
+        setSelectedGame('imposteur');
+        setMode('online');
+      }
     },
     {
       id: 'decodeur',
@@ -323,6 +345,9 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
       desc: 'Faites deviner des codes chiffrés à vos coéquipiers en transmettant des indices.',
       icon: <Lock size={20} />,
       badge: 'Bientôt 🚀',
+      color: '#6c757d',
+      glow: 'rgba(0, 0, 0, 0)',
+      gradient: 'linear-gradient(135deg, #495057, #343a40)',
       disabled: true
     }
   ];
@@ -475,7 +500,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                             border: '1px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '50%', width: '36px', height: '36px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#ffffff', cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
+                            color: 'var(--text-primary)', cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
                             opacity: gameMode === 'guess_number' ? 0.3 : 1
                           }}
                         >
@@ -511,7 +536,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                           )}
 
                           <div>
-                            <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#ffffff', margin: '0 0 2px 0' }}>
+                            <h4 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 2px 0' }}>
                               {filteredPacks[activePackIndex].name}
                             </h4>
                             <p style={{
@@ -535,7 +560,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                             border: '1px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '50%', width: '36px', height: '36px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#ffffff', cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
+                            color: 'var(--text-primary)', cursor: gameMode === 'guess_number' ? 'not-allowed' : 'pointer',
                             opacity: gameMode === 'guess_number' ? 0.3 : 1
                           }}
                         >
@@ -638,10 +663,10 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
                     <button 
                       className="btn-primary" 
                       onClick={handleCreateLobby}
-                      disabled={creating || filteredPacks.length === 0}
+                      disabled={creating || (gameMode !== 'imposteur' && filteredPacks.length === 0)}
                       style={{ padding: '12px', fontSize: '0.9rem', width: '100%' }}
                     >
-                      {creating ? 'Création...' : 'Créer un salon Le Tribunal'}
+                      {creating ? 'Création...' : gameMode === 'imposteur' ? "Créer un salon L'Imposteur" : 'Créer un salon Le Tribunal'}
                     </button>
                     {createError && <div style={{ color: 'var(--error)', fontSize: '0.78rem', marginTop: '2px' }}>{createError}</div>}
                   </div>
@@ -716,7 +741,7 @@ export default function DashboardScreen({ user, onLogout, onStartSolo, onCreateL
   );
 }
 
-// 📅 3D COVER FLOW CAROUSEL COMPONENT
+// 📅 REDESIGNED MODERN GAME CAROUSEL COMPONENT
 function GameCarousel3D({ items }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [startX, setStartX] = useState(0);
@@ -776,206 +801,266 @@ function GameCarousel3D({ items }) {
   const prev = () => setActiveIndex(prev => (prev - 1 + items.length) % items.length);
 
   const isMobile = windowWidth < 768;
-  const translateXVal = isMobile ? 120 : 260;
-  const translateZVal = isMobile ? -100 : -150;
-  const rotateYVal = isMobile ? -25 : -35;
-  const cardWidth = isMobile ? '240px' : '320px';
-  const cardHeight = isMobile ? '220px' : '240px';
+  const translateXVal = isMobile ? 180 : 260;
+  const cardWidth = isMobile ? '260px' : '320px';
+  const cardHeight = isMobile ? '230px' : '260px';
 
   return (
     <div 
-      ref={containerRef}
       style={{
-        perspective: '1200px',
         position: 'relative',
         width: '100%',
-        height: isMobile ? '290px' : '350px',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        userSelect: 'none',
-        cursor: isDragging ? 'grabbing' : 'grab',
+        gap: '20px',
         marginTop: '8px',
         marginBottom: '16px'
       }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleMouseUp}
     >
-      {/* 3D CARDS WRAPPER */}
-      <div style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        transformStyle: 'preserve-3d',
-      }}>
-        {items.map((item, index) => {
-          let offset = index - activeIndex;
-          
-          // Compute circular offset
-          if (offset < -items.length / 2) offset += items.length;
-          if (offset > items.length / 2) offset -= items.length;
+      <div 
+        ref={containerRef}
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: isMobile ? '260px' : '310px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          userSelect: 'none',
+          cursor: isDragging ? 'grabbing' : 'grab',
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleMouseUp}
+      >
+        {/* CARDS WRAPPER */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          {items.map((item, index) => {
+            let offset = index - activeIndex;
+            
+            // Compute circular offset
+            if (offset < -items.length / 2) offset += items.length;
+            if (offset > items.length / 2) offset -= items.length;
 
-          const absOffset = Math.abs(offset);
-          const isActive = offset === 0;
+            const absOffset = Math.abs(offset);
+            const isActive = offset === 0;
 
-          // 3D calculation
-          const rotateY = offset * rotateYVal;
-          const translateZ = absOffset * translateZVal;
-          const translateX = offset * translateXVal;
-          const scale = 1 - absOffset * 0.15;
-          const opacity = 1 - absOffset * 0.45;
-          const zIndex = 100 - absOffset;
+            const scale = isActive ? 1.05 : (absOffset === 1 ? 0.9 : 0.75);
+            const opacity = isActive ? 1 : (absOffset === 1 ? 1 : 0);
+            const zIndex = 100 - absOffset;
+            const translateX = offset * translateXVal;
 
-          return (
-            <div
-              key={index}
-              className={`game-card${item.disabled ? ' disabled' : ''}${isActive ? ' active-3d' : ''}`}
-              onClick={(e) => {
-                if (!isActive) {
-                  setActiveIndex(index);
-                  e.stopPropagation();
-                } else if (!item.disabled && item.onClick) {
-                  item.onClick();
-                }
-              }}
-              style={{
-                position: 'absolute',
-                width: cardWidth,
-                height: cardHeight,
-                padding: isMobile ? '20px' : '28px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                transition: 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
-                transform: `translateX(${translateX}px) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
-                opacity: opacity > 0 ? opacity : 0,
-                zIndex: zIndex,
-                pointerEvents: opacity > 0 ? 'auto' : 'none',
-                boxShadow: isActive ? '0 15px 35px rgba(255, 247, 0, 0.12)' : '0 5px 15px rgba(0, 0, 0, 0.3)',
-                borderColor: isActive ? 'var(--accent)' : 'var(--border-color)',
-                cursor: item.disabled ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {/* Card content */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div className="game-card-icon" style={{
-                    backgroundColor: isActive ? 'var(--accent)' : 'var(--bg-surface)',
-                    color: isActive ? '#000' : 'var(--accent)',
-                    width: isMobile ? '34px' : '42px',
-                    height: isMobile ? '34px' : '42px',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.3s ease'
-                  }}>
-                    {item.icon}
+            return (
+              <div
+                key={index}
+                className={`game-card${item.disabled ? ' disabled' : ''}${isActive ? ' active-card' : ' inactive-card'}`}
+                onClick={(e) => {
+                  if (!isActive) {
+                    setActiveIndex(index);
+                    e.stopPropagation();
+                  } else if (!item.disabled && item.onClick) {
+                    item.onClick();
+                  }
+                }}
+                style={{
+                  position: 'absolute',
+                  width: cardWidth,
+                  height: cardHeight,
+                  transition: 'all 0.5s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                  transform: `translateX(${translateX}px) scale(${scale})`,
+                  opacity: opacity,
+                  zIndex: zIndex,
+                  pointerEvents: opacity > 0 ? 'auto' : 'none',
+                  cursor: item.disabled ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <div 
+                  className="game-card-body"
+                  style={{
+                    padding: isMobile ? '20px' : '28px',
+                    border: isActive ? `2px solid ${item.color}` : '1px solid var(--border-color)',
+                    boxShadow: isActive 
+                      ? `0 8px 24px ${item.glow}, 0 2px 6px rgba(0, 0, 0, 0.12)` 
+                      : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  {/* Card content */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '8px' : '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div className="game-card-icon" style={{
+                        background: isActive ? item.gradient : 'var(--bg-surface)',
+                        color: isActive ? '#ffffff' : 'var(--text-secondary)',
+                        width: isMobile ? '34px' : '42px',
+                        height: isMobile ? '34px' : '42px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.3s ease',
+                        boxShadow: isActive ? `0 4px 10px ${item.glow}` : 'none',
+                      }}>
+                        {item.icon}
+                      </div>
+                      {item.badge && (
+                        <div className="game-card-badge" style={{
+                          margin: 0,
+                          backgroundColor: isActive ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255,255,255,0.05)',
+                          borderColor: isActive ? item.color : 'var(--border-color)',
+                          color: isActive ? item.color : 'var(--text-secondary)',
+                          fontSize: isMobile ? '0.6rem' : '0.68rem',
+                          padding: '2px 8px',
+                          borderRadius: '20px',
+                          borderWidth: '1px',
+                          borderStyle: 'solid',
+                          position: 'static',
+                        }}>
+                          {item.badge}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h4 style={{ 
+                        fontSize: isMobile ? '1.05rem' : '1.25rem', 
+                        fontWeight: 800, 
+                        margin: '0 0 4px 0', 
+                        color: 'var(--text-primary)',
+                      }}>
+                        {item.title}
+                      </h4>
+                      <p style={{ 
+                        fontSize: isMobile ? '0.75rem' : '0.82rem', 
+                        color: 'var(--text-secondary)', 
+                        margin: 0, 
+                        lineHeight: 1.4,
+                        display: '-webkit-box',
+                        WebkitLineClamp: isMobile ? 2 : 3,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
+                        {item.desc}
+                      </p>
+                    </div>
                   </div>
-                  {item.badge && (
-                    <div className="game-card-badge" style={{
-                      margin: 0,
-                      backgroundColor: isActive ? 'rgba(255, 247, 0, 0.15)' : 'rgba(255,255,255,0.05)',
-                      color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                      fontSize: isMobile ? '0.6rem' : '0.68rem',
-                      padding: '2px 6px'
+
+                  {isActive && !item.disabled && (
+                    <div className="configure-partie-btn" style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px', 
+                      color: item.color, 
+                      fontSize: isMobile ? '0.78rem' : '0.85rem', 
+                      fontWeight: 700, 
+                      alignSelf: 'flex-start',
+                      marginTop: '8px',
                     }}>
-                      {item.badge}
+                      <span>Configurer la partie</span>
+                      <ArrowRight size={isMobile ? 12 : 14} className="arrow-pulse" />
                     </div>
                   )}
                 </div>
-                <div>
-                  <h4 style={{ fontSize: isMobile ? '1.05rem' : '1.25rem', fontWeight: 800, margin: '0 0 4px 0', color: isActive ? '#fff' : 'var(--text-primary)' }}>
-                    {item.title}
-                  </h4>
-                  <p style={{ 
-                    fontSize: isMobile ? '0.75rem' : '0.82rem', 
-                    color: isActive ? 'rgba(255,255,255,0.85)' : 'var(--text-secondary)', 
-                    margin: 0, 
-                    lineHeight: 1.4,
-                    display: '-webkit-box',
-                    WebkitLineClamp: isMobile ? 2 : 3,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden'
-                  }}>
-                    {item.desc}
-                  </p>
-                </div>
               </div>
+            );
+          })}
+        </div>
 
-              {isActive && !item.disabled && (
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '6px', 
-                  color: 'var(--accent)', 
-                  fontSize: isMobile ? '0.78rem' : '0.85rem', 
-                  fontWeight: 700, 
-                  alignSelf: 'flex-start',
-                  marginTop: '8px',
-                  animation: 'pulse 1.5s infinite'
-                }}>
-                  <span>Configurer la partie</span>
-                  <ArrowRight size={isMobile ? 12 : 14} />
-                </div>
-              )}
-            </div>
+        {/* Nav Controls */}
+        <button 
+          onClick={(e) => { e.stopPropagation(); prev(); }}
+          className="carousel-nav-btn prev"
+          aria-label="Previous game"
+          style={{
+            position: 'absolute',
+            left: '10px',
+            zIndex: 200,
+            borderRadius: '50%',
+            width: '36px',
+            height: '36px',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-card)',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <button 
+          onClick={(e) => { e.stopPropagation(); next(); }}
+          className="carousel-nav-btn next"
+          aria-label="Next game"
+          style={{
+            position: 'absolute',
+            right: '10px',
+            zIndex: 200,
+            borderRadius: '50%',
+            width: '36px',
+            height: '36px',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '1px solid var(--border-color)',
+            background: 'var(--bg-card)',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      {/* Pagination indicators (Dots) */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: '-4px',
+        height: '10px',
+      }}>
+        {items.map((item, index) => {
+          const isActive = index === activeIndex;
+          return (
+            <button
+              key={index}
+              onClick={() => setActiveIndex(index)}
+              style={{
+                width: isActive ? '20px' : '8px',
+                height: '8px',
+                borderRadius: '4px',
+                background: isActive ? item.color : 'var(--border-color)',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                boxShadow: isActive ? `0 0 8px ${item.glow}` : 'none',
+              }}
+              title={item.title}
+            />
           );
         })}
       </div>
-
-      {/* Nav Controls */}
-      <button 
-        onClick={(e) => { e.stopPropagation(); prev(); }}
-        className="btn-secondary" 
-        style={{
-          position: 'absolute',
-          left: '10px',
-          zIndex: 200,
-          borderRadius: '50%',
-          width: '32px',
-          height: '32px',
-          padding: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: '1px solid var(--border-color)',
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(5px)'
-        }}
-      >
-        <ChevronLeft size={16} />
-      </button>
-      <button 
-        onClick={(e) => { e.stopPropagation(); next(); }}
-        className="btn-secondary" 
-        style={{
-          position: 'absolute',
-          right: '10px',
-          zIndex: 200,
-          borderRadius: '50%',
-          width: '32px',
-          height: '32px',
-          padding: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: '1px solid var(--border-color)',
-          background: 'rgba(0,0,0,0.5)',
-          backdropFilter: 'blur(5px)'
-        }}
-      >
-        <ChevronRight size={16} />
-      </button>
     </div>
   );
 }
+

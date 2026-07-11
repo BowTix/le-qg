@@ -156,7 +156,7 @@ export default function AuthScreen({ onAuthSuccess }) {
                 textAlign: 'center'
               }}>
                 ℹ️ simulation locale de mail reçu : <br />
-                Code de vérification : <strong style={{ fontSize: '1.1rem', color: '#fff' }}>{simulatedCode}</strong>
+                Code de vérification : <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{simulatedCode}</strong>
               </div>
             )}
 
@@ -361,3 +361,4 @@ export default function AuthScreen({ onAuthSuccess }) {
     </div>
   );
 }
+

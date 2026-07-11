@@ -654,7 +654,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
                     backgroundColor: 'var(--bg-input)',
                     border: '2px solid var(--border-color)',
                     borderRadius: '12px',
-                    color: '#fff',
+                    color: 'var(--text-primary)',
                     fontFamily: 'var(--font-sans)',
                     resize: 'none'
                   }}
@@ -704,3 +704,4 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
     </div>
   );
 }
+

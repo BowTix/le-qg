@@ -934,7 +934,7 @@ export default function AdminScreen({ onBack }) {
                               style={{ padding: '10px 12px', borderBottom: '1px solid #2A2A2A', cursor: 'pointer', transition: 'background 0.2s' }}
                               className="dropdown-item-hover"
                             >
-                              <p style={{ fontWeight: 600, fontSize: '0.85rem', color: '#fff', margin: 0 }}>{q.question_text}</p>
+                              <p style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0 }}>{q.question_text}</p>
                               <small style={{ color: 'var(--text-secondary)' }}>{q.pack_name} | {q.question_type}</small>
                             </div>
                           ))}
@@ -986,7 +986,7 @@ export default function AdminScreen({ onBack }) {
                               style={{ padding: '10px 12px', borderBottom: '1px solid #2A2A2A', cursor: 'pointer', transition: 'background 0.2s' }}
                               className="dropdown-item-hover"
                             >
-                              <p style={{ fontWeight: 600, fontSize: '0.85rem', color: '#fff', margin: 0 }}>{q.question_text}</p>
+                              <p style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0 }}>{q.question_text}</p>
                               <small style={{ color: 'var(--text-secondary)' }}>{q.pack_name} | {q.question_type}</small>
                             </div>
                           ))}
@@ -1038,7 +1038,7 @@ export default function AdminScreen({ onBack }) {
                               style={{ padding: '10px 12px', borderBottom: '1px solid #2A2A2A', cursor: 'pointer', transition: 'background 0.2s' }}
                               className="dropdown-item-hover"
                             >
-                              <p style={{ fontWeight: 600, fontSize: '0.85rem', color: '#fff', margin: 0 }}>{q.question_text}</p>
+                              <p style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0 }}>{q.question_text}</p>
                               <small style={{ color: 'var(--text-secondary)' }}>{q.pack_name} | {q.question_type}</small>
                             </div>
                           ))}
@@ -1067,3 +1067,4 @@ export default function AdminScreen({ onBack }) {
     </div>
   );
 }
+

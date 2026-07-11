@@ -53,7 +53,7 @@ class LobbyController
         } while ($checkStmt->fetch());
 
         $gameMode = $data['game_mode'] ?? 'classic';
-        if (!in_array($gameMode, ['classic', 'speed_blitz', 'sudden_death', 'guess_number', 'tribunal'])) {
+        if (!in_array($gameMode, ['classic', 'speed_blitz', 'sudden_death', 'guess_number', 'tribunal', 'imposteur'])) {
             $gameMode = 'classic';
         }
 
@@ -62,6 +62,12 @@ class LobbyController
             $tribunalPackId = (int) $stmtTribunalPack->fetchColumn();
             if ($tribunalPackId > 0) {
                 $packId = $tribunalPackId;
+            }
+        } elseif ($gameMode === 'imposteur') {
+            $stmtImposteurPack = $db->query("SELECT id FROM packs WHERE name = 'L\'Imposteur'");
+            $imposteurPackId = (int) $stmtImposteurPack->fetchColumn();
+            if ($imposteurPackId > 0) {
+                $packId = $imposteurPackId;
             }
         }
 
@@ -388,6 +394,76 @@ class LobbyController
             ];
         }
 
+        if ($lobby['game_mode'] === 'imposteur' && $lobby['status'] !== 'waiting') {
+            $phase = $lobby['imposteur_phase'];
+            $theme = $lobby['imposteur_theme'];
+            $eliminatedUserId = $lobby['imposteur_eliminated_user_id'] ? intval($lobby['imposteur_eliminated_user_id']) : null;
+
+            $myRole = null;
+            $myWord = null;
+            $myVote = null;
+
+            if ($currentUserId !== null) {
+                $stmtMyState = $db->prepare("SELECT imposteur_role, imposteur_word, imposteur_voted_for_user_id FROM lobby_players WHERE lobby_id = ? AND user_id = ?");
+                $stmtMyState->execute([$lobby['id'], $currentUserId]);
+                $myState = $stmtMyState->fetch();
+                if ($myState) {
+                    $myRole = $myState['imposteur_role'];
+                    $myWord = $myState['imposteur_word'];
+                    $myVote = $myState['imposteur_voted_for_user_id'] ? intval($myState['imposteur_voted_for_user_id']) : null;
+                }
+            }
+
+            // Get votes info for active players
+            $stmtVotes = $db->prepare("SELECT user_id, imposteur_voted_for_user_id FROM lobby_players WHERE lobby_id = ? AND is_eliminated = 0");
+            $stmtVotes->execute([$lobby['id']]);
+            $votesRaw = $stmtVotes->fetchAll();
+
+            $votedUserIds = [];
+            $voteCounts = []; // target_id => vote_count
+            foreach ($votesRaw as $vr) {
+                if ($vr['imposteur_voted_for_user_id'] !== null) {
+                    $votedUserIds[] = intval($vr['user_id']);
+                    $target = intval($vr['imposteur_voted_for_user_id']);
+                    $voteCounts[$target] = ($voteCounts[$target] ?? 0) + 1;
+                }
+            }
+
+            // Populate player list
+            foreach ($response['players'] as &$p) {
+                $pId = $p['user_id'];
+                $p['has_voted'] = in_array($pId, $votedUserIds);
+                
+                $stmtPlayerState = $db->prepare("SELECT imposteur_role, imposteur_word, imposteur_voted_for_user_id FROM lobby_players WHERE lobby_id = ? AND user_id = ?");
+                $stmtPlayerState->execute([$lobby['id'], $pId]);
+                $pState = $stmtPlayerState->fetch();
+                
+                // Only reveal roles/words in results phase, or if player is eliminated, or to the player themselves
+                if ($phase === 'results' || $lobby['status'] === 'finished' || $p['is_eliminated'] || $pId === $currentUserId) {
+                    if ($pState) {
+                        $p['imposteur_role'] = $pState['imposteur_role'];
+                        $p['imposteur_word'] = $pState['imposteur_word'];
+                    }
+                }
+                
+                if ($phase === 'results') {
+                    if ($pState) {
+                        $p['imposteur_voted_for_user_id'] = $pState['imposteur_voted_for_user_id'] ? intval($pState['imposteur_voted_for_user_id']) : null;
+                    }
+                    $p['imposteur_votes_received'] = $voteCounts[$pId] ?? 0;
+                }
+            }
+
+            $response['imposteur'] = [
+                'phase' => $phase,
+                'theme' => $theme,
+                'my_role' => $myRole,
+                'my_word' => $myWord,
+                'my_vote' => $myVote,
+                'eliminated_user_id' => $eliminatedUserId
+            ];
+        }
+
         return $response;
     }
 
@@ -478,6 +554,82 @@ class LobbyController
         if (intval($lobby['host_id']) !== $user['user_id']) {
             http_response_code(403);
             echo json_encode(['error' => 'Seul l\'hôte peut lancer la partie.']);
+            return;
+        }
+
+        if ($lobby['game_mode'] === 'imposteur') {
+            // Count players in lobby
+            $stmtCount = $db->prepare("SELECT COUNT(*) FROM lobby_players WHERE lobby_id = ?");
+            $stmtCount->execute([$lobby['id']]);
+            $playerCount = (int) $stmtCount->fetchColumn();
+            if ($playerCount < 3) {
+                http_response_code(400);
+                echo json_encode(['error' => 'La partie d\'Imposteur nécessite au moins 3 joueurs.']);
+                return;
+            }
+
+            // Get random word pair
+            $stmtWord = $db->query("SELECT * FROM imposteur_words ORDER BY RAND() LIMIT 1");
+            $wordPair = $stmtWord->fetch();
+            if (!$wordPair) {
+                $wordPair = ['word_innocent' => 'Lion', 'word_imposteur' => 'Tigre', 'theme' => 'Animaux'];
+            }
+
+            // Fetch players
+            $stmtPlayers = $db->prepare("SELECT user_id FROM lobby_players WHERE lobby_id = ?");
+            $stmtPlayers->execute([$lobby['id']]);
+            $playersList = $stmtPlayers->fetchAll(\PDO::FETCH_COLUMN);
+
+            // Select random Imposteur
+            $imposteurUserId = $playersList[array_rand($playersList)];
+
+            // Start game transaction
+            $nowMs = round(microtime(true) * 1000);
+            $db->prepare("
+                UPDATE lobbies 
+                SET status = 'playing',
+                    questions_list = '',
+                    game_started_at = ?,
+                    current_question_index = 0,
+                    current_question_id = NULL,
+                    imposteur_word_innocent = ?,
+                    imposteur_word_imposteur = ?,
+                    imposteur_theme = ?,
+                    imposteur_phase = 'debate',
+                    imposteur_eliminated_user_id = NULL
+                WHERE id = ?
+            ")->execute([$nowMs, $wordPair['word_innocent'], $wordPair['word_imposteur'], $wordPair['theme'], $lobby['id']]);
+
+            // Reset players
+            $stmtPlayerUpdate = $db->prepare("
+                UPDATE lobby_players 
+                SET is_eliminated = 0,
+                    imposteur_role = ?,
+                    imposteur_word = ?,
+                    imposteur_voted_for_user_id = NULL,
+                    current_score = 0,
+                    current_question_index = 0,
+                    finished_at = NULL,
+                    elo_change = 0
+                WHERE lobby_id = ? AND user_id = ?
+            ");
+            foreach ($playersList as $pId) {
+                $isImposteur = (intval($pId) === intval($imposteurUserId));
+                $role = $isImposteur ? 'imposteur' : 'innocent';
+                $word = $isImposteur ? $wordPair['word_imposteur'] : $wordPair['word_innocent'];
+                $stmtPlayerUpdate->execute([$role, $word, $lobby['id'], $pId]);
+            }
+
+            // Broadcast the state update
+            $lobby['status'] = 'playing';
+            $lobby['imposteur_word_innocent'] = $wordPair['word_innocent'];
+            $lobby['imposteur_word_imposteur'] = $wordPair['word_imposteur'];
+            $lobby['imposteur_theme'] = $wordPair['theme'];
+            $lobby['imposteur_phase'] = 'debate';
+            $lobby['imposteur_eliminated_user_id'] = null;
+            $this->broadcastLobbyState($db, $lobby);
+
+            echo json_encode(['success' => true]);
             return;
         }
 
@@ -1496,6 +1648,294 @@ class LobbyController
                 $stmtXP = $db->prepare("UPDATE users SET global_score = global_score + ?, coins = coins + ? WHERE id = ?");
                 $stmtXP->execute([$points, $coins, $authorId]);
             }
+        }
+    }
+
+    public function submitImposteurVote(array $data)
+    {
+        $user = AuthMiddleware::authenticate();
+        $roomCode = strtoupper(trim($data['room_code'] ?? ''));
+        $targetUserId = intval($data['voted_for_user_id'] ?? 0);
+
+        if ($targetUserId <= 0) {
+            http_response_code(400);
+            echo json_encode(['error' => 'ID du joueur requis.']);
+            return;
+        }
+
+        $db = Database::getConnection();
+
+        $stmtLobby = $db->prepare("SELECT * FROM lobbies WHERE room_code = ?");
+        $stmtLobby->execute([$roomCode]);
+        $lobby = $stmtLobby->fetch();
+
+        if (!$lobby || $lobby['game_mode'] !== 'imposteur' || $lobby['status'] !== 'playing') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Action invalide.']);
+            return;
+        }
+
+        if ($lobby['imposteur_phase'] !== 'voting') {
+            http_response_code(400);
+            echo json_encode(['error' => 'La phase de vote n\'est pas active.']);
+            return;
+        }
+
+        // Check if player is alive in the lobby
+        $stmtPlayer = $db->prepare("SELECT * FROM lobby_players WHERE lobby_id = ? AND user_id = ?");
+        $stmtPlayer->execute([$lobby['id'], $user['user_id']]);
+        $player = $stmtPlayer->fetch();
+
+        if (!$player || intval($player['is_eliminated']) === 1) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Vous ne pouvez pas voter car vous avez été éliminé.']);
+            return;
+        }
+
+        // Check if target is in the lobby and alive
+        $stmtTarget = $db->prepare("SELECT * FROM lobby_players WHERE lobby_id = ? AND user_id = ?");
+        $stmtTarget->execute([$lobby['id'], $targetUserId]);
+        $target = $stmtTarget->fetch();
+
+        if (!$target || intval($target['is_eliminated']) === 1) {
+            http_response_code(400);
+            echo json_encode(['error' => 'La cible du vote n\'est pas éligible ou a été éliminée.']);
+            return;
+        }
+
+        // Update vote
+        $db->prepare("UPDATE lobby_players SET imposteur_voted_for_user_id = ? WHERE lobby_id = ? AND user_id = ?")
+           ->execute([$targetUserId, $lobby['id'], $user['user_id']]);
+
+        // Check if all alive players have voted
+        $stmtTotalAlive = $db->prepare("SELECT COUNT(*) FROM lobby_players WHERE lobby_id = ? AND is_eliminated = 0");
+        $stmtTotalAlive->execute([$lobby['id']]);
+        $totalAlive = (int) $stmtTotalAlive->fetchColumn();
+
+        $stmtVotedAlive = $db->prepare("SELECT COUNT(*) FROM lobby_players WHERE lobby_id = ? AND is_eliminated = 0 AND imposteur_voted_for_user_id IS NOT NULL");
+        $stmtVotedAlive->execute([$lobby['id']]);
+        $totalVoted = (int) $stmtVotedAlive->fetchColumn();
+
+        if ($totalVoted >= $totalAlive) {
+            // Process the votes!
+            $stmtAllVotes = $db->prepare("SELECT user_id, imposteur_voted_for_user_id FROM lobby_players WHERE lobby_id = ? AND is_eliminated = 0");
+            $stmtAllVotes->execute([$lobby['id']]);
+            $votesList = $stmtAllVotes->fetchAll();
+
+            $counts = [];
+            foreach ($votesList as $v) {
+                $targetId = intval($v['imposteur_voted_for_user_id']);
+                $counts[$targetId] = ($counts[$targetId] ?? 0) + 1;
+            }
+
+            // Find the player with the most votes
+            arsort($counts);
+            $keys = array_keys($counts);
+            $maxVotes = $counts[$keys[0]];
+
+            // Find if there is a tie
+            $candidates = [];
+            foreach ($counts as $uid => $vc) {
+                if ($vc === $maxVotes) {
+                    $candidates[] = $uid;
+                }
+            }
+
+            // Resolve tie randomly
+            $eliminatedUserId = $candidates[array_rand($candidates)];
+
+            // Eliminate player
+            $db->prepare("UPDATE lobby_players SET is_eliminated = 1 WHERE lobby_id = ? AND user_id = ?")
+               ->execute([$lobby['id'], $eliminatedUserId]);
+
+            // Save details in lobby
+            $db->prepare("UPDATE lobbies SET imposteur_phase = 'results', imposteur_eliminated_user_id = ? WHERE id = ?")
+               ->execute([$eliminatedUserId, $lobby['id']]);
+
+            $lobby['imposteur_phase'] = 'results';
+            $lobby['imposteur_eliminated_user_id'] = $eliminatedUserId;
+
+            // Fetch details of eliminated player to check role
+            $stmtElim = $db->prepare("SELECT imposteur_role, username FROM lobby_players lp JOIN users u ON lp.user_id = u.id WHERE lp.lobby_id = ? AND lp.user_id = ?");
+            $stmtElim->execute([$lobby['id'], $eliminatedUserId]);
+            $elimPlayer = $stmtElim->fetch();
+            
+            // Check win conditions
+            $stmtRemainingPlayers = $db->prepare("SELECT user_id, imposteur_role FROM lobby_players WHERE lobby_id = ? AND is_eliminated = 0");
+            $stmtRemainingPlayers->execute([$lobby['id']]);
+            $remaining = $stmtRemainingPlayers->fetchAll();
+            
+            $imposteurCount = 0;
+            $innocentCount = 0;
+            foreach ($remaining as $r) {
+                if ($r['imposteur_role'] === 'imposteur') {
+                    $imposteurCount++;
+                } else {
+                    $innocentCount++;
+                }
+            }
+
+            if ($imposteurCount === 0) {
+                // Imposteur is eliminated! Innocents win!
+                $lobby['status'] = 'finished';
+                $this->calculateImposteurFinalRankings($db, $lobby, 'innocent');
+            } elseif (count($remaining) <= 2) {
+                // Only 2 players left and Imposteur is still alive! Imposteur wins!
+                $lobby['status'] = 'finished';
+                $this->calculateImposteurFinalRankings($db, $lobby, 'imposteur');
+            }
+        }
+
+        $this->broadcastLobbyState($db, $lobby);
+        echo json_encode(['success' => true]);
+    }
+
+    public function startImposteurVoting(array $data)
+    {
+        $user = AuthMiddleware::authenticate();
+        $roomCode = strtoupper(trim($data['room_code'] ?? ''));
+
+        $db = Database::getConnection();
+
+        $stmtLobby = $db->prepare("SELECT * FROM lobbies WHERE room_code = ?");
+        $stmtLobby->execute([$roomCode]);
+        $lobby = $stmtLobby->fetch();
+
+        if (!$lobby || $lobby['game_mode'] !== 'imposteur' || $lobby['status'] !== 'playing') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Action invalide.']);
+            return;
+        }
+
+        if (intval($lobby['host_id']) !== $user['user_id']) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Seul l\'hôte peut lancer la phase de vote.']);
+            return;
+        }
+
+        if ($lobby['imposteur_phase'] !== 'debate') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Action impossible dans cette phase.']);
+            return;
+        }
+
+        // Reset votes and change phase to voting
+        $db->prepare("UPDATE lobby_players SET imposteur_voted_for_user_id = NULL WHERE lobby_id = ?")
+           ->execute([$lobby['id']]);
+
+        $db->prepare("UPDATE lobbies SET imposteur_phase = 'voting' WHERE id = ?")
+           ->execute([$lobby['id']]);
+
+        $lobby['imposteur_phase'] = 'voting';
+        $this->broadcastLobbyState($db, $lobby);
+
+        echo json_encode(['success' => true]);
+    }
+
+    public function startImposteurNextRound(array $data)
+    {
+        $user = AuthMiddleware::authenticate();
+        $roomCode = strtoupper(trim($data['room_code'] ?? ''));
+
+        $db = Database::getConnection();
+
+        $stmtLobby = $db->prepare("SELECT * FROM lobbies WHERE room_code = ?");
+        $stmtLobby->execute([$roomCode]);
+        $lobby = $stmtLobby->fetch();
+
+        if (!$lobby || $lobby['game_mode'] !== 'imposteur' || $lobby['status'] !== 'playing') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Action invalide.']);
+            return;
+        }
+
+        if (intval($lobby['host_id']) !== $user['user_id']) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Seul l\'hôte peut passer à la manche suivante.']);
+            return;
+        }
+
+        if ($lobby['imposteur_phase'] !== 'results') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Action impossible dans cette phase.']);
+            return;
+        }
+
+        // Reset votes, set eliminated to NULL in lobbies and change phase to debate
+        $db->prepare("UPDATE lobby_players SET imposteur_voted_for_user_id = NULL WHERE lobby_id = ?")
+           ->execute([$lobby['id']]);
+
+        $db->prepare("UPDATE lobbies SET imposteur_phase = 'debate', imposteur_eliminated_user_id = NULL WHERE id = ?")
+           ->execute([$lobby['id']]);
+
+        $lobby['imposteur_phase'] = 'debate';
+        $lobby['imposteur_eliminated_user_id'] = null;
+        $this->broadcastLobbyState($db, $lobby);
+
+        echo json_encode(['success' => true]);
+    }
+
+    private function calculateImposteurFinalRankings($db, $lobby, $winnerRole)
+    {
+        // Finish lobby status
+        $db->prepare("UPDATE lobbies SET status = 'finished', current_question_id = NULL WHERE id = ?")
+           ->execute([$lobby['id']]);
+
+        // Get host/winner details
+        $stmtHost = $db->prepare("SELECT username FROM users WHERE id = ?");
+        $stmtHost->execute([$lobby['host_id']]);
+        $hostUsername = $stmtHost->fetchColumn();
+
+        // Get players ELOs and names
+        $stmtPlayers = $db->prepare("
+            SELECT lp.*, u.username, u.elo
+            FROM lobby_players lp
+            JOIN users u ON lp.user_id = u.id
+            WHERE lp.lobby_id = ?
+        ");
+        $stmtPlayers->execute([$lobby['id']]);
+        $players = $stmtPlayers->fetchAll();
+
+        // Find the winner to log in matches
+        $winnerLogName = ($winnerRole === 'innocent') ? 'Les Innocents' : 'L\'Imposteur';
+        foreach ($players as $p) {
+            if ($p['imposteur_role'] === $winnerRole) {
+                $winnerLogName = $p['username'];
+                break;
+            }
+        }
+
+        // Get pack name
+        $stmtPack = $db->prepare("SELECT name FROM packs WHERE id = ?");
+        $stmtPack->execute([$lobby['pack_id']]);
+        $packName = $stmtPack->fetchColumn() ?: "L'Imposteur";
+
+        // Log match
+        $stmtMatch = $db->prepare("INSERT INTO matches (room_code, game_mode, pack_name, winner_username) VALUES (?, ?, ?, ?)");
+        $stmtMatch->execute([
+            $lobby['room_code'],
+            $lobby['game_mode'],
+            $packName,
+            $winnerLogName
+        ]);
+
+        // Compute Elo changes and coins
+        foreach ($players as $p) {
+            $role = $p['imposteur_role'];
+            $isWinner = ($role === $winnerRole);
+            
+            $eloChange = $isWinner ? 15 : -10;
+            $coinBonus = $isWinner ? 100 : 10;
+            
+            // Set current_score to 100 for winners, 0 for losers to display properly
+            $score = $isWinner ? 100 : 0;
+
+            // Update database values
+            $db->prepare("UPDATE users SET elo = GREATEST(0, elo + ?), coins = coins + ? WHERE id = ?")
+               ->execute([$eloChange, $coinBonus, $p['user_id']]);
+
+            $db->prepare("UPDATE lobby_players SET elo_change = ?, current_score = ? WHERE lobby_id = ? AND user_id = ?")
+               ->execute([$eloChange, $score, $lobby['id'], $p['user_id']]);
         }
     }
 }
