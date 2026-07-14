@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
 import DashboardScreen from './components/DashboardScreen';
 import SoloQuizScreen from './components/SoloQuizScreen';
@@ -8,6 +9,7 @@ import CreatorScreen from './components/CreatorScreen';
 import LeaderboardScreen from './components/LeaderboardScreen';
 import ProfileScreen from './components/ProfileScreen';
 import DailyQuizScreen from './components/DailyQuizScreen';
+import ShopScreen from './components/ShopScreen';
 import { api, PUBLIC_BASE } from './utils/api';
 import {
   Trophy,
@@ -21,16 +23,32 @@ import {
   Coins,
   Gamepad2,
   Calendar,
-  Share2
+  Share2,
+  Sparkles
 } from 'lucide-react';
-import { getEloRank } from './utils/progression';
+import { getLevel } from './utils/progression';
 
+// ── Protected Route wrapper ─────────────────────────────────────────────────
+// authLoading=true means we haven't checked localStorage yet → don't redirect
+function PrivateRoute({ user, authLoading, children }) {
+  if (authLoading) return null; // wait silently, no flash
+  if (!user) return <Navigate to="/" replace />;
+  return children;
+}
+
+// ── Main App ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [view, setView] = useState('auth');
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true); // true until localStorage check done
   const [showDropdown, setShowDropdown] = useState(false);
   const [dailyStatus, setDailyStatus] = useState({ scheduled: false, completed: false });
   const [showDailyModal, setShowDailyModal] = useState(false);
+
+  // Navigation params passed via router state
+  const { soloPackId, soloGameMode, roomCode } = location.state || {};
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -54,11 +72,6 @@ export default function App() {
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
-  // Navigation state
-  const [soloPackId, setSoloPackId] = useState(null);
-  const [soloGameMode, setSoloGameMode] = useState('classic');
-  const [roomCode, setRoomCode] = useState('');
-
   // 1. Restore Auth Session on Mount
   useEffect(() => {
     const savedToken = localStorage.getItem('quiz_token');
@@ -66,20 +79,27 @@ export default function App() {
 
     if (savedToken && savedUser) {
       setUser(JSON.parse(savedUser));
-      setView('dashboard');
+      // Only redirect to /dashboard if we landed on the auth page itself
+      if (location.pathname === '/') {
+        navigate('/dashboard', { replace: true });
+      }
+      // Otherwise stay on the current URL (e.g. /boutique after F5)
     }
+
+    // Mark auth check as done — PrivateRoute can now make decisions
+    setAuthLoading(false);
 
     const handleSessionExpired = () => {
       setUser(null);
-      setView('auth');
+      navigate('/', { replace: true });
     };
     window.addEventListener('auth_session_expired', handleSessionExpired);
     return () => window.removeEventListener('auth_session_expired', handleSessionExpired);
   }, []);
 
-  // 2. Auto-Refresh profile stats on dashboard entry
+  // 2. Auto-Refresh profile stats when on dashboard
   useEffect(() => {
-    if (view === 'dashboard') {
+    if (location.pathname === '/dashboard' && user) {
       const refreshProfile = async () => {
         try {
           const res = await api.get('/auth/profile');
@@ -93,7 +113,7 @@ export default function App() {
       };
       refreshProfile();
     }
-  }, [view]);
+  }, [location.pathname]);
 
   const fetchDailyStatus = async () => {
     try {
@@ -110,18 +130,18 @@ export default function App() {
     if (user) {
       fetchDailyStatus();
     }
-  }, [user, view]);
+  }, [user, location.pathname]);
 
   const handleAuthSuccess = (userData) => {
     setUser(userData);
-    setView('dashboard');
+    navigate('/dashboard', { replace: true });
   };
 
   const handleLogout = () => {
     localStorage.removeItem('quiz_token');
     localStorage.removeItem('quiz_user');
     setUser(null);
-    setView('auth');
+    navigate('/', { replace: true });
   };
 
   const updateUserStats = (stats) => {
@@ -131,6 +151,8 @@ export default function App() {
       localStorage.setItem('quiz_user', JSON.stringify(updatedUser));
     }
   };
+
+  const isAuth = location.pathname === '/';
 
   return (
     <div className="layout-page">
@@ -144,7 +166,7 @@ export default function App() {
         {/* Logo */}
         <div
           className="header-logo"
-          onClick={() => user && setView('dashboard')}
+          onClick={() => user && navigate('/dashboard')}
           style={{ cursor: user ? 'pointer' : 'default' }}
         >
           <Gamepad2 size={22} style={{ color: 'var(--accent)', flexShrink: 0 }} />
@@ -154,13 +176,13 @@ export default function App() {
         {/* Right-side actions */}
         <div className="header-actions">
 
-          {user && view !== 'auth' && (
+          {user && !isAuth && (
             <>
               {/* Nav shortcuts */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <button
                   className="btn-secondary"
-                  onClick={() => setView('leaderboard')}
+                  onClick={() => navigate('/classement')}
                   style={{ padding: '7px 12px', fontSize: '0.825rem' }}
                   title="Classement"
                 >
@@ -169,12 +191,30 @@ export default function App() {
                 </button>
                 <button
                   className="btn-secondary"
-                  onClick={() => setView('creator')}
+                  onClick={() => navigate('/creer')}
                   style={{ padding: '7px 12px', fontSize: '0.825rem' }}
                   title="Créer un thème"
                 >
                   <Plus size={14} style={{ color: 'var(--accent)' }} />
                   <span className="hide-mobile">Créer Thème</span>
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => navigate('/boutique')}
+                  style={{ padding: '7px 12px', fontSize: '0.825rem' }}
+                  title="Boutique"
+                >
+                  <Sparkles size={14} style={{ color: '#ffb300' }} />
+                  <span className="hide-mobile">Boutique</span>
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => navigate('/collection')}
+                  style={{ padding: '7px 12px', fontSize: '0.825rem' }}
+                  title="Collection"
+                >
+                  <Trophy size={14} style={{ color: 'var(--accent)' }} />
+                  <span className="hide-mobile">Collection</span>
                 </button>
                 <button
                   className="btn-secondary"
@@ -211,18 +251,10 @@ export default function App() {
                   <Coins size={14} style={{ color: '#f59e0b' }} />
                   <span>{user.coins || 0}</span>
                 </span>
-                {(() => {
-                  const rank = getEloRank(user.elo);
-                  return (
-                    <span
-                      style={{ display: 'flex', alignItems: 'center', gap: '5px', color: rank.color, textShadow: rank.glow }}
-                      title={`${user.elo} Elo — ${rank.name}`}
-                    >
-                      <Trophy size={14} style={{ color: rank.color }} />
-                      <span>{rank.name}</span>
-                    </span>
-                  );
-                })()}
+                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--accent)' }} title={`Niveau ${getLevel(user.global_score)} (${user.global_score} XP)`}>
+                  <Trophy size={14} style={{ color: 'var(--accent)' }} />
+                  <span>Niveau {getLevel(user.global_score)}</span>
+                </span>
               </div>
             </>
           )}
@@ -235,7 +267,7 @@ export default function App() {
           )}
 
           {/* Profile dropdown */}
-          {user && view !== 'auth' && (
+          {user && !isAuth && (
             <div style={{ position: 'relative' }}>
               {/* Avatar trigger */}
               <div
@@ -250,14 +282,14 @@ export default function App() {
               >
                 {user.avatar_url ? (
                   user.avatar_url.startsWith('/uploads/') ? (
-                    <img src={`${PUBLIC_BASE}${user.avatar_url}`} alt="Avatar" className="avatar" style={{ width: '28px', height: '28px' }} />
+                    <img src={`${PUBLIC_BASE}${user.avatar_url}`} alt="Avatar" className={`avatar ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px' }} />
                   ) : user.avatar_url.startsWith('http') ? (
-                    <img src={user.avatar_url} alt="Avatar" className="avatar" style={{ width: '28px', height: '28px' }} />
+                    <img src={user.avatar_url} alt="Avatar" className={`avatar ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px' }} />
                   ) : (
-                    <div className="avatar-placeholder" style={{ width: '28px', height: '28px', fontSize: '1rem' }}>{user.avatar_url}</div>
+                    <div className={`avatar-placeholder ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px', fontSize: '1rem' }}>{user.avatar_url}</div>
                   )
                 ) : (
-                  <div className="avatar-placeholder" style={{ width: '28px', height: '28px' }}>
+                  <div className={`avatar-placeholder ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px' }}>
                     <User size={14} />
                   </div>
                 )}
@@ -268,26 +300,39 @@ export default function App() {
               {showDropdown && (
                 <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
                   <div className="dropdown-header">
-                    <div style={{ fontWeight: 700, fontSize: '0.9rem' }} className="truncate">
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.9rem',
+                        color: user.equipped_color && !['rainbow', 'cyberpunk'].includes(user.equipped_color) ? user.equipped_color : undefined
+                      }}
+                      className={`truncate ${user.equipped_color === 'rainbow' ? 'text-rainbow' : (user.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}`}
+                    >
                       {user.username}
                       <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: '0.78rem' }}>#{user.discriminator}</span>
                     </div>
+                    {user.equipped_title && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '1px' }}>
+                        "{user.equipped_title}"
+                      </div>
+                    )}
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                       {user.role === 'admin' ? 'Administrateur' : 'Joueur'}
                     </div>
                   </div>
 
                   {user.role === 'admin' && (
-                    <button className="dropdown-item danger" onClick={() => { setView('admin'); setShowDropdown(false); }}>
+                    <button className="dropdown-item danger" onClick={() => { navigate('/admin'); setShowDropdown(false); }}>
                       <ShieldAlert size={14} />
                       Espace Admin
                     </button>
                   )}
 
-                  <button className="dropdown-item" onClick={() => { setView('profile'); setShowDropdown(false); }}>
+                  <button className="dropdown-item" onClick={() => { navigate('/profil'); setShowDropdown(false); }}>
                     <User size={14} style={{ color: 'var(--accent)' }} />
                     Mon Profil
                   </button>
+
 
                   <button className="dropdown-item" onClick={() => toggleTheme()}>
                     {theme === 'dark'
@@ -312,68 +357,155 @@ export default function App() {
 
       {/* ── Main Content Router ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
-        {view === 'auth' && (
-          <AuthScreen onAuthSuccess={handleAuthSuccess} />
-        )}
-
-        {view === 'dashboard' && user && (
-          <DashboardScreen
-            user={user}
-            onLogout={handleLogout}
-            onStartSolo={(packId, mode) => { setSoloPackId(packId); setSoloGameMode(mode); setView('solo'); }}
-            onCreateLobby={(code) => { setRoomCode(code); setView('lobby'); }}
-            onJoinLobby={(code) => { setRoomCode(code); setView('lobby'); }}
-            onOpenAdmin={() => setView('admin')}
-            onOpenCreator={() => setView('creator')}
-            onOpenLeaderboard={() => setView('leaderboard')}
-            onOpenProfile={() => setView('profile')}
-            onStartDailyQuiz={() => setView('daily_quiz')}
+        <Routes>
+          {/* Public route — show nothing while checking auth to avoid flash */}
+          <Route
+            path="/"
+            element={
+              authLoading
+                ? null
+                : user
+                  ? <Navigate to="/dashboard" replace />
+                  : <AuthScreen onAuthSuccess={handleAuthSuccess} />
+            }
           />
-        )}
 
-        {view === 'daily_quiz' && (
-          <DailyQuizScreen
-            onBack={() => setView('dashboard')}
-            onUpdateUserStats={updateUserStats}
+          {/* Protected routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <DashboardScreen
+                  user={user}
+                  onLogout={handleLogout}
+                  onStartSolo={(packId, mode) => navigate('/quiz/solo', { state: { soloPackId: packId, soloGameMode: mode } })}
+                  onCreateLobby={(code) => navigate(`/quiz/multi/${code}`, { state: { roomCode: code } })}
+                  onJoinLobby={(code) => navigate(`/quiz/multi/${code}`, { state: { roomCode: code } })}
+                  onOpenAdmin={() => navigate('/admin')}
+                  onOpenCreator={() => navigate('/creer')}
+                  onOpenLeaderboard={() => navigate('/classement')}
+                  onOpenProfile={() => navigate('/profil')}
+                  onStartDailyQuiz={() => navigate('/quiz/jour')}
+                  onUpdateUserStats={updateUserStats}
+                  onOpenShop={() => navigate('/boutique')}
+                  onOpenCollection={() => navigate('/collection')}
+                />
+              </PrivateRoute>
+            }
           />
-        )}
 
-        {view === 'solo' && (
-          <SoloQuizScreen
-            packId={soloPackId}
-            gameMode={soloGameMode}
-            onBack={() => setView('dashboard')}
-            onUpdateUserStats={updateUserStats}
+          <Route
+            path="/quiz/jour"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <DailyQuizScreen
+                  onBack={() => navigate('/dashboard')}
+                  onUpdateUserStats={updateUserStats}
+                />
+              </PrivateRoute>
+            }
           />
-        )}
 
-        {view === 'lobby' && user && (
-          <MultiplayerArena
-            roomCode={roomCode}
-            user={user}
-            onBack={() => setView('dashboard')}
+          <Route
+            path="/quiz/solo"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <SoloQuizScreen
+                  packId={soloPackId}
+                  gameMode={soloGameMode || 'classic'}
+                  onBack={() => navigate('/dashboard')}
+                  onUpdateUserStats={updateUserStats}
+                />
+              </PrivateRoute>
+            }
           />
-        )}
 
-        {view === 'admin' && (
-          <AdminScreen onBack={() => setView('dashboard')} />
-        )}
-
-        {view === 'creator' && (
-          <CreatorScreen onBack={() => setView('dashboard')} />
-        )}
-
-        {view === 'leaderboard' && (
-          <LeaderboardScreen onBack={() => setView('dashboard')} />
-        )}
-
-        {view === 'profile' && user && (
-          <ProfileScreen
-            user={user}
-            onBack={() => setView('dashboard')}
-            onUpdateUserStats={updateUserStats}
+          <Route
+            path="/quiz/multi/:roomCode"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <MultiplayerArena
+                  roomCode={roomCode}
+                  user={user}
+                  onBack={() => navigate('/dashboard')}
+                />
+              </PrivateRoute>
+            }
           />
-        )}
+
+          <Route
+            path="/admin"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <AdminScreen onBack={() => navigate('/dashboard')} />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/creer"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <CreatorScreen onBack={() => navigate('/dashboard')} />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/classement"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <LeaderboardScreen onBack={() => navigate('/dashboard')} />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/profil"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <ProfileScreen
+                  user={user}
+                  onBack={() => navigate('/dashboard')}
+                  onUpdateUserStats={updateUserStats}
+                />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/boutique"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <ShopScreen
+                  key="shop"
+                  user={user}
+                  mode="shop"
+                  onRefreshProfile={updateUserStats}
+                  onBack={() => navigate('/dashboard')}
+                />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/collection"
+            element={
+              <PrivateRoute user={user} authLoading={authLoading}>
+                <ShopScreen
+                  key="collection"
+                  user={user}
+                  mode="collection"
+                  onRefreshProfile={updateUserStats}
+                  onBack={() => navigate('/dashboard')}
+                />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Fallback: redirect everything unknown to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </main>
 
       {/* 📅 DAILY QUIZ MODAL */}
@@ -524,7 +656,7 @@ export default function App() {
                   className="btn-primary" 
                   onClick={() => {
                     setShowDailyModal(false);
-                    setView('daily_quiz');
+                    navigate('/quiz/jour');
                   }}
                   style={{ padding: '12px 28px', fontSize: '0.9rem', marginTop: '8px' }}
                 >
@@ -546,4 +678,3 @@ export default function App() {
     </div>
   );
 }
-

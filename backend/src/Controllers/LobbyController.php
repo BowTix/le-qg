@@ -15,31 +15,8 @@ class LobbyController
         $user = AuthMiddleware::authenticate();
         $data = json_decode(file_get_contents('php://input'), true);
 
-        $packId = intval($data['pack_id'] ?? 0);
-        if ($packId <= 0) {
-            http_response_code(400);
-            echo json_encode(['error' => 'pack_id requis.']);
-            return;
-        }
-
+        $packId = null;
         $db = Database::getConnection();
-
-        // Verify pack exists and is validated
-        $stmtPack = $db->prepare("SELECT id, name, is_validated FROM packs WHERE id = ?");
-        $stmtPack->execute([$packId]);
-        $pack = $stmtPack->fetch();
-
-        if (!$pack) {
-            http_response_code(404);
-            echo json_encode(['error' => 'Pack introuvable.']);
-            return;
-        }
-
-        if (!$pack['is_validated'] && $user['role'] !== 'admin') {
-            http_response_code(403);
-            echo json_encode(['error' => 'Ce pack n\'est pas encore validé.']);
-            return;
-        }
 
         // Generate unique 5-char room code
         $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -52,24 +29,7 @@ class LobbyController
             $checkStmt->execute([$roomCode]);
         } while ($checkStmt->fetch());
 
-        $gameMode = $data['game_mode'] ?? 'classic';
-        if (!in_array($gameMode, ['classic', 'speed_blitz', 'sudden_death', 'guess_number', 'tribunal', 'imposteur'])) {
-            $gameMode = 'classic';
-        }
-
-        if ($gameMode === 'tribunal') {
-            $stmtTribunalPack = $db->query("SELECT id FROM packs WHERE name = 'Le Tribunal'");
-            $tribunalPackId = (int) $stmtTribunalPack->fetchColumn();
-            if ($tribunalPackId > 0) {
-                $packId = $tribunalPackId;
-            }
-        } elseif ($gameMode === 'imposteur') {
-            $stmtImposteurPack = $db->query("SELECT id FROM packs WHERE name = 'L\'Imposteur'");
-            $imposteurPackId = (int) $stmtImposteurPack->fetchColumn();
-            if ($imposteurPackId > 0) {
-                $packId = $imposteurPackId;
-            }
-        }
+        $gameMode = 'kculture';
 
         // Insert lobby
         $stmt = $db->prepare("INSERT INTO lobbies (room_code, host_id, pack_id, status, game_mode, tribunal_phase, tribunal_phase_ends_at, current_question_index) VALUES (?, ?, ?, 'waiting', ?, NULL, NULL, 0)");
@@ -150,7 +110,7 @@ class LobbyController
             SELECT l.*, u.username as host_username, p.name as pack_name
             FROM lobbies l
             JOIN users u ON l.host_id = u.id
-            JOIN packs p ON l.pack_id = p.id
+            LEFT JOIN packs p ON l.pack_id = p.id
             WHERE l.room_code = ?
         ");
         $stmt->execute([$roomCode]);
@@ -166,7 +126,7 @@ class LobbyController
         $stmtPlayers = $db->prepare("
             SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
                    lp.elo_change, lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
-                   u.username, u.global_score, u.elo
+                   u.username, u.global_score, u.elo, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
             WHERE lp.lobby_id = ?
@@ -216,7 +176,11 @@ class LobbyController
                 'global_score' => intval($p['global_score']),
                 'elo' => intval($p['elo']),
                 'reaction' => $reaction,
-                'is_eliminated' => intval($p['is_eliminated']) === 1
+                'is_eliminated' => intval($p['is_eliminated']) === 1,
+                'avatar_url' => $p['avatar_url'] ?? null,
+                'equipped_border' => $p['equipped_border'] ?? null,
+                'equipped_color' => $p['equipped_color'] ?? null,
+                'equipped_title' => $p['equipped_title'] ?? null
             ];
 
             // Only expose Elo and Coin changes when game is finished
@@ -504,7 +468,7 @@ class LobbyController
         $stmtPlayers = $db->prepare("
             SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
                    lp.elo_change, lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
-                   u.username, u.global_score, u.elo
+                   u.username, u.global_score, u.elo, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
             WHERE lp.lobby_id = ?
@@ -633,15 +597,14 @@ class LobbyController
             return;
         }
 
-        // Select random questions from the pack (5 for tribunal, 10 otherwise)
-        $limit = ($lobby['game_mode'] === 'tribunal') ? 5 : 10;
-        $stmtQuestions = $db->prepare("SELECT id FROM questions WHERE pack_id = ? ORDER BY RAND() LIMIT " . $limit);
-        $stmtQuestions->execute([$lobby['pack_id']]);
+        // Select random questions globally (10 questions)
+        $limit = 10;
+        $stmtQuestions = $db->query("SELECT id FROM questions ORDER BY RAND() LIMIT " . $limit);
         $questionRows = $stmtQuestions->fetchAll();
 
         if (empty($questionRows)) {
             http_response_code(400);
-            echo json_encode(['error' => 'Ce pack ne contient aucune question.']);
+            echo json_encode(['error' => 'La base de données ne contient aucune question.']);
             return;
         }
 
@@ -776,7 +739,7 @@ class LobbyController
         $questionId = intval($questionIds[$requestedIndex]);
 
         // Fetch question details
-        $stmtQ = $db->prepare("SELECT id, question_text, question_type, correct_opt, opt_a, opt_b, opt_c, opt_d FROM questions WHERE id = ?");
+        $stmtQ = $db->prepare("SELECT id, question_text, question_type, correct_opt, opt_a, opt_b, opt_c, opt_d, media_url FROM questions WHERE id = ?");
         $stmtQ->execute([$questionId]);
         $question = $stmtQ->fetch();
 
@@ -786,11 +749,13 @@ class LobbyController
             return;
         }
 
-        $questionType = $question['question_type'] ?? 'multiple_choice';
+        $questionType = $question['question_type'] ?? 'qcm';
         $shuffledOptions = null;
         $correctOpt = 'A'; // default fallback for token
 
-        if ($questionType === 'open') {
+        $isOpenType = ($questionType === 'open') || ($questionType === 'media' && empty(trim($question['opt_b'] ?? '')));
+
+        if ($isOpenType) {
             $shuffledOptions = null;
         } else {
             $shuffledValues = [$question['opt_a'], $question['opt_b'], $question['opt_c'], $question['opt_d']];
@@ -830,6 +795,7 @@ class LobbyController
                 'id' => intval($question['id']),
                 'question_text' => $question['question_text'],
                 'question_type' => $questionType,
+                'media_url' => $question['media_url'],
                 'options' => $shuffledOptions
             ],
             'question_index' => $requestedIndex,
@@ -909,8 +875,7 @@ class LobbyController
         $sentAt = intval($payload['sent_at']);
         $elapsedMs = $nowMs - $sentAt;
 
-        // Dynamic time limit based on mode
-        $timeLimit = ($lobby['game_mode'] === 'speed_blitz') ? 5000 : 15000;
+        $timeLimit = 15000;
 
         // Auto timeout if response time exceeds limit (excluding TIMEOUT message itself)
         if ($answer !== 'TIMEOUT' && $elapsedMs > $timeLimit) {
@@ -936,42 +901,24 @@ class LobbyController
             return;
         }
 
-        $questionType = $question['question_type'] ?? 'multiple_choice';
+        $questionType = $question['question_type'] ?? 'qcm';
         $isCorrect = false;
         $pointsAwarded = 0;
         $correctOpt = null;
         $correctText = '';
 
-        if ($questionType === 'guess_number') {
-            $correctValue = intval($question['correct_value'] ?? 0);
-            $correctText = "Valeur attendue : " . $correctValue;
+        // Clean timeLimit: always 15000 ms (15s) in kculture
+        $timeLimit = 15000;
 
-            if ($answer !== 'TIMEOUT') {
-                $userVal = intval($answer);
-                $diff = abs($userVal - $correctValue);
-                $tolerance1 = 0.01 * $correctValue;
-                $tolerance10 = 0.10 * $correctValue;
+        $isOpenType = ($questionType === 'open') || ($questionType === 'media' && empty(trim($question['opt_b'] ?? '')));
 
-                if ($diff <= $tolerance1) {
-                    $isCorrect = true;
-                    $pointsAwarded = 150;
-                } elseif ($diff <= $tolerance10) {
-                    $isCorrect = true;
-                    $pointsAwarded = 50;
-                } else {
-                    $isCorrect = false;
-                }
-            }
-        } elseif ($questionType === 'open') {
+        if ($isOpenType) {
             $correctText = $question['opt_a'] ?? '';
             if ($answer !== 'TIMEOUT') {
                 $isCorrect = (self::cleanText($answer) === self::cleanText($correctText));
-                if ($isCorrect) {
-                    $pointsAwarded = 100;
-                }
             }
         } else {
-            // Standard Multiple Choice
+            // QCM or Media with options
             if (!in_array($answer, ['A', 'B', 'C', 'D', 'TIMEOUT'])) {
                 http_response_code(400);
                 echo json_encode(['error' => 'Réponse invalide. Choisissez A, B, C ou D.']);
@@ -985,7 +932,7 @@ class LobbyController
             $correctText = $question[$optMap[$correctOpt]] ?? '';
         }
 
-        // Calculate points based on speed (only for correct multiple choice answers)
+        // Calculate points based on speed
         if ($isCorrect && $pointsAwarded === 0) {
             $effectiveElapsed = min($elapsedMs, $timeLimit);
             $timeLeftRatio = max(0, ($timeLimit - $effectiveElapsed)) / $timeLimit;
@@ -1181,6 +1128,9 @@ class LobbyController
             // Update user Elo and coins (floor at 0 Elo)
             $db->prepare("UPDATE users SET elo = GREATEST(0, elo + ?), coins = coins + ? WHERE id = ?")
                ->execute([$eloChange, $coinBonus, $p['user_id']]);
+
+            // Quests tracking for coins earned
+            \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'coins_earned', $coinBonus);
 
             // Record Elo change for display
             $db->prepare("UPDATE lobby_players SET elo_change = ? WHERE lobby_id = ? AND user_id = ?")

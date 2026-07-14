@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { api } from '../utils/api';
+import { api, PUBLIC_BASE } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
-import { Users, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins, Eye, EyeOff, MessageSquare } from 'lucide-react';
+import { Users, User, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import Pusher from 'pusher-js';
 
 export default function MultiplayerArena({ roomCode, user, onBack }) {
@@ -759,8 +759,41 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>#{i + 1}</span>
-                        <span style={{ ...getUsernameStyle(p.global_score) }}>{p.username}</span>
-                        {p.user_id === user.id && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Vous)</span>}
+                        
+                        {/* Avatar and Border */}
+                        <div style={{ position: 'relative', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {p.avatar_url ? (
+                            p.avatar_url.startsWith('/uploads/') ? (
+                              <img src={`${PUBLIC_BASE}${p.avatar_url}`} alt="Avatar" className={`avatar ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                            ) : p.avatar_url.startsWith('http') ? (
+                              <img src={p.avatar_url} alt="Avatar" className={`avatar ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                            ) : (
+                              <div className={`avatar-placeholder ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%', fontSize: '0.9rem' }}>{p.avatar_url}</div>
+                            )
+                          ) : (
+                            <div className={`avatar-placeholder ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--border-color)' }}>
+                              <User size={12} />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Name and Title */}
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span
+                              className={p.equipped_color === 'rainbow' ? 'text-rainbow' : (p.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
+                              style={{ ...getUsernameStyle(p.global_score), color: p.equipped_color && !['rainbow', 'cyberpunk'].includes(p.equipped_color) ? p.equipped_color : undefined, fontWeight: 700 }}
+                            >
+                              {p.username}
+                            </span>
+                            {p.user_id === user.id && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Vous)</span>}
+                          </div>
+                          {p.equipped_title && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '1px' }}>
+                              {p.equipped_title}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {p.user_id === lobbyState.host_id && (
                           <span style={{
@@ -850,8 +883,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
     const secondsLeft = Math.ceil(tribunalTimer / 1000);
 
     return (
-        <div className="container animate-fade-in"
-             style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px', alignItems: 'start' }}>
+        <div className="container animate-fade-in game-layout">
 
           {/* LEFT: Game Area */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1634,22 +1666,15 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   // RENDER: PLAYING (question + answer)
   // ============================================================
   if (gamePhase === 'playing' || gamePhase === 'feedback') {
-    if (lobbyState.game_mode === 'tribunal') {
-      return renderTribunalGame();
-    }
-    if (lobbyState.game_mode === 'imposteur') {
-      return renderImposteurGame();
-    }
     const isFeedback = gamePhase === 'feedback';
     const myPlayerInfo = lobbyState?.players.find(p => p.user_id === user.id);
     const isEliminated = myPlayerInfo?.is_eliminated;
 
-    const timeLimit = (lobbyState && lobbyState.game_mode === 'speed_blitz') ? 5000 : 15000;
+    const timeLimit = 15000;
     const timeRatio = questionTimer / timeLimit;
 
     return (
-        <div className="container animate-fade-in"
-             style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px', alignItems: 'start' }}>
+        <div className="container animate-fade-in game-layout">
 
           {/* LEFT: Question Area */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1725,13 +1750,33 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                       {currentQuestion.question_text}
                     </h2>
 
-                    {currentQuestion.question_type === 'guess_number' || currentQuestion.question_type === 'open' ? (
+                    {currentQuestion.media_url && (
+                        <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}>
+                          <img 
+                              src={currentQuestion.media_url.startsWith('http') 
+                                ? currentQuestion.media_url 
+                                : currentQuestion.media_url.replace(/^\/?(images\/)?/, '/images/')
+                              } 
+                              alt="Illustration de la question" 
+                              style={{ 
+                                maxWidth: '100%', 
+                                maxHeight: '280px', 
+                                borderRadius: '8px', 
+                                objectFit: 'contain', 
+                                border: '1px solid var(--border-color)',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                              }} 
+                          />
+                        </div>
+                    )}
+
+                    {currentQuestion.question_type === 'open' || !currentQuestion.options ? (
                         <form onSubmit={(e) => { e.preventDefault(); handleAnswer(openAnswer.trim()); }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           <input
-                              type={currentQuestion.question_type === 'guess_number' ? 'number' : 'text'}
+                              type="text"
                               value={openAnswer}
                               onChange={(e) => setOpenAnswer(e.target.value)}
-                              placeholder={currentQuestion.question_type === 'guess_number' ? 'Entrez votre estimation...' : 'Entrez votre réponse...'}
+                              placeholder="Entrez votre réponse..."
                               disabled={!!selectedOption || isFeedback}
                               style={{
                                 width: '100%',
@@ -1801,7 +1846,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                               <>
                                 <XCircle size={20} style={{ color: 'var(--error)' }} />
                                 <span style={{ color: 'var(--error)', fontWeight: 700 }}>
-                          Incorrect — Réponse : {answerFeedback.correct_option || answerFeedback.correct_value}. {answerFeedback.correct_text}
+                          Incorrect — La bonne réponse était : {answerFeedback.correct_text}
                         </span>
                               </>
                           )}
@@ -1837,10 +1882,41 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>#{i + 1}</span>
-                        <span style={{ ...getUsernameStyle(p.global_score), fontWeight: isMe ? 700 : 500, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {p.username}{isMe ? ' (Vous)' : ''}
-                      {p.is_eliminated && <Skull size={13} style={{ color: 'var(--error)' }} />}
-                    </span>
+                        
+                        {/* Mini Avatar with border */}
+                        <div style={{ position: 'relative', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {p.avatar_url ? (
+                            p.avatar_url.startsWith('/uploads/') ? (
+                              <img src={`${PUBLIC_BASE}${p.avatar_url}`} alt="Avatar" className={`avatar ${p.equipped_border || ''}`} style={{ width: '18px', height: '18px', borderRadius: '50%' }} />
+                            ) : p.avatar_url.startsWith('http') ? (
+                              <img src={p.avatar_url} alt="Avatar" className={`avatar ${p.equipped_border || ''}`} style={{ width: '18px', height: '18px', borderRadius: '50%' }} />
+                            ) : (
+                              <div className={`avatar-placeholder ${p.equipped_border || ''}`} style={{ width: '18px', height: '18px', borderRadius: '50%', fontSize: '0.6rem' }}>{p.avatar_url}</div>
+                            )
+                          ) : (
+                            <div className={`avatar-placeholder ${p.equipped_border || ''}`} style={{ width: '18px', height: '18px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--border-color)' }}>
+                              <User size={8} />
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              className={p.equipped_color === 'rainbow' ? 'text-rainbow' : (p.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
+                              style={{ ...getUsernameStyle(p.global_score), color: p.equipped_color && !['rainbow', 'cyberpunk'].includes(p.equipped_color) ? p.equipped_color : undefined, fontWeight: isMe ? 700 : 500 }}
+                            >
+                              {p.username}
+                            </span>
+                            {isMe && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Vous)</span>}
+                            {p.is_eliminated && <Skull size={13} style={{ color: 'var(--error)', marginLeft: '4px' }} />}
+                          </div>
+                          {p.equipped_title && (
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '1px' }}>
+                              {p.equipped_title}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{p.score} pts</span>
@@ -1959,9 +2035,6 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   // RENDER: FINAL RESULTS / PODIUM
   // ============================================================
   if (gamePhase === 'results' || lobbyState.status === 'finished') {
-    if (lobbyState.game_mode === 'imposteur') {
-      return renderImposteurFinalResults();
-    }
     const players = lobbyState.players;
     const podium = players.slice(0, 3);
     const podiumOrder = podium.length >= 3 ? [podium[1], podium[0], podium[2]] : podium;
@@ -2044,9 +2117,40 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.85rem', minWidth: '24px' }}>#{i + 1}</span>
-                      <span style={{ ...getUsernameStyle(p.global_score), fontWeight: p.user_id === user.id ? 700 : 500 }}>
-                    {p.username}{p.user_id === user.id ? ' (Vous)' : ''}
-                  </span>
+                      
+                      {/* Avatar with Border */}
+                      <div style={{ position: 'relative', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {p.avatar_url ? (
+                          p.avatar_url.startsWith('/uploads/') ? (
+                            <img src={`${PUBLIC_BASE}${p.avatar_url}`} alt="Avatar" className={`avatar ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                          ) : p.avatar_url.startsWith('http') ? (
+                            <img src={p.avatar_url} alt="Avatar" className={`avatar ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
+                          ) : (
+                            <div className={`avatar-placeholder ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%', fontSize: '0.9rem' }}>{p.avatar_url}</div>
+                          )
+                        ) : (
+                          <div className={`avatar-placeholder ${p.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--border-color)' }}>
+                            <User size={12} />
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span
+                            className={p.equipped_color === 'rainbow' ? 'text-rainbow' : (p.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
+                            style={{ ...getUsernameStyle(p.global_score), color: p.equipped_color && !['rainbow', 'cyberpunk'].includes(p.equipped_color) ? p.equipped_color : undefined, fontWeight: p.user_id === user.id ? 700 : 500 }}
+                          >
+                            {p.username}
+                          </span>
+                          {p.user_id === user.id && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Vous)</span>}
+                        </div>
+                        {p.equipped_title && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '1px' }}>
+                            {p.equipped_title}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{p.score} pts</span>

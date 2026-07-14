@@ -1,0 +1,1102 @@
+[
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Quelle est la langue officielle de la France ?",
+    "opt_a": "Français",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Quel est le symbole de la République française ?",
+    "opt_a": "Marianne",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Quelle est la fête nationale française ?",
+    "opt_a": "14 juillet",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Quel fleuve traverse Paris ?",
+    "opt_a": "Seine",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Quelle est la monnaie unique européenne ?",
+    "opt_a": "Euro",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Combien y a-t-il de départements en France métropolitaine ?",
+    "opt_a": "96",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Combien y a-t-il de régions en France métropolitaine ?",
+    "opt_a": "13",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Comment s'appelle le drapeau français ?",
+    "opt_a": "Tricolore",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Quel est le plus vieux monument de Paris encore debout ?",
+    "opt_a": "Notre-Dame",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Culture Générale",
+    "question_text": "Quelle ville est souvent considérée comme la capitale de l'Union européenne ?",
+    "opt_a": "Bruxelles",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quel fromage est originaire de Normandie et porte son nom ?",
+    "opt_a": "Camembert",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quelle boisson est produite à partir de raisin ?",
+    "opt_a": "Vin",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quel plat est composé de pâte, de tomate et de mozzarella ?",
+    "opt_a": "Pizza",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quelle pâtisserie française a la forme d'un croissant de lune ?",
+    "opt_a": "Croissant",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quel fromage suisse est connu pour ses trous ?",
+    "opt_a": "Emmental",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quel dessert français est composé de couches de pâte feuilletée et de crème pâtissière ?",
+    "opt_a": "Mille-feuille",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quelle boisson chaude est préparée à partir de feuilles séchées ?",
+    "opt_a": "Thé",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quel plat traditionnel japonais est à base de riz vinaigré ?",
+    "opt_a": "Sushi",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quelle charcuterie italienne est un jambon cru séché ?",
+    "opt_a": "Prosciutto",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Gastronomie",
+    "question_text": "Quelle pâte à tartiner italienne est à base de noisettes et de cacao ?",
+    "opt_a": "Nutella",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Qui est le président de la République française en 2026 ?",
+    "opt_a": "Macron",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Combien de pays composent l'Union européenne en 2026 ?",
+    "opt_a": "27",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Quel pays a quitté l'Union européenne en 2020 ?",
+    "opt_a": "Royaume-Uni",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Quelle ville est souvent considérée comme la capitale de l'Union européenne ?",
+    "opt_a": "Bruxelles",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Quel traité a marqué la création de l'Union européenne ?",
+    "opt_a": "Maastricht",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Quel est le nom du parti politique fondé par Emmanuel Macron ?",
+    "opt_a": "Renaissance",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Quelle organisation internationale a son siège à Bruxelles ?",
+    "opt_a": "OTAN",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Qui est le président des États-Unis en 2026 ?",
+    "opt_a": "Biden",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Qui est le secrétaire général de l'ONU en 2026 ?",
+    "opt_a": "Guterres",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Actualités et politique",
+    "question_text": "Quelle est la capitale de l'Allemagne ?",
+    "opt_a": "Berlin",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quelle est la capitale de l'Italie ?",
+    "opt_a": "Rome",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quel est le plus long fleuve d'Europe ?",
+    "opt_a": "Volga",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quelle est la capitale du Portugal ?",
+    "opt_a": "Lisbonne",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quel est le pays le plus peuplé du monde ?",
+    "opt_a": "Chine",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quelle est la capitale des États-Unis ?",
+    "opt_a": "Washington",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quel est le plus grand désert d'Asie ?",
+    "opt_a": "Gobi",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quelle est la capitale de la Belgique ?",
+    "opt_a": "Bruxelles",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quel océan borde l'Afrique à l'est ?",
+    "opt_a": "Indien",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quelle est la capitale du Maroc ?",
+    "opt_a": "Rabat",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Géographie",
+    "question_text": "Quel est le plus grand lac d'Afrique ?",
+    "opt_a": "Victoria",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui a écrit Les Trois Mousquetaires ?",
+    "opt_a": "Dumas",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui a peint La Jeune Fille à la perle ?",
+    "opt_a": "Vermeer",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui a écrit Le Horla ?",
+    "opt_a": "Maupassant",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui est l'auteur des Fleurs du Mal ?",
+    "opt_a": "Baudelaire",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui a peint Le Cri ?",
+    "opt_a": "Munch",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui a écrit À la recherche du temps perdu ?",
+    "opt_a": "Proust",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui a peint Les Demoiselles d'Avignon ?",
+    "opt_a": "Picasso",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui est l'auteur de L'Étranger ?",
+    "opt_a": "Camus",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui a peint La Naissance de Vénus ?",
+    "opt_a": "Botticelli",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Arts et littérature",
+    "question_text": "Qui est l'auteur de Les Mains libres ?",
+    "opt_a": "Éluard",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel pays a remporté la Coupe du Monde de football en 2022 ?",
+    "opt_a": "Argentine",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel sport se joue avec une raquette, un filet et une balle jaune ?",
+    "opt_a": "Tennis",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Combien de joueurs composent une équipe de basketball sur le terrain ?",
+    "opt_a": "5",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel est le sport le plus populaire en France ?",
+    "opt_a": "Football",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quelle est la distance officielle d'un marathon en kilomètres ?",
+    "opt_a": "42",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel sport utilise un ballon ovale ?",
+    "opt_a": "Rugby",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel est le nom du stade du Paris Saint-Germain ?",
+    "opt_a": "Parc des Princes",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel est le record du monde du 100 mètres en secondes ?",
+    "opt_a": "9,58",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel sport utilise un arc et des flèches ?",
+    "opt_a": "Tir à l'arc",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Sport",
+    "question_text": "Quel pays a accueilli les Jeux Olympiques en 2024 ?",
+    "opt_a": "France",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quel est le symbole chimique du fer ?",
+    "opt_a": "Fe",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quelle planète est la plus éloignée du Soleil ?",
+    "opt_a": "Neptune",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Qui a découvert la pénicilline ?",
+    "opt_a": "Fleming",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quel est le pH de l'eau pure ?",
+    "opt_a": "7",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quel est le gaz le plus léger ?",
+    "opt_a": "Hydrogène",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quel est le symbole chimique du cuivre ?",
+    "opt_a": "Cu",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Qui a formulé la célèbre équation E=mc² ?",
+    "opt_a": "Einstein",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quelle est la vitesse du son dans l'air en mètres par seconde ?",
+    "opt_a": "343",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quel élément chimique a pour symbole K ?",
+    "opt_a": "Potassium",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Science",
+    "question_text": "Quelle est l'unité de force dans le système international ?",
+    "opt_a": "Newton",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Qui est le personnage principal de la série Super Mario ?",
+    "opt_a": "Mario",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Quelle entreprise a développé Fortnite ?",
+    "opt_a": "Epic",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Quel est le nom du héros dans The Legend of Zelda ?",
+    "opt_a": "Link",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Dans quel jeu incarne-t-on Master Chief ?",
+    "opt_a": "Halo",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Quelle console de Nintendo est sortie en 2017 ?",
+    "opt_a": "Switch",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Quel jeu consiste à aligner des blocs pour les faire disparaître ?",
+    "opt_a": "Tetris",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Quel est l'un des personnages jouables dans Grand Theft Auto V ?",
+    "opt_a": "Trevor",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Quel est le nom du jeu de battle royale développé par Krafton ?",
+    "opt_a": "PUBG",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Qui est le créateur de Minecraft ?",
+    "opt_a": "Notch",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Jeux vidéos",
+    "question_text": "Quel est le nom du chien compagnon dans Half-Life 2 ?",
+    "opt_a": "Dog",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Quel acteur incarne Iron Man dans l'Univers Cinématographique Marvel ?",
+    "opt_a": "Downey",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Qui a réalisé Jurassic Park ?",
+    "opt_a": "Spielberg",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Dans quelle série joue-t-on le personnage de Walter White ?",
+    "opt_a": "Breaking Bad",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Quel est le titre du film avec Leonardo DiCaprio et Kate Winslet sur un bateau ?",
+    "opt_a": "Titanic",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Quel acteur joue Jack Dawson dans Titanic ?",
+    "opt_a": "DiCaprio",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Quelle est la série la plus regardée de l'histoire de Netflix ?",
+    "opt_a": "Squid Game",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Quel est le titre du film Disney avec Simba ?",
+    "opt_a": "Lion King",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Quel acteur incarne Batman dans The Dark Knight ?",
+    "opt_a": "Bale",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Dans quelle série apparaît Daenerys Targaryen ?",
+    "opt_a": "Game of Thrones",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "TV et cinéma",
+    "question_text": "Quel est le titre du film avec un grand requin blanc ?",
+    "opt_a": "Jaws",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel groupe a chanté Hey Jude ?",
+    "opt_a": "Beatles",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel chanteur est surnommé le Roi de la Pop ?",
+    "opt_a": "Jackson",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel est le nom du groupe de Bono ?",
+    "opt_a": "U2",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel était l'instrument de prédilection de Mozart ?",
+    "opt_a": "Piano",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel groupe a interprété Hotel California ?",
+    "opt_a": "Eagles",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel artiste a sorti l'album Thriller ?",
+    "opt_a": "Jackson",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel est le nom du groupe de Freddie Mercury ?",
+    "opt_a": "Queen",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel chanteur a sorti Shape of You ?",
+    "opt_a": "Sheeran",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quel groupe a interprété Stairway to Heaven ?",
+    "opt_a": "Led Zeppelin",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Musique",
+    "question_text": "Quelle chanteuse a sorti Rolling in the Deep ?",
+    "opt_a": "Adele",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "En quelle année a eu lieu la chute de Constantinople ?",
+    "opt_a": "1453",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "Qui a découvert la tombe de Toutânkhamon ?",
+    "opt_a": "Carter",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "En quelle année a eu lieu le débarquement de Normandie ?",
+    "opt_a": "1944",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "Qui a écrit le Code de Hammurabi ?",
+    "opt_a": "Hammurabi",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "Quel empereur romain a construit un mur en Angleterre ?",
+    "opt_a": "Hadrien",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "En quelle année a eu lieu la bataille de Waterloo ?",
+    "opt_a": "1815",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "Qui a été le premier homme à marcher sur la Lune ?",
+    "opt_a": "Armstrong",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "Quel roi de France a été guillotiné pendant la Révolution française ?",
+    "opt_a": "Louis XVI",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "En quelle année a commencé la construction de la Tour Eiffel ?",
+    "opt_a": "1887",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  },
+  {
+    "themeName": "Histoire",
+    "question_text": "Qui a été le premier président des États-Unis ?",
+    "opt_a": "Washington",
+    "opt_b": "",
+    "opt_c": "",
+    "opt_d": "",
+    "correct_opt": "A",
+    "question_type": "open"
+  }
+]

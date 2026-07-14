@@ -203,6 +203,24 @@ try {
             }
             break;
 
+        case '/api/quests':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuestController())->getQuests();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/quests/claim':
+            if ($method === 'POST') {
+                (new \App\Controllers\QuestController())->claimQuest();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         case '/api/quiz/daily/status':
             if ($method === 'GET') {
                 (new \App\Controllers\QuizController())->getDailyStatus();
@@ -400,6 +418,42 @@ try {
                 (new \App\Controllers\QuizController())->createAdminPack(getRequestBody());
             } elseif ($method === 'DELETE') {
                 (new \App\Controllers\QuizController())->deleteAdminPack(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shop/collection':
+            if ($method === 'GET') {
+                (new \App\Controllers\ShopController())->getCollection();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shop/buy-cosmetic':
+            if ($method === 'POST') {
+                (new \App\Controllers\ShopController())->buyCosmetic();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shop/buy-booster':
+            if ($method === 'POST') {
+                (new \App\Controllers\ShopController())->buyBooster();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shop/equip':
+            if ($method === 'POST') {
+                (new \App\Controllers\ShopController())->equipItem();
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);

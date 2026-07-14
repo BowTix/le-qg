@@ -94,6 +94,18 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
     }
   }, [timeLeft]);
 
+  // Appuyer sur Entrée pour passer à la suivante après validation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter' && result !== null) {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [result]);
+
   const handleTimeOut = useCallback(async () => {
     if (answeredRef.current) return;
     clearInterval(timerRef.current);
@@ -391,13 +403,33 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
               {currentQuestion.question_text}
             </h2>
 
-            {currentQuestion.question_type === 'open' || currentQuestion.question_type === 'guess_number' ? (
+            {currentQuestion.media_url && (
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0' }}>
+                <img 
+                  src={currentQuestion.media_url.startsWith('http') 
+                    ? currentQuestion.media_url 
+                    : currentQuestion.media_url.replace(/^\/?(images\/)?/, '/images/')
+                  } 
+                  alt="Illustration de la question" 
+                  style={{ 
+                    maxWidth: '100%', 
+                    maxHeight: '280px', 
+                    borderRadius: '8px', 
+                    objectFit: 'contain', 
+                    border: '1px solid var(--border-color)',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                  }} 
+                />
+              </div>
+            )}
+
+            {currentQuestion.question_type === 'open' || !currentQuestion.options ? (
               <form onSubmit={handleOpenAnswerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
                 <input
-                  type={currentQuestion.question_type === 'guess_number' ? 'number' : 'text'}
+                  type="text"
                   value={openAnswer}
                   onChange={(e) => setOpenAnswer(e.target.value)}
-                  placeholder={currentQuestion.question_type === 'guess_number' ? 'Entrez votre estimation...' : 'Écrivez votre réponse ici...'}
+                  placeholder="Écrivez votre réponse ici..."
                   disabled={answered}
                   style={{
                     width: '100%',

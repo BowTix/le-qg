@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api, PUBLIC_BASE } from '../utils/api';
 import { ArrowLeft, User, KeyRound, Award, Heart, UserPlus, UserMinus, Check, X, ShieldAlert, BookOpen, Edit3, Image, LogOut, Trophy, Coins } from 'lucide-react';
-import { getLevel, getLevelBadge, getLevelProgressDetails, getUsernameStyle, getEloRank } from '../utils/progression';
+import { getLevel, getLevelBadge, getLevelProgressDetails, getUsernameStyle } from '../utils/progression';
 
 export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
   // Modal visibility
@@ -197,10 +197,11 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
   const { currentLevelXp, xpNeededForNextLevel } = getLevelProgressDetails(user.global_score);
 
   // Avatar helper
-  const renderAvatar = (url, size = '100px', fontSize = '3.5rem') => {
+  const renderAvatar = (url, size = '100px', fontSize = '3.5rem', equippedBorder = null) => {
+    const borderClass = equippedBorder || '';
     if (!url) {
       return (
-        <div style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+        <div className={`avatar-placeholder ${borderClass}`} style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: equippedBorder ? undefined : '3px solid var(--border-color)', color: 'var(--text-secondary)' }}>
           <User size={size === '100px' ? 44 : 24} />
         </div>
       );
@@ -211,7 +212,8 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
         <img 
           src={`${PUBLIC_BASE}${url}`} 
           alt="Avatar" 
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}
+          className={`avatar ${borderClass}`}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: equippedBorder ? undefined : '2px solid var(--accent-secondary)', boxShadow: equippedBorder ? undefined : '0 0 15px var(--accent-secondary-glow)' }}
         />
       );
     }
@@ -221,14 +223,15 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
         <img 
           src={url} 
           alt="Avatar" 
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}
+          className={`avatar ${borderClass}`}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: equippedBorder ? undefined : '2px solid var(--accent-secondary)', boxShadow: equippedBorder ? undefined : '0 0 15px var(--accent-secondary-glow)' }}
         />
       );
     }
 
     // Emoji preset (fallback)
     return (
-      <div style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize, border: '2px solid var(--accent-secondary)', boxShadow: '0 0 15px var(--accent-secondary-glow)' }}>
+      <div className={`avatar-placeholder ${borderClass}`} style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize, border: equippedBorder ? undefined : '2px solid var(--accent-secondary)', boxShadow: equippedBorder ? undefined : '0 0 15px var(--accent-secondary-glow)' }}>
         {url}
       </div>
     );
@@ -259,16 +262,26 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
 
           {/* Large Avatar container */}
           <div style={{ position: 'relative', zIndex: 10 }}>
-            {renderAvatar(user.avatar_url, '110px', '4rem')}
+            {renderAvatar(user.avatar_url, '110px', '4rem', user.equipped_border)}
           </div>
 
           {/* Name & Title */}
           <div style={{ textAlign: 'center', zIndex: 10 }}>
             <h1 style={{ fontSize: '1.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
-              <span style={nameStyle}>{user.username}</span>
+              <span
+                className={user.equipped_color === 'rainbow' ? 'text-rainbow' : (user.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
+                style={{ ...nameStyle, color: user.equipped_color && !['rainbow', 'cyberpunk'].includes(user.equipped_color) ? user.equipped_color : undefined }}
+              >
+                {user.username}
+              </span>
               <span style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', fontWeight: 500 }}>#{user.discriminator}</span>
             </h1>
-            <span style={{ fontSize: '0.85rem', color: 'var(--accent-secondary)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', marginTop: '4px', display: 'block' }}>
+            {user.equipped_title && (
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', fontWeight: 600, display: 'block', marginTop: '2px' }}>
+                "{user.equipped_title}"
+              </span>
+            )}
+            <span style={{ fontSize: '0.85rem', color: 'var(--accent-secondary)', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', marginTop: '6px', display: 'block' }}>
               {badgeLabel} (Lvl {lvl})
             </span>
           </div>
@@ -292,19 +305,11 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
           {/* Gaming Stats Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', width: '100%', marginTop: '10px' }}>
             <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Rang Arène</span>
-              {(() => {
-                const rank = getEloRank(user.elo);
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: rank.color, textShadow: rank.glow }}>
-                      <Trophy size={16} />
-                      <strong style={{ fontSize: '1.25rem' }}>{rank.name}</strong>
-                    </div>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{user.elo} Elo</span>
-                  </div>
-                );
-              })()}
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Niveau Global</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)' }}>
+                <Award size={18} />
+                <strong style={{ fontSize: '1.4rem' }}>Lvl {lvl}</strong>
+              </div>
             </div>
 
             <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -401,7 +406,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
                         </span>
                       </div>
                       <span style={{ fontSize: '0.75rem', color: 'var(--accent-secondary)' }}>
-                        🏆 {u.elo}
+                        Lvl {getLevel(u.global_score)}
                       </span>
                     </div>
                   ))}
@@ -512,15 +517,10 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
                     </div>
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)', borderTop: '1px solid rgba(255,255,255,0.02)', paddingTop: '4px', alignItems: 'center' }}>
-                      {(() => {
-                        const rank = getEloRank(friend.elo);
-                        return (
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: rank.color, textShadow: rank.glow }}>
-                            <Trophy size={12} />
-                            <span>{rank.name} ({friend.elo})</span>
-                          </span>
-                        );
-                      })()}
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent)' }}>
+                        <Trophy size={12} style={{ color: 'var(--accent)' }} />
+                        <span>Lvl {getLevel(friend.global_score)}</span>
+                      </span>
                       {friend.bio && (
                         <span style={{ fontStyle: 'italic', maxWidth: '55%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={friend.bio}>
                           "{friend.bio}"

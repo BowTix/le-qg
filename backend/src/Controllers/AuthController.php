@@ -113,17 +113,17 @@ class AuthController {
             $uName = trim($parts[0]);
             $uDisc = trim($parts[1]);
             
-            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url FROM users WHERE username = ? AND discriminator = ?");
+            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ? AND discriminator = ?");
             $stmt->execute([$uName, $uDisc]);
             $user = $stmt->fetch();
         } else {
-            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url FROM users WHERE email = ?");
+            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE email = ?");
             $stmt->execute([$loginInput]);
             $user = $stmt->fetch();
             
             if (!$user) {
                 // Try searching by username (in case there's only one user with this username, or just fall back)
-                $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url FROM users WHERE username = ?");
+                $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ?");
                 $stmt->execute([$loginInput]);
                 $results = $stmt->fetchAll();
                 if (count($results) === 1) {
@@ -160,6 +160,7 @@ class AuthController {
             'role' => $user['role']
         ];
         $token = JWT::encode($payload);
+        \App\Controllers\QuestController::incrementProgress((int) $user['id'], 'login');
 
         echo json_encode([
             "success" => true,
@@ -174,7 +175,10 @@ class AuthController {
                 "elo" => (int) $user['elo'],
                 "coins" => (int) $user['coins'],
                 "bio" => $user['bio'],
-                "avatar_url" => $user['avatar_url']
+                "avatar_url" => $user['avatar_url'],
+                "equipped_border" => $user['equipped_border'],
+                "equipped_color" => $user['equipped_color'],
+                "equipped_title" => $user['equipped_title']
             ]
         ]);
     }
@@ -356,7 +360,7 @@ class AuthController {
         }
 
         // Fetch fresh profile data
-        $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, elo, coins, bio, avatar_url FROM users WHERE id = ?");
+        $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, elo, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
         $stmtFresh->execute([$userId]);
         $freshUser = $stmtFresh->fetch();
 
@@ -382,7 +386,10 @@ class AuthController {
                 "elo" => (int) $freshUser['elo'],
                 "coins" => (int) $freshUser['coins'],
                 "bio" => $freshUser['bio'],
-                "avatar_url" => $freshUser['avatar_url']
+                "avatar_url" => $freshUser['avatar_url'],
+                "equipped_border" => $freshUser['equipped_border'],
+                "equipped_color" => $freshUser['equipped_color'],
+                "equipped_title" => $freshUser['equipped_title']
             ]
         ]);
     }
@@ -392,9 +399,10 @@ class AuthController {
      */
     public function profile() {
         $authUser = \App\Middleware\AuthMiddleware::authenticate();
+        \App\Controllers\QuestController::incrementProgress((int) $authUser['user_id'], 'login');
         $db = Database::getConnection();
         
-        $stmt = $db->prepare("SELECT id, username, discriminator, email, role, global_score, elo, coins, bio, avatar_url FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, username, discriminator, email, role, global_score, elo, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
         $stmt->execute([$authUser['user_id']]);
         $profile = $stmt->fetch();
         
@@ -416,7 +424,10 @@ class AuthController {
                 "elo" => (int) $profile['elo'],
                 "coins" => (int) $profile['coins'],
                 "bio" => $profile['bio'],
-                "avatar_url" => $profile['avatar_url']
+                "avatar_url" => $profile['avatar_url'],
+                "equipped_border" => $profile['equipped_border'],
+                "equipped_color" => $profile['equipped_color'],
+                "equipped_title" => $profile['equipped_title']
             ]
         ]);
     }

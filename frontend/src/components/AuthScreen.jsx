@@ -40,10 +40,14 @@ export default function AuthScreen({ onAuthSuccess }) {
       if (isLogin) {
         // Login Flow
         const response = await api.post('/auth/login', { username, password });
+        console.debug('[Auth] login response:', response);
         if (response.token && response.user) {
           localStorage.setItem('quiz_token', response.token);
           localStorage.setItem('quiz_user', JSON.stringify(response.user));
+          console.debug('[Auth] token saved to localStorage:', localStorage.getItem('quiz_token')?.slice(0, 20) + '...');
           onAuthSuccess(response.user);
+        } else {
+          console.warn('[Auth] login response missing token or user:', response);
         }
       } else {
         // Register Flow

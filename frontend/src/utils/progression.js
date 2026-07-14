@@ -44,27 +44,8 @@ export const getLevelProgressDetails = (xp) => {
  * - Lvl 15+: Neon cyan/blue
  */
 export const getUsernameStyle = (xp) => {
-  const lvl = getLevel(xp);
-  if (lvl >= 15) {
-    return {
-      color: '#0891b2',
-      fontWeight: '700'
-    };
-  }
-  if (lvl >= 10) {
-    return {
-      color: '#7c3aed',
-      fontWeight: '700'
-    };
-  }
-  if (lvl >= 5) {
-    return {
-      color: '#d97706',
-      fontWeight: '700'
-    };
-  }
   return {
-    fontWeight: '600'
+    fontWeight: '700'
   };
 };
 

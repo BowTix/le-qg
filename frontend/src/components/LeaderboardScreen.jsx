@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import { ArrowLeft, Trophy, Calendar, Zap, Skull, ShieldCheck, Gamepad } from 'lucide-react';
-import { getLevel, getUsernameStyle, getEloRank } from '../utils/progression';
+import { getLevel, getUsernameStyle } from '../utils/progression';
 
 export default function LeaderboardScreen({ onBack }) {
-  const [topPlayers, setTopPlayers] = useState([]);
-  const [recentMatches, setRecentMatches] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [cachedData] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cache_leaderboard');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [topPlayers, setTopPlayers] = useState(() => cachedData ? cachedData.top_players || [] : []);
+  const [recentMatches, setRecentMatches] = useState(() => cachedData ? cachedData.recent_matches || [] : []);
+  const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -14,11 +23,14 @@ export default function LeaderboardScreen({ onBack }) {
   }, []);
 
   const fetchStats = async () => {
-    setLoading(true);
+    if (!localStorage.getItem('cache_leaderboard')) {
+      setLoading(true);
+    }
     try {
       const data = await api.get('/quiz/leaderboard');
       setTopPlayers(data.top_players || []);
       setRecentMatches(data.recent_matches || []);
+      localStorage.setItem('cache_leaderboard', JSON.stringify(data));
     } catch (err) {
       setError("Impossible de charger les statistiques.");
     } finally {
@@ -90,14 +102,9 @@ export default function LeaderboardScreen({ onBack }) {
                 {second && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
                     <span style={{ ...getUsernameStyle(second.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{second.username}</span>
-                    {(() => {
-                      const rank = getEloRank(second.elo);
-                      return (
-                        <span style={{ fontSize: '0.75rem', color: rank.color, textShadow: rank.glow, fontWeight: 700, marginBottom: '8px' }}>
-                          {rank.name} ({second.elo})
-                        </span>
-                      );
-                    })()}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '8px' }}>
+                      Collection : {second.collection_value || 0} pts
+                    </span>
                     <div style={{
                       width: '100%',
                       height: '70px',
@@ -120,14 +127,9 @@ export default function LeaderboardScreen({ onBack }) {
                 {first && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
                     <span style={{ ...getUsernameStyle(first.global_score), fontSize: '0.95rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{first.username}</span>
-                    {(() => {
-                      const rank = getEloRank(first.elo);
-                      return (
-                        <span style={{ fontSize: '0.8rem', color: rank.color, textShadow: rank.glow, fontWeight: 800, marginBottom: '8px' }}>
-                          {rank.name} ({first.elo})
-                        </span>
-                      );
-                    })()}
+                    <span style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 800, textShadow: '0 0 10px rgba(255,247,0,0.2)', marginBottom: '8px' }}>
+                      Collection : {first.collection_value || 0} pts
+                    </span>
                     <div style={{
                       width: '100%',
                       height: '100px',
@@ -151,14 +153,9 @@ export default function LeaderboardScreen({ onBack }) {
                 {third && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
                     <span style={{ ...getUsernameStyle(third.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{third.username}</span>
-                    {(() => {
-                      const rank = getEloRank(third.elo);
-                      return (
-                        <span style={{ fontSize: '0.75rem', color: rank.color, textShadow: rank.glow, fontWeight: 700, marginBottom: '8px' }}>
-                          {rank.name} ({third.elo})
-                        </span>
-                      );
-                    })()}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '8px' }}>
+                      Collection : {third.collection_value || 0} pts
+                    </span>
                     <div style={{
                       width: '100%',
                       height: '50px',
@@ -206,14 +203,9 @@ export default function LeaderboardScreen({ onBack }) {
                     <span style={{ ...getUsernameStyle(p.global_score), fontWeight: 600 }}>{p.username}</span>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Lvl {getLevel(p.global_score)})</span>
                   </div>
-                  {(() => {
-                    const rank = getEloRank(p.elo);
-                    return (
-                      <span style={{ color: rank.color, textShadow: rank.glow, fontWeight: 700, fontSize: '0.85rem' }}>
-                        {rank.name} ({p.elo})
-                      </span>
-                    );
-                  })()}
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.85rem' }}>
+                    Collection : {p.collection_value || 0} pts
+                  </span>
                 </div>
               ))}
               
