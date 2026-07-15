@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../utils/api';
 import { Coins, Sparkles, Check, CheckCircle2, Lock, Eye, EyeOff, Loader2, ArrowLeft, Trophy, CreditCard, X, ChevronLeft, ChevronRight, GraduationCap, Landmark, Car, Globe, Sword, Heart, Utensils, Gem, CloudLightning, Lightbulb } from 'lucide-react';
 import { getUsernameStyle } from '../utils/progression';
-import GameCard from './GameCard';
+import GameCard, { RARITY_CONFIG, getCardImageSrc as getImgSrc } from './GameCard';
+import VanillaTilt from 'vanilla-tilt';
 
 // Dynamically import all images in src/assets/cards/ using Vite's glob import
 const cardImages = import.meta.glob('../assets/cards/*.{png,jpg,jpeg,webp,svg}', { eager: true, import: 'default' });
@@ -64,16 +65,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
   const [flippedCards, setFlippedCards] = useState([false, false, false]);
   const [zoomedCard, setZoomedCard] = useState(null);
 
-  // Zoom 3D Holographic Card States
-  const [cardRotate, setCardRotate] = useState({ x: 0, y: 0 });
-  const [shinePos, setShinePos] = useState({ x: 50, y: 50 });
-  const [isHovered, setIsHovered] = useState(false);
-
-  useEffect(() => {
-    setCardRotate({ x: 0, y: 0 });
-    setShinePos({ x: 50, y: 50 });
-    setIsHovered(false);
-  }, [zoomedCard]);
+  // (3D/foil logic now lives inside ZoomedCardModal component)
 
   // Filtering & Sorting states
   const [viewMode, setViewMode] = useState('sets'); // 'sets' | 'global'
@@ -99,20 +91,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
     setZoomedCard(ownedCardsList[newIdx]);
   };
 
-  const handleCardMouseMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    
-    const rotateX = ((y - centerY) / centerY) * -12;
-    const rotateY = ((x - centerX) / centerX) * 12;
-    
-    setCardRotate({ x: rotateX, y: rotateY });
-    
-    const percentX = (x / rect.width) * 100;
+  const _handleCardMouseMove_REMOVED = (e) => {
+    const percentX = (0 / 1) * 100;
     const percentY = (y / rect.height) * 100;
     setShinePos({ x: percentX, y: percentY });
   };
@@ -1159,153 +1139,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
             </button>
           )}
 
-          {/* Enlarged Card face (Pokemon style) */}
-          {(() => {
-            const isLegendary = zoomedCard.rarity === 'legendary';
-            const isEpic = zoomedCard.rarity === 'epic';
-            const isRare = zoomedCard.rarity === 'rare';
-            
-            return (
-              <div
-                className={`card-glow-${zoomedCard.rarity}`}
-                onMouseMove={handleCardMouseMove}
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => {
-                  setIsHovered(false);
-                  setCardRotate({ x: 0, y: 0 });
-                  setShinePos({ x: 50, y: 50 });
-                }}
-                style={{
-                  width: '360px',
-                  height: '540px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  borderRadius: '24px',
-                  border: isLegendary ? '4px solid #eab308' : (isEpic ? '4px solid #a855f7' : (isRare ? '4px solid #3b82f6' : '4px solid #64748b')),
-                  background: 'linear-gradient(180deg, var(--bg-card) 0%, var(--bg-input) 100%)',
-                  position: 'relative',
-                  padding: '16px',
-                  boxShadow: isLegendary 
-                    ? '0 0 35px rgba(234,179,8,0.5)' 
-                    : (isEpic 
-                      ? '0 0 30px rgba(168,85,247,0.45)' 
-                      : '0 10px 30px rgba(0,0,0,0.5)'),
-                  transform: `perspective(1000px) rotateX(${cardRotate.x}deg) rotateY(${cardRotate.y}deg)`,
-                  transition: isHovered ? 'none' : 'transform 0.4s ease, box-shadow 0.4s ease',
-                  transformStyle: 'preserve-3d',
-                  overflow: 'hidden'
-                }}
-              >
-                {/* Holographic Shine Overlay */}
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  borderRadius: '24px',
-                  background: isHovered 
-                    ? (zoomedCard.rarity === 'legendary'
-                      ? `radial-gradient(circle at ${shinePos.x}% ${shinePos.y}%, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0) 50%),
-                         linear-gradient(${135 + cardRotate.y}deg, rgba(239, 68, 68, 0.16) 0%, rgba(234, 179, 8, 0.16) 25%, rgba(34, 197, 94, 0.16) 50%, rgba(59, 130, 246, 0.16) 75%, rgba(168, 85, 247, 0.16) 100%)`
-                      : (zoomedCard.rarity === 'epic'
-                        ? `radial-gradient(circle at ${shinePos.x}% ${shinePos.y}%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 55%),
-                           linear-gradient(${135 + cardRotate.y}deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 50%, rgba(168, 85, 247, 0.2) 100%)`
-                        : `radial-gradient(circle at ${shinePos.x}% ${shinePos.y}%, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 60%),
-                           linear-gradient(${135 + cardRotate.y}deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 255, 255, 0) 70%)`))
-                    : 'none',
-                  mixBlendMode: 'overlay',
-                  pointerEvents: 'none',
-                  zIndex: 5,
-                  transition: 'background 0.15s ease'
-                }} />
-                {/* Header: Name and Rarity symbol */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', width: '100%' }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--text-primary)' }}>
-                    {zoomedCard.name}
-                  </span>
-                  <span 
-                    className={`badge-${zoomedCard.rarity}`} 
-                    style={{ 
-                      fontSize: '0.75rem', 
-                      padding: '3px 8px', 
-                      borderRadius: '6px', 
-                      textTransform: 'uppercase',
-                      fontWeight: 900
-                    }}
-                  >
-                    {zoomedCard.rarity === 'legendary' ? 'LEG' : (zoomedCard.rarity === 'epic' ? 'ÉPIQUE' : (zoomedCard.rarity === 'rare' ? 'RARE' : 'COM'))}
-                  </span>
-                </div>
-
-                {/* Image Frame (800x600 ratio) */}
-                <div style={{ 
-                  width: '100%', 
-                  aspectRatio: '4 / 3', 
-                  borderRadius: '12px', 
-                  overflow: 'hidden', 
-                  position: 'relative',
-                  border: '2px solid rgba(255,255,255,0.08)',
-                  boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.4)',
-                  backgroundColor: '#000000',
-                  marginBottom: '12px'
-                }}>
-                  {(() => {
-                    const imgSrc = getCardImageSrc(zoomedCard.id);
-                    return imgSrc ? (
-                      <img
-                        src={imgSrc}
-                        alt={zoomedCard.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          textAlign: 'center',
-                          padding: '8px',
-                          color: 'var(--text-muted)',
-                          fontSize: '0.85rem',
-                          backgroundColor: 'var(--bg-input)'
-                        }}
-                      >
-                        <span>Image manquante</span>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Description Text Box */}
-                <div style={{ 
-                  flex: 1,
-                  backgroundColor: 'rgba(0,0,0,0.3)',
-                  borderRadius: '12px',
-                  padding: '10px 12px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center'
-                }}>
-                  <p style={{ 
-                    fontSize: '0.82rem', 
-                    color: 'var(--text-secondary)', 
-                    lineHeight: '1.4',
-                    margin: 0,
-                    textAlign: 'center'
-                  }}>
-                    {zoomedCard.description}
-                  </p>
-                </div>
-
-                {/* Small footer card index or set name */}
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    {zoomedCard.set}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
+          {/* Enlarged Card face — premium 3D tilt + foil */}
+          <ZoomedCardFace card={zoomedCard} />
 
           {/* Right Navigation Arrow */}
           {ownedCardsList.length > 1 && (
@@ -1336,4 +1171,295 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
     )}
   </>
 );
+}
+
+// ==========================================
+// ZOOMED CARD FACE — 3D tilt + holographic foil
+// Displayed inside the modal when a card is clicked
+// ==========================================
+// ==========================================
+// ZOOMED CARD FACE — 3D tilt + holographic foil
+// Displayed inside the modal when a card is clicked
+// ==========================================
+function ZoomedCardFace({ card }) {
+  const tiltRef = useRef(null);
+  const foilRef = useRef(null);
+
+  const rarity = card.rarity || 'common';
+  const cfg = RARITY_CONFIG[rarity] || RARITY_CONFIG.common;
+  const imgSrc = getImgSrc(card.id);
+  const borderColor = cfg.border;
+
+  const getBgGradient = () => {
+    switch(rarity) {
+      case 'legendary': return 'linear-gradient(160deg, #2a1f00 0%, #0a0800 100%)';
+      case 'epic': return 'linear-gradient(160deg, #1c0b2b 0%, #08030d 100%)';
+      case 'rare': return 'linear-gradient(160deg, #0b182b 0%, #03080d 100%)';
+      default: return 'linear-gradient(160deg, #1f2229 0%, #0a0b0e 100%)';
+    }
+  };
+
+  const getRarityLabel = () => {
+    switch(rarity) {
+      case 'legendary': return 'Légendaire';
+      case 'epic': return 'Épique';
+      case 'rare': return 'Rare';
+      default: return 'Commune';
+    }
+  };
+
+  useEffect(() => {
+    const el = tiltRef.current;
+    if (!el) return;
+
+    VanillaTilt.init(el, {
+      max: 15,
+      speed: 400,
+      glare: false,
+      scale: 1.05,
+      perspective: 1200,
+      transition: true,
+    });
+
+    const handleMouseMove = (e) => {
+      if (!foilRef.current) return;
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width;
+      const y = (e.clientY - rect.top) / rect.height;
+
+      const bgX = 100 - (x * 100);
+      const bgY = 100 - (y * 100);
+
+      foilRef.current.style.backgroundPosition = `${bgX}% ${bgY}%`;
+      foilRef.current.style.opacity = rarity === 'legendary' ? '0.3' : '0.8';
+    };
+
+    const handleMouseLeave = () => {
+      if (foilRef.current) {
+        foilRef.current.style.opacity = '0';
+        foilRef.current.style.transition = 'opacity 0.4s ease-out';
+      }
+    };
+
+    const handleMouseEnter = () => {
+      if (foilRef.current) {
+        foilRef.current.style.transition = 'none';
+      }
+    };
+
+    el.addEventListener('mousemove', handleMouseMove);
+    el.addEventListener('mouseleave', handleMouseLeave);
+    el.addEventListener('mouseenter', handleMouseEnter);
+
+    return () => {
+      if (el._vTilt) el._vTilt.destroy();
+      el.removeEventListener('mousemove', handleMouseMove);
+      el.removeEventListener('mouseleave', handleMouseLeave);
+      el.removeEventListener('mouseenter', handleMouseEnter);
+    };
+  }, [card.id, rarity]);
+
+  const outerBoxShadow = rarity === 'legendary'
+      ? `0 0 0 1px #000, 0 0 0 3px ${borderColor}, 0 0 30px rgba(234,179,8,0.5), 0 25px 50px rgba(0,0,0,0.8)`
+      : rarity === 'epic'
+          ? `0 0 0 1px #000, 0 0 0 3px ${borderColor}, 0 0 25px rgba(168,85,247,0.5), 0 25px 50px rgba(0,0,0,0.8)`
+          : rarity === 'rare'
+              ? `0 0 0 1px #000, 0 0 0 3px ${borderColor}, 0 0 20px rgba(59,130,246,0.5), 0 25px 50px rgba(0,0,0,0.8)`
+              : `0 0 0 1px #000, 0 0 0 3px ${borderColor}, 0 25px 50px rgba(0,0,0,0.8)`;
+
+  return (
+      <div
+          ref={tiltRef}
+          data-tilt
+          style={{
+            cursor: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'16\' height=\'16\' viewBox=\'0 0 16 16\'%3E%3Ccircle cx=\'8\' cy=\'8\' r=\'2.5\' fill=\'white\' opacity=\'0.9\'/%3E%3C/svg%3E") 8 8, auto',
+            width: '380px',
+            height: '560px',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: '16px',
+            background: getBgGradient(),
+            position: 'relative',
+            padding: '16px',
+            boxShadow: outerBoxShadow,
+            overflow: 'hidden',
+            transformStyle: 'preserve-3d',
+            willChange: 'transform',
+          }}
+      >
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E")`,
+          pointerEvents: 'none', zIndex: 0, mixBlendMode: 'overlay',
+        }} />
+
+        <div style={{
+          position: 'absolute', inset: '4px',
+          border: `1px solid rgba(255,255,255,0.15)`,
+          borderRadius: '12px', pointerEvents: 'none', zIndex: 1,
+          boxShadow: `inset 0 0 20px rgba(0,0,0,0.5)`,
+        }} />
+
+        <div
+            ref={foilRef}
+            style={{
+              position: 'absolute', inset: 0,
+              pointerEvents: 'none', zIndex: 10, opacity: 0,
+              mixBlendMode: rarity === 'legendary' ? 'color-dodge' : 'overlay',
+              backgroundImage: rarity === 'legendary'
+                  ? 'linear-gradient(115deg, transparent 20%, rgba(255,215,0,0.5) 36%, rgba(255,105,180,0.4) 43%, rgba(0,255,255,0.5) 50%, rgba(138,43,226,0.4) 57%, rgba(255,215,0,0.5) 64%, transparent 80%)'
+                  : 'linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.4) 45%, rgba(255,255,255,0.8) 50%, rgba(255,255,255,0.4) 55%, transparent 70%)',
+              backgroundSize: '250% 250%',
+            }}
+        />
+
+        {/* EN-TÊTE REVISITÉ : Titre + Badge de rareté fixe */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '10px 14px', zIndex: 3, position: 'relative',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(0,0,0,0.3) 100%)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '8px',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
+          marginBottom: '14px',
+          gap: '12px'
+        }}>
+          <div style={{
+            fontSize: '1.25rem',
+            fontWeight: 900,
+            color: '#ffffff',
+            textShadow: `0 2px 4px rgba(0,0,0,0.8), 0 0 10px ${cfg.glow}`,
+            letterSpacing: '0.5px',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}>
+            {card.name}
+          </div>
+
+          {/* Badge d'étoiles stylisées (Largeur fixe de 4 étoiles) */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2px',
+            minWidth: '70px', // Maintient une largeur fixe pour éviter tout décalage
+            justifyContent: 'flex-end',
+            flexShrink: 0
+          }}>
+            {[1, 2, 3, 4].map(num => {
+              const activeStars = rarity === 'legendary' ? 4 : rarity === 'epic' ? 3 : rarity === 'rare' ? 2 : 1;
+              const isActive = num <= activeStars;
+
+              return (
+                  <svg
+                      key={num}
+                      viewBox="0 0 24 24"
+                      width="16"
+                      height="16"
+                      fill={isActive ? borderColor : "rgba(255,255,255,0.08)"}
+                      stroke={isActive ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.05)"}
+                      strokeWidth="1.5"
+                      style={{
+                        filter: isActive ? `drop-shadow(0 0 4px ${cfg.glow})` : 'none',
+                        transform: isActive ? 'scale(1.1)' : 'scale(0.9)',
+                      }}
+                  >
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{
+          width: '100%',
+          aspectRatio: '4 / 3',
+          borderRadius: '8px',
+          position: 'relative',
+          zIndex: 2,
+          backgroundColor: '#000',
+          flexShrink: 0,
+          border: `3px solid ${borderColor}`,
+          boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
+          overflow: 'hidden'
+        }}>
+          {imgSrc ? (
+              <img src={imgSrc} alt={card.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          ) : (
+              <div style={{
+                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#475569', fontSize: '0.85rem', backgroundColor: '#0c111a',
+              }}><span>Image manquante</span></div>
+          )}
+        </div>
+
+        <div style={{
+          zIndex: 4, position: 'relative',
+          marginTop: '-14px',
+          alignSelf: 'center',
+          background: '#0c111a',
+          border: `2px solid ${borderColor}`,
+          borderRadius: '20px',
+          padding: '4px 16px',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+        <span style={{
+          fontSize: '0.75rem',
+          color: '#e2e8f0',
+          fontWeight: 800,
+          textTransform: 'uppercase',
+          letterSpacing: '1px'
+        }}>
+          {card.set || card.card_set}
+        </span>
+        </div>
+
+        <div style={{
+          flex: 1,
+          marginTop: '8px',
+          borderRadius: '8px',
+          padding: '16px',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+          zIndex: 2, position: 'relative',
+          background: 'rgba(0,0,0,0.5)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            overflow: 'hidden',
+            opacity: 0.03,
+            pointerEvents: 'none',
+            zIndex: 0,
+            userSelect: 'none',
+            padding: '4px'
+          }}>
+          <span style={{
+            display: 'block',
+            fontSize: '0.55rem',
+            fontWeight: 800,
+            color: '#ffffff',
+            textTransform: 'uppercase',
+            letterSpacing: '1px',
+            lineHeight: '1.4',
+            wordBreak: 'break-all',
+            textAlign: 'justify'
+          }}>
+            {`${card.name.replace(/\s+/g, '')}\u00A0`.repeat(300)}
+          </span>
+          </div>
+
+          <p style={{
+            fontSize: '1.1rem', color: '#cbd5e1', lineHeight: '1.6', margin: 0,
+            textAlign: 'center', position: 'relative', zIndex: 1,
+            textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+            fontWeight: 500
+          }}>
+            {card.description}
+          </p>
+        </div>
+      </div>
+  );
 }
