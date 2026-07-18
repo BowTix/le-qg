@@ -12,19 +12,14 @@ import DailyQuizScreen from './components/DailyQuizScreen';
 import ShopScreen from './components/ShopScreen';
 import { api, PUBLIC_BASE } from './utils/api';
 import {
-  Trophy,
-  Plus,
   User,
   LogOut,
   ShieldAlert,
   ChevronDown,
   Sun,
   Moon,
-  Coins,
-  Gamepad2,
-  Calendar,
-  Share2,
-  Sparkles
+  Gem,
+  CircleHelp,
 } from 'lucide-react';
 import { getLevel } from './utils/progression';
 
@@ -45,7 +40,6 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true); // true until localStorage check done
   const [showDropdown, setShowDropdown] = useState(false);
   const [dailyStatus, setDailyStatus] = useState({ scheduled: false, completed: false });
-  const [showDailyModal, setShowDailyModal] = useState(false);
 
   // Navigation params passed via router state
   const { soloPackId, soloGameMode, roomCode } = location.state || {};
@@ -155,157 +149,260 @@ export default function App() {
   const isAuth = location.pathname === '/';
 
   return (
-    <div className="layout-page">
+    <div className="layout-page" style={{ background: 'transparent', minHeight: '100vh' }}>
 
-      {/* Animated shimmer accent bar at top */}
-      <div className="accent-bar" />
+      {/* ── Global CSS for floating background blobs ── */}
+      <style>{`
+        @keyframes floatTeal {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(120px, -80px) scale(1.25); }
+          66% { transform: translate(-70px, 50px) scale(0.85); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        @keyframes floatFuchsia {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(-100px, 120px) scale(0.8); }
+          66% { transform: translate(90px, -70px) scale(1.3); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        @keyframes floatAmber {
+          0% { transform: translate(0px, 0px) scale(1); }
+          50% { transform: translate(80px, 90px) scale(1.25); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+      `}</style>
+
+      {/* ── Global Fixed Background ── */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100vw',
+          height: '100vh',
+          background: '#0f172a',
+          zIndex: -2,
+          pointerEvents: 'none',
+        }}
+      />
+      {/* Ambient glowing blobs */}
+      <div
+        style={{
+          position: 'fixed',
+          pointerEvents: 'none',
+          left: '-8rem',
+          top: '10rem',
+          width: '430px',
+          height: '430px',
+          borderRadius: '50%',
+          background: 'rgba(45,212,191,0.18)',
+          filter: 'blur(140px)',
+          zIndex: -1,
+          animation: 'floatTeal 15s infinite ease-in-out',
+        }}
+      />
+      <div
+        style={{
+          position: 'fixed',
+          pointerEvents: 'none',
+          right: '-8rem',
+          top: '-6rem',
+          width: '460px',
+          height: '460px',
+          borderRadius: '50%',
+          background: 'rgba(217,70,239,0.18)',
+          filter: 'blur(150px)',
+          zIndex: -1,
+          animation: 'floatFuchsia 18s infinite ease-in-out',
+        }}
+      />
+      <div
+        style={{
+          position: 'fixed',
+          pointerEvents: 'none',
+          bottom: 0,
+          left: '30%',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: 'rgba(251,191,36,0.09)',
+          filter: 'blur(140px)',
+          zIndex: -1,
+          animation: 'floatAmber 13s infinite ease-in-out',
+        }}
+      />
 
       {/* ── Global Header ── */}
-      <header className="header-nav">
-
-        {/* Logo */}
-        <div
-          className="header-logo"
-          onClick={() => user && navigate('/dashboard')}
-          style={{ cursor: user ? 'pointer' : 'default' }}
+      {user && !isAuth && (
+        <header
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            height: '64px',
+            padding: '0 20px',
+            margin: '12px 16px 0',
+            borderRadius: '18px',
+            border: '1px solid rgba(148,163,184,0.18)',
+            background: 'rgba(15,23,42,0.72)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 8px 32px rgba(2,6,23,0.28)',
+            position: 'sticky',
+            top: '12px',
+            zIndex: 100,
+          }}
         >
-          <Gamepad2 size={22} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-          <span>LE QG</span>
-        </div>
-
-        {/* Right-side actions */}
-        <div className="header-actions">
-
-          {user && !isAuth && (
-            <>
-              {/* Nav shortcuts */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button
-                  className="btn-secondary"
-                  onClick={() => navigate('/classement')}
-                  style={{ padding: '7px 12px', fontSize: '0.825rem' }}
-                  title="Classement"
-                >
-                  <Trophy size={14} style={{ color: 'var(--accent)' }} />
-                  <span className="hide-mobile">Classement</span>
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => navigate('/creer')}
-                  style={{ padding: '7px 12px', fontSize: '0.825rem' }}
-                  title="Créer un thème"
-                >
-                  <Plus size={14} style={{ color: 'var(--accent)' }} />
-                  <span className="hide-mobile">Créer Thème</span>
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => navigate('/boutique')}
-                  style={{ padding: '7px 12px', fontSize: '0.825rem' }}
-                  title="Boutique"
-                >
-                  <Sparkles size={14} style={{ color: '#ffb300' }} />
-                  <span className="hide-mobile">Boutique</span>
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => navigate('/collection')}
-                  style={{ padding: '7px 12px', fontSize: '0.825rem' }}
-                  title="Collection"
-                >
-                  <Trophy size={14} style={{ color: 'var(--accent)' }} />
-                  <span className="hide-mobile">Collection</span>
-                </button>
-                <button
-                  className="btn-secondary"
-                  onClick={() => setShowDailyModal(true)}
-                  style={{ 
-                    padding: '7px 12px', 
-                    fontSize: '0.825rem',
-                    position: 'relative',
-                    border: '1px solid rgba(255, 247, 0, 0.25)',
-                    background: 'linear-gradient(135deg, rgba(255, 247, 0, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)'
-                  }}
-                  title="Quiz du Jour"
-                >
-                  <Calendar size={14} style={{ color: 'var(--accent)' }} />
-                  <span className="hide-mobile">Quiz du Jour</span>
-                  {dailyStatus.scheduled && !dailyStatus.completed && (
-                    <span style={{
-                      position: 'absolute',
-                      top: '-3px',
-                      right: '-3px',
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: '#ef4444',
-                      boxShadow: '0 0 6px #ef4444'
-                    }} />
-                  )}
-                </button>
-              </div>
-
-              {/* Stats pill */}
-              <div className="header-stats">
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }} title="Pièces">
-                  <Coins size={14} style={{ color: '#f59e0b' }} />
-                  <span>{user.coins || 0}</span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--accent)' }} title={`Niveau ${getLevel(user.global_score)} (${user.global_score} XP)`}>
-                  <Trophy size={14} style={{ color: 'var(--accent)' }} />
-                  <span>Niveau {getLevel(user.global_score)}</span>
-                </span>
-              </div>
-            </>
-          )}
-
-          {/* Theme toggle — only when logged out */}
-          {!user && (
-            <button className="btn-icon" onClick={toggleTheme} title="Changer de thème">
-              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-          )}
-
-          {/* Profile dropdown */}
-          {user && !isAuth && (
-            <div style={{ position: 'relative' }}>
-              {/* Avatar trigger */}
-              <div
+          {/* Logo */}
+          <div
+            onClick={() => navigate('/dashboard')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+          >
+            <div
+              style={{
+                width: '36px', height: '36px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '11px',
+                background: '#2dd4bf',
+                flexShrink: 0,
+              }}
+            >
+              <span
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer',
-                  padding: '4px 8px', borderRadius: '10px',
-                  border: '1.5px solid var(--border-color)',
-                  background: 'var(--bg-hover)',
-                  transition: 'var(--transition)'
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  letterSpacing: '-0.08em',
+                  color: '#062a2b',
                 }}
-                onClick={(e) => { e.stopPropagation(); setShowDropdown(!showDropdown); }}
               >
+                QG
+              </span>
+            </div>
+            <span
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: '18px',
+                fontWeight: 800,
+                letterSpacing: '-0.05em',
+                color: '#fff',
+              }}
+            >
+              Le QG
+            </span>
+          </div>
+
+          {/* Right side */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+
+            {/* Coins */}
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: '7px',
+                padding: '7px 13px',
+                borderRadius: '12px',
+                background: 'rgba(30,41,59,0.7)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                fontSize: '13px',
+                fontWeight: 700,
+                color: '#fff',
+                fontFamily: "'Manrope', sans-serif",
+              }}
+            >
+              <Gem size={15} style={{ color: '#fbbf24', flexShrink: 0 }} />
+              {(user.coins || 0).toLocaleString('fr-FR')}
+            </div>
+
+            {/* Help button */}
+            <button
+              aria-label="Aide"
+              title="Aide"
+              style={{
+                width: '38px', height: '38px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '12px',
+                background: 'rgba(30,41,59,0.7)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                color: '#aab7ce',
+                cursor: 'pointer',
+                transition: 'color 0.2s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#aab7ce')}
+            >
+              <CircleHelp size={17} />
+            </button>
+
+            {/* Profile dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowDropdown(!showDropdown); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '7px',
+                  padding: '5px 12px 5px 5px',
+                  borderRadius: '12px',
+                  background: 'rgba(30,41,59,0.7)',
+                  border: '1px solid rgba(255,255,255,0.09)',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(51,65,85,0.8)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(30,41,59,0.7)')}
+              >
+                {/* Avatar */}
                 {user.avatar_url ? (
                   user.avatar_url.startsWith('/uploads/') ? (
-                    <img src={`${PUBLIC_BASE}${user.avatar_url}`} alt="Avatar" className={`avatar ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px' }} />
+                    <img src={`${PUBLIC_BASE}${user.avatar_url}`} alt="Avatar" className={`avatar ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '8px' }} />
                   ) : user.avatar_url.startsWith('http') ? (
-                    <img src={user.avatar_url} alt="Avatar" className={`avatar ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px' }} />
+                    <img src={user.avatar_url} alt="Avatar" className={`avatar ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px', borderRadius: '8px' }} />
                   ) : (
-                    <div className={`avatar-placeholder ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px', fontSize: '1rem' }}>{user.avatar_url}</div>
+                    <div
+                      style={{
+                        width: '28px', height: '28px',
+                        borderRadius: '8px',
+                        background: '#2dd4bf',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        fontSize: '12px', fontWeight: 800,
+                        color: '#062a2b',
+                      }}
+                    >
+                      {user.avatar_url}
+                    </div>
                   )
                 ) : (
-                  <div className={`avatar-placeholder ${user.equipped_border || ''}`} style={{ width: '28px', height: '28px' }}>
-                    <User size={14} />
+                  <div
+                    style={{
+                      width: '28px', height: '28px',
+                      borderRadius: '8px',
+                      background: '#2dd4bf',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      fontSize: '12px', fontWeight: 800,
+                      color: '#062a2b',
+                    }}
+                  >
+                    {user.username?.[0]?.toUpperCase() || 'U'}
                   </div>
                 )}
-                <ChevronDown size={13} style={{ color: 'var(--text-secondary)' }} />
-              </div>
+                <span
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    color: '#fff',
+                    fontFamily: "'Manrope', sans-serif",
+                  }}
+                >
+                  {user.username}
+                </span>
+                <ChevronDown size={13} style={{ color: '#aab7ce' }} />
+              </button>
 
               {/* Dropdown */}
               {showDropdown && (
                 <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
                   <div className="dropdown-header">
                     <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: '0.9rem',
-                        color: user.equipped_color && !['rainbow', 'cyberpunk'].includes(user.equipped_color) ? user.equipped_color : undefined
-                      }}
+                      style={{ fontWeight: 700, fontSize: '0.9rem', color: user.equipped_color && !['rainbow', 'cyberpunk'].includes(user.equipped_color) ? user.equipped_color : undefined }}
                       className={`truncate ${user.equipped_color === 'rainbow' ? 'text-rainbow' : (user.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}`}
                     >
                       {user.username}
@@ -333,7 +430,6 @@ export default function App() {
                     Mon Profil
                   </button>
 
-
                   <button className="dropdown-item" onClick={() => toggleTheme()}>
                     {theme === 'dark'
                       ? <Sun size={14} style={{ color: 'var(--accent)' }} />
@@ -351,9 +447,41 @@ export default function App() {
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </header>
+          </div>
+        </header>
+      )}
+
+      {/* Auth header (logo seul, pas de nav) */}
+      {!user && (
+        <header
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            height: '60px',
+            padding: '0 24px',
+            borderBottom: '1px solid var(--border-color)',
+            background: 'var(--bg-primary)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '32px', height: '32px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '9px',
+                background: 'var(--accent)',
+              }}
+            >
+              <span style={{ fontWeight: 800, fontSize: '12px', letterSpacing: '-0.05em', color: '#fff' }}>QG</span>
+            </div>
+            <span style={{ fontWeight: 800, fontSize: '16px', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}>Le QG</span>
+          </div>
+          {/* Theme toggle on login page */}
+          <button className="btn-icon" onClick={toggleTheme} title="Changer de thème" style={{ marginLeft: 'auto' }}>
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        </header>
+      )}
 
       {/* ── Main Content Router ── */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
@@ -377,6 +505,7 @@ export default function App() {
               <PrivateRoute user={user} authLoading={authLoading}>
                 <DashboardScreen
                   user={user}
+                  dailyStatus={dailyStatus}
                   onLogout={handleLogout}
                   onStartSolo={(packId, mode) => navigate('/quiz/solo', { state: { soloPackId: packId, soloGameMode: mode } })}
                   onCreateLobby={(code) => navigate(`/quiz/multi/${code}`, { state: { roomCode: code } })}
@@ -507,174 +636,6 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-
-      {/* 📅 DAILY QUIZ MODAL */}
-      {showDailyModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(10px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '20px'
-        }} onClick={() => setShowDailyModal(false)}>
-          <div 
-            className="glass-card" 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '20px', 
-              padding: '36px', 
-              background: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              borderLeft: '4px solid var(--accent)',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
-              position: 'relative',
-              maxWidth: '500px',
-              width: '100%'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '1.4rem' }}>📅</span>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '0.5px', textTransform: 'uppercase', margin: 0, color: 'var(--text-primary)' }}>
-                  Le Quiz du Jour
-                </h3>
-              </div>
-              
-              {dailyStatus.completed ? (
-                <span style={{ 
-                  backgroundColor: 'rgba(0, 255, 157, 0.1)', 
-                  color: 'var(--success)', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 700, 
-                  padding: '4px 10px', 
-                  borderRadius: '20px',
-                  border: '1px solid rgba(0, 255, 157, 0.2)'
-                }}>
-                  Complété
-                </span>
-              ) : (
-                <span style={{ 
-                  backgroundColor: 'rgba(255, 247, 0, 0.1)', 
-                  color: 'var(--accent)', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 700, 
-                  padding: '4px 10px', 
-                  borderRadius: '20px',
-                  border: '1px solid rgba(255, 247, 0, 0.2)'
-                }}>
-                  Disponible
-                </span>
-              )}
-            </div>
-
-            {dailyStatus.completed ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center', textAlign: 'center', backgroundColor: 'var(--bg-surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>Votre résultat aujourd'hui :</p>
-                  <span style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--accent)', margin: '4px 0 0 0' }}>
-                    {(() => {
-                      const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
-                      return `${correctCount}/3`;
-                    })()}
-                  </span>
-                  <span style={{ fontSize: '1.4rem', letterSpacing: '4px' }}>
-                    {dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}
-                    {dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}
-                    {dailyStatus.attempt.q3_correct ? '🟩' : '🟥'}
-                  </span>
-                  
-                  {/* Share Button */}
-                  <button 
-                    className="btn-primary" 
-                    onClick={() => {
-                      const correctCount = [dailyStatus.attempt.q1_correct, dailyStatus.attempt.q2_correct, dailyStatus.attempt.q3_correct].filter(Boolean).length;
-                      const dateObj = new Date();
-                      const d = String(dateObj.getDate()).padStart(2, '0');
-                      const m = String(dateObj.getMonth() + 1).padStart(2, '0');
-                      const shareText = `Le QG - Quiz du Jour #${d}-${m} 📅\n${dailyStatus.attempt.q1_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q2_correct ? '🟩' : '🟥'}${dailyStatus.attempt.q3_correct ? '🟩' : '🟥'} (${correctCount}/3)\nJouez vous aussi sur : ${window.location.origin}`;
-                      
-                      navigator.clipboard.writeText(shareText);
-                      alert("Résultats copiés dans le presse-papiers !");
-                    }}
-                    style={{ marginTop: '12px', padding: '10px 20px', fontSize: '0.85rem' }}
-                  >
-                    <Share2 size={16} />
-                    Partager mon résultat (Copier)
-                  </button>
-                </div>
-
-                {/* Stats Section */}
-                {dailyStatus.stats && (
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Taux de réussite global ({dailyStatus.stats.total} participants) :
-                    </span>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                          <span>Q1</span>
-                          <strong style={{ color: 'var(--text-primary)' }}>{dailyStatus.stats.q1_pct}%</strong>
-                        </div>
-                        <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${dailyStatus.stats.q1_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                          <span>Q2</span>
-                          <strong style={{ color: 'var(--text-primary)' }}>{dailyStatus.stats.q2_pct}%</strong>
-                        </div>
-                        <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${dailyStatus.stats.q2_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                          <span>Q3</span>
-                          <strong style={{ color: 'var(--text-primary)' }}>{dailyStatus.stats.q3_pct}%</strong>
-                        </div>
-                        <div style={{ height: '6px', backgroundColor: 'var(--border-color)', borderRadius: '3px', overflow: 'hidden' }}>
-                          <div style={{ width: `${dailyStatus.stats.q3_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '3px' }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center' }}>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                  Un défi quotidien unique vous attend ! Répondez correctement à 3 questions partagées par toute la communauté. Attention, vous n'avez qu'une seule tentative par jour.
-                </p>
-                <button 
-                  className="btn-primary" 
-                  onClick={() => {
-                    setShowDailyModal(false);
-                    navigate('/quiz/jour');
-                  }}
-                  style={{ padding: '12px 28px', fontSize: '0.9rem', marginTop: '8px' }}
-                >
-                  Lancer le Quiz du Jour
-                </button>
-              </div>
-            )}
-
-            <button 
-              className="btn-secondary" 
-              onClick={() => setShowDailyModal(false)}
-              style={{ width: '100%', padding: '12px', marginTop: '8px' }}
-            >
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
