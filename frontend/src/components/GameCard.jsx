@@ -171,8 +171,8 @@ export default function GameCard({
 
   // === LOCKED CARD ===
   if (isLocked) {
-    const cardWidth = size === 'lg' ? (width || '380px') : '140px';
-    const cardHeight = size === 'lg' ? (height || '560px') : '215px';
+    const cardWidth = size === 'lg' ? (width || '380px') : '160px';
+    const cardHeight = size === 'lg' ? (height || '560px') : '236px';
     const lockSize = size === 'lg' ? 48 : 18;
     const qSize = size === 'lg' ? '4rem' : '1.6rem';
     const textFontSize = size === 'lg' ? '1rem' : '0.55rem';

@@ -877,7 +877,8 @@ class QuizController {
                 u.username, 
                 u.global_score,
                 COALESCE(SUM(
-                    CASE 
+                    CASE
+                        WHEN c.id IS NULL THEN 0
                         WHEN c.rarity = 'legendary' THEN 1000
                         WHEN c.rarity = 'epic' THEN 300
                         WHEN c.rarity = 'rare' THEN 100

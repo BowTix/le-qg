@@ -2,8 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import { ArrowLeft, Trophy, Calendar, Zap, Skull, ShieldCheck, Gamepad } from 'lucide-react';
 import { getLevel, getUsernameStyle } from '../utils/progression';
+import { useNavigate } from 'react-router-dom';
 
 export default function LeaderboardScreen({ onBack }) {
+  const navigate = useNavigate();
   const [cachedData] = useState(() => {
     try {
       const cached = localStorage.getItem('cache_leaderboard');
@@ -101,7 +103,7 @@ export default function LeaderboardScreen({ onBack }) {
                 {/* 2nd Place (Left) */}
                 {second && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                    <span style={{ ...getUsernameStyle(second.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{second.username}</span>
+                    <button className="user-profile-link" onClick={() => navigate(`/joueur/${second.id}`)} style={{ ...getUsernameStyle(second.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{second.username}</button>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '8px' }}>
                       Collection : {second.collection_value || 0} pts
                     </span>
@@ -126,7 +128,7 @@ export default function LeaderboardScreen({ onBack }) {
                 {/* 1st Place (Center) */}
                 {first && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '35%' }}>
-                    <span style={{ ...getUsernameStyle(first.global_score), fontSize: '0.95rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{first.username}</span>
+                    <button className="user-profile-link" onClick={() => navigate(`/joueur/${first.id}`)} style={{ ...getUsernameStyle(first.global_score), fontSize: '0.95rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{first.username}</button>
                     <span style={{ fontSize: '0.8rem', color: 'var(--accent)', fontWeight: 800, textShadow: '0 0 10px rgba(255,247,0,0.2)', marginBottom: '8px' }}>
                       Collection : {first.collection_value || 0} pts
                     </span>
@@ -152,7 +154,7 @@ export default function LeaderboardScreen({ onBack }) {
                 {/* 3rd Place (Right) */}
                 {third && (
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '30%' }}>
-                    <span style={{ ...getUsernameStyle(third.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{third.username}</span>
+                    <button className="user-profile-link" onClick={() => navigate(`/joueur/${third.id}`)} style={{ ...getUsernameStyle(third.global_score), fontSize: '0.85rem', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', marginBottom: '6px' }}>{third.username}</button>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 700, marginBottom: '8px' }}>
                       Collection : {third.collection_value || 0} pts
                     </span>
@@ -200,7 +202,7 @@ export default function LeaderboardScreen({ onBack }) {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontWeight: 800, color: 'var(--text-secondary)', width: '20px' }}>#{idx + 4}</span>
-                    <span style={{ ...getUsernameStyle(p.global_score), fontWeight: 600 }}>{p.username}</span>
+                    <button className="user-profile-link" onClick={() => navigate(`/joueur/${p.id}`)} style={{ ...getUsernameStyle(p.global_score), fontWeight: 600 }}>{p.username}</button>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Lvl {getLevel(p.global_score)})</span>
                   </div>
                   <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.85rem' }}>

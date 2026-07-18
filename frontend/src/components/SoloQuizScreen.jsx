@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { api } from '../utils/api';
-import { ArrowLeft, Clock, Award, CheckCircle2, XCircle, ChevronRight, Trophy } from 'lucide-react';
+import { ArrowLeft, Clock, Award, CheckCircle2, Coins, XCircle, ChevronRight, Trophy } from 'lucide-react';
 
 export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, onUpdateUserStats }) {
   const timeLimit = gameMode === 'speed_blitz' ? 5 : 20;
@@ -257,10 +257,10 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
             display: 'flex',
             justifyContent: 'space-around',
             alignItems: 'center',
-            backgroundColor: 'var(--bg-input)',
-            borderRadius: '12px',
+            backgroundColor: 'rgba(15, 23, 42, 0.4)',
+            borderRadius: '14px',
             padding: '24px',
-            border: '1px solid var(--border-color)'
+            border: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
             <div>
               <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Questions</span>
@@ -288,10 +288,10 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: '12px',
-                padding: '12px',
-                borderRadius: '8px',
-                backgroundColor: h.correct ? 'rgba(0, 255, 157, 0.03)' : 'rgba(255, 59, 105, 0.03)',
-                border: `1px solid ${h.correct ? 'rgba(0, 255, 157, 0.1)' : 'rgba(255, 59, 105, 0.1)'}`
+                padding: '14px',
+                borderRadius: '12px',
+                backgroundColor: h.correct ? 'rgba(45, 212, 191, 0.06)' : 'rgba(251, 113, 133, 0.06)',
+                border: `1px solid ${h.correct ? 'rgba(45, 212, 191, 0.15)' : 'rgba(251, 113, 133, 0.15)'}`
               }}>
                 {h.correct ? (
                   <CheckCircle2 size={18} style={{ color: 'var(--success)', marginTop: '2px', flexShrink: 0 }} />
@@ -341,12 +341,12 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            backgroundColor: timeLeft <= 5 ? 'var(--error-glow)' : 'var(--bg-card)',
-            color: timeLeft <= 5 ? 'var(--error)' : 'var(--accent)',
+            backgroundColor: timeLeft <= 5 ? 'rgba(251, 113, 133, 0.15)' : 'rgba(15, 23, 42, 0.4)',
+            color: timeLeft <= 5 ? '#fb7185' : '#2dd4bf',
             padding: '8px 16px',
-            borderRadius: '20px',
-            border: `1px solid ${timeLeft <= 5 ? 'var(--error)' : 'var(--border-color)'}`,
-            fontWeight: 700,
+            borderRadius: '14px',
+            border: `1px solid ${timeLeft <= 5 ? 'rgba(251, 113, 133, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+            fontWeight: 800,
             minWidth: '90px',
             justifyContent: 'center',
             transition: 'var(--transition-smooth)'
@@ -358,11 +358,11 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
       </div>
 
       {/* Progress indicators */}
-      <div style={{ width: '100%', height: '4px', backgroundColor: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+      <div style={{ width: '100%', height: '4px', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: '2px', overflow: 'hidden' }}>
         <div style={{
           width: `${((questionIndex + 1) / 10) * 100}%`,
           height: '100%',
-          backgroundColor: 'var(--accent)',
+          backgroundColor: '#2dd4bf',
           transition: 'width 0.4s ease-out'
         }} />
       </div>
@@ -432,15 +432,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
                   placeholder="Écrivez votre réponse ici..."
                   disabled={answered}
                   style={{
-                    width: '100%',
-                    padding: '16px',
-                    borderRadius: '12px',
-                    border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-input)',
-                    color: 'var(--text-primary)',
                     fontSize: '1.1rem',
-                    outline: 'none',
-                    transition: 'border-color 0.2s'
                   }}
                   autoFocus
                 />
@@ -524,7 +516,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
                     {result.correct ? (
                       <>
                         <CheckCircle2 size={22} />
-                        Correct ! (+{result.points_awarded} pts, +{result.coins_awarded} 🪙)
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Correct ! (+{result.points_awarded} pts, +{result.coins_awarded} <Coins size={14} />)</span>
                       </>
                     ) : (
                       <>

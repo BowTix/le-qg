@@ -125,8 +125,8 @@ class LobbyController
         // Fetch all players sorted by score
         $stmtPlayers = $db->prepare("
             SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
-                   lp.elo_change, lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
-                   u.username, u.global_score, u.elo, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
+                   lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
+                   u.username, u.global_score, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
             WHERE lp.lobby_id = ?
@@ -158,6 +158,13 @@ class LobbyController
     {
         $nowMs = round(microtime(true) * 1000);
 
+        $scores = array_map(fn($player) => intval($player['current_score']), $playersRaw);
+        $maxScore = $scores ? max($scores) : 0;
+        $minScore = $scores ? min($scores) : 0;
+        $distinctScores = array_values(array_unique($scores));
+        rsort($distinctScores);
+        $secondScore = count($distinctScores) >= 2 ? $distinctScores[1] : null;
+
         // Build players array
         $players = [];
         foreach ($playersRaw as $p) {
@@ -174,7 +181,6 @@ class LobbyController
                 'current_question_index' => intval($p['current_question_index']),
                 'finished' => $p['finished_at'] !== null,
                 'global_score' => intval($p['global_score']),
-                'elo' => intval($p['elo']),
                 'reaction' => $reaction,
                 'is_eliminated' => intval($p['is_eliminated']) === 1,
                 'avatar_url' => $p['avatar_url'] ?? null,
@@ -183,16 +189,15 @@ class LobbyController
                 'equipped_title' => $p['equipped_title'] ?? null
             ];
 
-            // Only expose Elo and Coin changes when game is finished
+            // Expose the coin bonus only when the game is finished.
             if ($lobby['status'] === 'finished') {
-                $elo = intval($p['elo_change']);
-                $playerData['elo_change'] = $elo;
-                if ($elo === 15) {
+                $score = intval($p['current_score']);
+                if ($score === $maxScore) {
                     $playerData['coin_bonus'] = 100;
-                } else if ($elo === 5) {
-                    $playerData['coin_bonus'] = 50;
-                } else if ($elo === -10) {
+                } else if ($score === $minScore && $minScore !== $maxScore) {
                     $playerData['coin_bonus'] = 10;
+                } else if (count($playersRaw) >= 3 && $secondScore !== null && $score === $secondScore) {
+                    $playerData['coin_bonus'] = 50;
                 } else {
                     $playerData['coin_bonus'] = 25;
                 }
@@ -467,8 +472,8 @@ class LobbyController
 
         $stmtPlayers = $db->prepare("
             SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
-                   lp.elo_change, lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
-                   u.username, u.global_score, u.elo, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
+                   lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
+                   u.username, u.global_score, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
             WHERE lp.lobby_id = ?
@@ -573,8 +578,7 @@ class LobbyController
                     imposteur_voted_for_user_id = NULL,
                     current_score = 0,
                     current_question_index = 0,
-                    finished_at = NULL,
-                    elo_change = 0
+                    finished_at = NULL
                 WHERE lobby_id = ? AND user_id = ?
             ");
             foreach ($playersList as $pId) {
@@ -647,8 +651,7 @@ class LobbyController
                 last_answered_question_id = NULL,
                 last_guess = NULL,
                 reaction = NULL,
-                reaction_sent_at = NULL,
-                elo_change = 0
+                reaction_sent_at = NULL
             WHERE lobby_id = ?
         ");
         $stmtReset->execute([$lobby['id']]);
@@ -1065,7 +1068,7 @@ class LobbyController
     }
 
     // ================================================================
-    // CALCULATE FINAL RANKINGS & ELO (private helper)
+    // CALCULATE FINAL RESULTS AND COIN BONUSES (private helper)
     // ================================================================
     private function calculateFinalRankings($db, $lobby)
     {
@@ -1075,7 +1078,7 @@ class LobbyController
 
         // Get all players sorted by score DESC
         $stmtPlayers = $db->prepare("
-            SELECT lp.*, u.username, u.elo
+            SELECT lp.*, u.username
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
             WHERE lp.lobby_id = ?
@@ -1098,7 +1101,7 @@ class LobbyController
             $winner['username']
         ]);
 
-        // Calculate tie-safe Elo changes and award coins bonuses
+        // Award coin bonuses based on the final score.
         $scores = array_map(function ($p) { return intval($p['current_score']); }, $players);
         $distinctScores = array_values(array_unique($scores));
         rsort($distinctScores); // highest first
@@ -1109,32 +1112,24 @@ class LobbyController
 
         foreach ($players as $p) {
             $score = intval($p['current_score']);
-            $eloChange = 0;
             $coinBonus = 0;
 
             if ($score === $maxScore) {
-                $eloChange = 15; // Winner(s)
                 $coinBonus = 100;
             } elseif ($score === $minScore && $minScore !== $maxScore) {
-                $eloChange = -10; // Last place
                 $coinBonus = 10;
             } elseif (count($players) >= 3 && $secondScore !== null && $score === $secondScore) {
-                $eloChange = 5; // Second place
                 $coinBonus = 50;
             } else {
                 $coinBonus = 25; // 3rd place / others
             }
 
-            // Update user Elo and coins (floor at 0 Elo)
-            $db->prepare("UPDATE users SET elo = GREATEST(0, elo + ?), coins = coins + ? WHERE id = ?")
-               ->execute([$eloChange, $coinBonus, $p['user_id']]);
+            $db->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")
+               ->execute([$coinBonus, $p['user_id']]);
 
             // Quests tracking for coins earned
             \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'coins_earned', $coinBonus);
 
-            // Record Elo change for display
-            $db->prepare("UPDATE lobby_players SET elo_change = ? WHERE lobby_id = ? AND user_id = ?")
-               ->execute([$eloChange, $lobby['id'], $p['user_id']]);
         }
     }
 
@@ -1836,9 +1831,9 @@ class LobbyController
         $stmtHost->execute([$lobby['host_id']]);
         $hostUsername = $stmtHost->fetchColumn();
 
-        // Get players ELOs and names
+        // Get players and their game roles.
         $stmtPlayers = $db->prepare("
-            SELECT lp.*, u.username, u.elo
+            SELECT lp.*, u.username
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
             WHERE lp.lobby_id = ?
@@ -1869,23 +1864,22 @@ class LobbyController
             $winnerLogName
         ]);
 
-        // Compute Elo changes and coins
+        // Award coins and set display scores for the final result.
         foreach ($players as $p) {
             $role = $p['imposteur_role'];
             $isWinner = ($role === $winnerRole);
             
-            $eloChange = $isWinner ? 15 : -10;
             $coinBonus = $isWinner ? 100 : 10;
             
             // Set current_score to 100 for winners, 0 for losers to display properly
             $score = $isWinner ? 100 : 0;
 
             // Update database values
-            $db->prepare("UPDATE users SET elo = GREATEST(0, elo + ?), coins = coins + ? WHERE id = ?")
-               ->execute([$eloChange, $coinBonus, $p['user_id']]);
+            $db->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")
+               ->execute([$coinBonus, $p['user_id']]);
 
-            $db->prepare("UPDATE lobby_players SET elo_change = ?, current_score = ? WHERE lobby_id = ? AND user_id = ?")
-               ->execute([$eloChange, $score, $lobby['id'], $p['user_id']]);
+            $db->prepare("UPDATE lobby_players SET current_score = ? WHERE lobby_id = ? AND user_id = ?")
+               ->execute([$score, $lobby['id'], $p['user_id']]);
         }
     }
 }

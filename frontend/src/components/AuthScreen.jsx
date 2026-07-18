@@ -126,11 +126,18 @@ export default function AuthScreen({ onAuthSuccess }) {
       <div className="glass-card w-full max-w-md">
         
         {/* Header Title */}
-        <div className="text-center mb-8">
-          <h1 style={{ color: 'var(--accent)', fontSize: '2.5rem', marginBottom: '8px', fontWeight: 800 }}>
-            LE QG
+        <div className="text-center mb-8" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <h1 style={{ 
+            color: '#fff', 
+            fontSize: 'clamp(2.2rem, 5vw, 2.8rem)', 
+            marginBottom: '8px', 
+            fontWeight: 800, 
+            letterSpacing: '-0.06em',
+            textShadow: '0 0 40px rgba(45,212,191,0.2)'
+          }}>
+            LE <span style={{ color: '#2dd4bf' }}>QG</span>
           </h1>
-          <p style={{ color: 'var(--text-secondary)' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500 }}>
             Défiez vos amis sur le Quiz Général
           </p>
         </div>
@@ -138,7 +145,7 @@ export default function AuthScreen({ onAuthSuccess }) {
         {/* Verification Screen */}
         {needsVerification ? (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-secondary)', marginBottom: '16px', fontWeight: 700 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2dd4bf', marginBottom: '16px', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               <ShieldCheck size={20} />
               Vérifier votre Compte
             </div>
@@ -150,17 +157,17 @@ export default function AuthScreen({ onAuthSuccess }) {
             {/* Local Mock Infobox */}
             {simulatedCode && (
               <div style={{
-                backgroundColor: 'rgba(0, 240, 255, 0.05)',
-                border: '1px dashed var(--accent-secondary)',
-                color: 'var(--accent-secondary)',
+                backgroundColor: 'rgba(251, 191, 36, 0.06)',
+                border: '1px dashed rgba(251, 191, 36, 0.3)',
+                color: '#fbbf24',
                 padding: '12px',
-                borderRadius: '8px',
+                borderRadius: '12px',
                 marginBottom: '20px',
                 fontSize: '0.85rem',
                 textAlign: 'center'
               }}>
                 ℹ️ simulation locale de mail reçu : <br />
-                Code de vérification : <strong style={{ fontSize: '1.1rem', color: 'var(--text-primary)' }}>{simulatedCode}</strong>
+                Code de vérification : <strong style={{ fontSize: '1.1rem', color: '#fff' }}>{simulatedCode}</strong>
               </div>
             )}
 
@@ -230,30 +237,43 @@ export default function AuthScreen({ onAuthSuccess }) {
         ) : (
           /* Authentication Forms */
           <>
-            {/* Tab Toggle */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '24px' }}>
+            {/* Tab Toggle - Segmented Controller style */}
+            <div style={{ 
+              display: 'flex', 
+              background: 'rgba(15,23,42,0.35)', 
+              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '14px', 
+              padding: '4px',
+              gap: '4px',
+              marginBottom: '28px',
+              fontFamily: "'Manrope', sans-serif"
+            }}>
               <button
+                type="button"
                 onClick={() => { setIsLogin(true); setError(''); setSuccess(''); }}
                 style={{
-                  flex: 1, padding: '12px',
-                  background: 'transparent', border: 'none',
-                  borderBottom: isLogin ? '2px solid var(--accent)' : '2px solid transparent',
-                  color: isLogin ? 'var(--accent)' : 'var(--text-secondary)',
-                  fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
-                  transition: 'var(--transition)', fontFamily: 'var(--font-sans)'
+                  flex: 1, padding: '10px 14px',
+                  background: isLogin ? 'rgba(45,212,191,0.15)' : 'transparent', 
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: isLogin ? '#2dd4bf' : '#aab7ce',
+                  fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer',
+                  transition: 'all 0.2s ease',
                 }}
               >
                 Connexion
               </button>
               <button
+                type="button"
                 onClick={() => { setIsLogin(false); setError(''); setSuccess(''); }}
                 style={{
-                  flex: 1, padding: '12px',
-                  background: 'transparent', border: 'none',
-                  borderBottom: !isLogin ? '2px solid var(--accent)' : '2px solid transparent',
-                  color: !isLogin ? 'var(--accent)' : 'var(--text-secondary)',
-                  fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
-                  transition: 'var(--transition)', fontFamily: 'var(--font-sans)'
+                  flex: 1, padding: '10px 14px',
+                  background: !isLogin ? 'rgba(45,212,191,0.15)' : 'transparent', 
+                  border: 'none',
+                  borderRadius: '10px',
+                  color: !isLogin ? '#2dd4bf' : '#aab7ce',
+                  fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer',
+                  transition: 'all 0.2s ease',
                 }}
               >
                 Créer un compte

@@ -1,8 +1,28 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, PUBLIC_BASE } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
 import { Users, User, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import Pusher from 'pusher-js';
+
+function PlayerProfileLink({ player, children, className = '', style }) {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      type="button"
+      className={`user-profile-link ${className}`.trim()}
+      onClick={(event) => {
+        event.stopPropagation();
+        navigate(`/joueur/${player.user_id}`);
+      }}
+      aria-label={`Voir le profil de ${player.username}`}
+      style={style}
+    >
+      {children ?? player.username}
+    </button>
+  );
+}
 
 export default function MultiplayerArena({ roomCode, user, onBack }) {
   // === LOBBY STATE (from polling) ===
@@ -753,9 +773,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                 {lobbyState.players.map((p, i) => (
                     <div key={p.user_id} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '10px 14px', backgroundColor: p.user_id === user.id ? 'rgba(255,247,0,0.03)' : 'var(--bg-input)',
-                      border: `1px solid ${p.user_id === user.id ? 'var(--accent)' : 'var(--border-color)'}`,
-                      borderRadius: '8px'
+                      padding: '10px 14px', backgroundColor: p.user_id === user.id ? 'rgba(45, 212, 191, 0.06)' : 'var(--bg-input)',
+                      border: `1px solid ${p.user_id === user.id ? '#2dd4bf' : 'var(--border-color)'}`,
+                      borderRadius: '12px'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>#{i + 1}</span>
@@ -780,12 +800,13 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                         {/* Name and Title */}
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span
+                            <PlayerProfileLink
+                              player={p}
                               className={p.equipped_color === 'rainbow' ? 'text-rainbow' : (p.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
                               style={{ ...getUsernameStyle(p.global_score), color: p.equipped_color && !['rainbow', 'cyberpunk'].includes(p.equipped_color) ? p.equipped_color : undefined, fontWeight: 700 }}
                             >
                               {p.username}
-                            </span>
+                            </PlayerProfileLink>
                             {p.user_id === user.id && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Vous)</span>}
                           </div>
                           {p.equipped_title && (
@@ -797,7 +818,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                       </div>
                       {p.user_id === lobbyState.host_id && (
                           <span style={{
-                            backgroundColor: 'rgba(255,247,0,0.1)', color: 'var(--accent)',
+                            backgroundColor: 'rgba(45, 212, 191, 0.15)', color: '#2dd4bf',
                             fontSize: '0.7rem', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase'
                           }}>Hôte</span>
                       )}
@@ -816,10 +837,10 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
             ) : (
                 <div style={{
                   textAlign: 'center', padding: '14px', color: 'var(--text-secondary)',
-                  backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px',
+                  backgroundColor: 'rgba(15, 23, 42, 0.35)', borderRadius: '12px',
                   border: '1px dashed var(--border-color)', fontSize: '0.9rem'
                 }}>
-                  En attente du lancement par <strong style={{ color: 'var(--accent)' }}>{lobbyState.host_username}</strong>...
+                  En attente du lancement par <strong style={{ color: '#2dd4bf' }}>{lobbyState.host_username}</strong>...
                 </div>
             )}
           </div>
@@ -836,7 +857,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
           {/* Background pulse effect */}
           <div style={{
             position: 'absolute', width: '300px', height: '300px', borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,247,0,0.15) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(45, 212, 191, 0.2) 0%, transparent 70%)',
             animation: 'pulse 1s ease-in-out infinite'
           }} />
 
@@ -847,7 +868,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
             <div key={countdownValue} style={{
               fontSize: '8rem', fontWeight: 900, color: 'var(--accent)',
               lineHeight: 1, animation: 'fadeIn 0.3s ease-out',
-              textShadow: '0 0 40px rgba(255,247,0,0.4)'
+              textShadow: '0 0 40px rgba(45, 212, 191, 0.5)'
             }}>
               {countdownValue > 0 ? countdownValue : 'GO!'}
             </div>
@@ -1071,8 +1092,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                                 key={sub.id}
                                 style={{
                                   padding: '20px',
-                                  backgroundColor: isWinner ? 'rgba(255,247,0,0.02)' : 'var(--bg-input)',
-                                  border: `1px solid ${isWinner ? 'var(--accent)' : 'var(--border-color)'}`,
+                                  backgroundColor: isWinner ? 'rgba(45, 212, 191, 0.08)' : 'var(--bg-input)',
+                                  border: `1px solid ${isWinner ? '#2dd4bf' : 'var(--border-color)'}`,
                                   borderRadius: '12px',
                                   display: 'flex',
                                   flexDirection: 'column',
@@ -1158,15 +1179,15 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     <div key={p.user_id} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '8px 12px',
-                      backgroundColor: isMe ? 'rgba(255,247,0,0.04)' : 'var(--bg-input)',
-                      border: `1px solid ${isMe ? 'rgba(255,247,0,0.2)' : 'var(--border-color)'}`,
-                      borderRadius: '6px', fontSize: '0.85rem'
+                      backgroundColor: isMe ? 'rgba(45, 212, 191, 0.08)' : 'var(--bg-input)',
+                      border: `1px solid ${isMe ? 'rgba(45, 212, 191, 0.3)' : 'var(--border-color)'}`,
+                      borderRadius: '10px', fontSize: '0.85rem'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>#{i + 1}</span>
-                        <span style={{ ...getUsernameStyle(p.global_score), fontWeight: isMe ? 700 : 500 }}>
+                        <PlayerProfileLink player={p} style={{ ...getUsernameStyle(p.global_score), fontWeight: isMe ? 700 : 500 }}>
                       {p.username}{isMe ? ' (Vous)' : ''}
-                    </span>
+                    </PlayerProfileLink>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.8rem' }}>{p.score} pts</span>
@@ -1333,9 +1354,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                       border: `1px solid ${dead ? 'rgba(255,68,68,0.1)' : 'var(--border-color)'}`,
                       opacity: dead ? 0.5 : 1
                     }}>
-                      <span style={{ ...getUsernameStyle(p.global_score), fontSize: '0.85rem', fontWeight: 600 }}>
+                      <PlayerProfileLink player={p} style={{ ...getUsernameStyle(p.global_score), fontSize: '0.85rem', fontWeight: 600 }}>
                         {p.username}
-                      </span>
+                      </PlayerProfileLink>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: dead ? 'var(--error)' : 'var(--success)' }}>
                         {dead ? '💀 Éliminé' : '💚 En vie'}
                       </span>
@@ -1425,9 +1446,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     backgroundColor: p.has_voted ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.02)',
                     border: `1px solid ${p.has_voted ? 'rgba(34,197,94,0.15)' : 'var(--border-color)'}`
                   }}>
-                    <span style={{ ...getUsernameStyle(p.global_score), fontSize: '0.8rem', fontWeight: 600 }}>
+                    <PlayerProfileLink player={p} style={{ ...getUsernameStyle(p.global_score), fontSize: '0.8rem', fontWeight: 600 }}>
                       {p.username}
-                    </span>
+                    </PlayerProfileLink>
                     <span style={{ fontSize: '0.72rem', fontWeight: 700, color: p.has_voted ? 'var(--success)' : 'var(--text-muted)' }}>
                       {p.has_voted ? 'A voté ✅' : 'Réfléchit... 💬'}
                     </span>
@@ -1500,9 +1521,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                       padding: '12px 16px', backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: '8px'
                     }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ ...getUsernameStyle(p.global_score), fontWeight: 700, fontSize: '0.88rem' }}>
+                        <PlayerProfileLink player={p} style={{ ...getUsernameStyle(p.global_score), fontWeight: 700, fontSize: '0.88rem' }}>
                           {p.username} {p.user_id === eliminated_user_id ? '💀' : ''}
-                        </span>
+                        </PlayerProfileLink>
                         {votesReceived > 0 && (
                           <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                             Voté par : {votersList.join(', ')}
@@ -1589,10 +1610,10 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
             </div>
           </div>
 
-          {/* Leaderboard and ELO Changes */}
+          {/* Player result summary */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <h3 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
-              Bilan des Joueurs & Elo
+              Bilan des Joueurs
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {players.map((p) => {
@@ -1601,13 +1622,13 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                 return (
                   <div key={p.user_id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '12px 16px', backgroundColor: p.user_id === user.id ? 'rgba(255,247,0,0.03)' : 'var(--bg-input)',
-                    borderRadius: '8px', border: `1px solid ${p.user_id === user.id ? 'rgba(255,247,0,0.15)' : 'var(--border-color)'}`
+                    padding: '12px 16px', backgroundColor: p.user_id === user.id ? 'rgba(45, 212, 191, 0.06)' : 'var(--bg-input)',
+                    borderRadius: '12px', border: `1px solid ${p.user_id === user.id ? 'rgba(45, 212, 191, 0.2)' : 'var(--border-color)'}`
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ ...getUsernameStyle(p.global_score), fontWeight: p.user_id === user.id ? 700 : 500 }}>
+                      <PlayerProfileLink player={p} style={{ ...getUsernameStyle(p.global_score), fontWeight: p.user_id === user.id ? 700 : 500 }}>
                         {p.username} {p.user_id === user.id ? ' (Vous)' : ''}
-                      </span>
+                      </PlayerProfileLink>
                       <span style={{
                         fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', borderRadius: '4px',
                         backgroundColor: p.imposteur_role === 'imposteur' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255,255,255,0.05)',
@@ -1630,16 +1651,6 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                       }}>
                         {isWinner ? 'Victoire 🎉' : 'Défaite'}
                       </span>
-
-                      {/* ELO changes */}
-                      {p.elo_change !== undefined && (
-                        <span style={{
-                          fontSize: '0.8rem', fontWeight: 800, minWidth: '55px', textAlign: 'right',
-                          color: p.elo_change > 0 ? 'var(--success)' : p.elo_change < 0 ? 'var(--error)' : 'var(--text-secondary)'
-                        }}>
-                          {p.elo_change > 0 ? '+' : ''}{p.elo_change} Elo
-                        </span>
-                      )}
 
                       {/* Coins changes */}
                       <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffb300', minWidth: '60px', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
@@ -1724,8 +1735,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
             {/* Score display */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '6px 12px', backgroundColor: 'rgba(255,247,0,0.05)',
-              borderRadius: '8px', border: '1px solid rgba(255,247,0,0.1)', alignSelf: 'flex-start'
+              padding: '6px 12px', backgroundColor: 'rgba(45, 212, 191, 0.1)',
+              borderRadius: '10px', border: '1px solid rgba(45, 212, 191, 0.2)', alignSelf: 'flex-start'
             }}>
               <Trophy size={14} style={{ color: 'var(--accent)' }} />
               <span style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '0.9rem' }}>{playerScore} pts</span>
@@ -1876,9 +1887,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     <div key={p.user_id} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       padding: '8px 12px',
-                      backgroundColor: isMe ? 'rgba(255,247,0,0.04)' : 'var(--bg-input)',
-                      border: `1px solid ${isMe ? 'rgba(255,247,0,0.2)' : 'var(--border-color)'}`,
-                      borderRadius: '6px', fontSize: '0.85rem'
+                      backgroundColor: isMe ? 'rgba(45, 212, 191, 0.08)' : 'var(--bg-input)',
+                      border: `1px solid ${isMe ? 'rgba(45, 212, 191, 0.3)' : 'var(--border-color)'}`,
+                      borderRadius: '10px', fontSize: '0.85rem'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: '0.8rem' }}>#{i + 1}</span>
@@ -1902,12 +1913,13 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span
+                            <PlayerProfileLink
+                              player={p}
                               className={p.equipped_color === 'rainbow' ? 'text-rainbow' : (p.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
                               style={{ ...getUsernameStyle(p.global_score), color: p.equipped_color && !['rainbow', 'cyberpunk'].includes(p.equipped_color) ? p.equipped_color : undefined, fontWeight: isMe ? 700 : 500 }}
                             >
                               {p.username}
-                            </span>
+                            </PlayerProfileLink>
                             {isMe && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Vous)</span>}
                             {p.is_eliminated && <Skull size={13} style={{ color: 'var(--error)', marginLeft: '4px' }} />}
                           </div>
@@ -2007,7 +2019,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>#{i + 1}</span>
-                      <span style={{ ...getUsernameStyle(p.global_score) }}>{p.username}</span>
+                      <PlayerProfileLink player={p} style={{ ...getUsernameStyle(p.global_score) }}>{p.username}</PlayerProfileLink>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{p.score} pts</span>
@@ -2073,9 +2085,9 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
                           flex: '1', maxWidth: '160px'
                         }}>
-                    <span style={{ ...getUsernameStyle(p.global_score), fontSize: '0.9rem', fontWeight: 700 }}>
+                    <PlayerProfileLink player={p} style={{ ...getUsernameStyle(p.global_score), fontSize: '0.9rem', fontWeight: 700 }}>
                       {p.username}
-                    </span>
+                    </PlayerProfileLink>
                           <div style={{
                             width: '100%', height, backgroundColor: bgColor,
                             borderRadius: '8px 8px 0 0', display: 'flex', flexDirection: 'column',
@@ -2084,14 +2096,6 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                           }}>
                             <span style={{ fontSize: '1.8rem' }}>{place}</span>
                             <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{p.score} pts</span>
-                            {p.elo_change !== undefined && (
-                                <span style={{
-                                  fontSize: '0.75rem', fontWeight: 700,
-                                  color: p.elo_change > 0 ? 'var(--success)' : p.elo_change < 0 ? 'var(--error)' : 'var(--text-secondary)'
-                                }}>
-                          {p.elo_change > 0 ? '+' : ''}{p.elo_change} Elo
-                        </span>
-                            )}
                             {p.coin_bonus !== undefined && (
                                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffb300', display: 'flex', alignItems: 'center', gap: '3px' }}>
                           +{p.coin_bonus} <Coins size={12} />
@@ -2112,8 +2116,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
               {players.map((p, i) => (
                   <div key={p.user_id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '10px 14px', backgroundColor: p.user_id === user.id ? 'rgba(255,247,0,0.04)' : 'var(--bg-input)',
-                    borderRadius: '8px', border: `1px solid ${p.user_id === user.id ? 'rgba(255,247,0,0.15)' : 'var(--border-color)'}`
+                    padding: '10px 14px', backgroundColor: p.user_id === user.id ? 'rgba(45, 212, 191, 0.08)' : 'var(--bg-input)',
+                    borderRadius: '12px', border: `1px solid ${p.user_id === user.id ? 'rgba(45, 212, 191, 0.2)' : 'var(--border-color)'}`
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <span style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.85rem', minWidth: '24px' }}>#{i + 1}</span>
@@ -2137,12 +2141,13 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span
+                          <PlayerProfileLink
+                            player={p}
                             className={p.equipped_color === 'rainbow' ? 'text-rainbow' : (p.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
                             style={{ ...getUsernameStyle(p.global_score), color: p.equipped_color && !['rainbow', 'cyberpunk'].includes(p.equipped_color) ? p.equipped_color : undefined, fontWeight: p.user_id === user.id ? 700 : 500 }}
                           >
                             {p.username}
-                          </span>
+                          </PlayerProfileLink>
                           {p.user_id === user.id && <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Vous)</span>}
                         </div>
                         {p.equipped_title && (
@@ -2154,15 +2159,6 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{p.score} pts</span>
-                      {p.elo_change !== undefined && (
-                          <span style={{
-                            fontSize: '0.8rem', fontWeight: 700,
-                            color: p.elo_change > 0 ? 'var(--success)' : p.elo_change < 0 ? 'var(--error)' : 'var(--text-secondary)',
-                            minWidth: '55px', textAlign: 'right'
-                          }}>
-                      {p.elo_change > 0 ? '+' : ''}{p.elo_change} Elo
-                    </span>
-                      )}
                       {p.coin_bonus !== undefined && (
                           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffb300', minWidth: '60px', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
                       +{p.coin_bonus} <Coins size={13} />

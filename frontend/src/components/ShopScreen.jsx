@@ -3,6 +3,7 @@ import { api } from '../utils/api';
 import { Coins, Sparkles, Check, CheckCircle2, Lock, Eye, EyeOff, Loader2, ArrowLeft, Trophy, CreditCard, X, ChevronLeft, ChevronRight, GraduationCap, Landmark, Car, Globe, Sword, Heart, Utensils, Gem, CloudLightning, Lightbulb } from 'lucide-react';
 import { getUsernameStyle } from '../utils/progression';
 import GameCard, { RARITY_CONFIG, getCardImageSrc as getImgSrc } from './GameCard';
+import BoosterOffer from './shop/BoosterOffer';
 import VanillaTilt from 'vanilla-tilt';
 
 const cardImages = import.meta.glob('../assets/cards/*.{png,jpg,jpeg,webp,svg}', { eager: true, import: 'default' });
@@ -43,7 +44,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
     }
   });
 
-  const [activeTab, setActiveTab] = useState(mode === 'collection' ? 'album' : 'cosmetics');
+  const [activeTab, setActiveTab] = useState(mode === 'collection' ? 'album' : 'booster');
   const [loading, setLoading] = useState(!cachedData);
   const [error, setError] = useState('');
 
@@ -136,7 +137,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
       if (res.success) {
         setCoins(res.new_coins);
         setUnlockedCosmetics(prev => [...prev, { type: item.type, value: item.value }]);
-        onRefreshProfile();
+        onRefreshProfile({ coins: res.new_coins });
       } else {
         alert(res.error || 'Échec de l\'achat.');
       }
@@ -160,7 +161,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
       const res = await api.post('/shop/equip', { item_type: type, item_value: targetValue });
       if (res.success) {
         setEquipped(prev => ({ ...prev, [type]: targetValue }));
-        onRefreshProfile();
+        onRefreshProfile({});
       } else {
         alert(res.error || 'Impossible d\'équiper cet article.');
       }
@@ -188,7 +189,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
         setDrawnCards(res.drawn_cards);
         setBoosterPhase('revealing');
         await fetchCollectionDataSilent();
-        onRefreshProfile();
+        onRefreshProfile({ coins: res.new_coins });
       } else {
         alert(res.error || 'Erreur lors de l\'ouverture du booster.');
         setBoosterPhase('idle');
@@ -280,6 +281,16 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
     return list;
   };
 
+  const handleCollectionRailWheel = (event) => {
+    const rail = event.currentTarget;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (!delta || rail.scrollWidth <= rail.clientWidth) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    rail.scrollLeft += delta;
+  };
+
   if (loading) {
     return (
         <div className="flex-1 flex items-center justify-center p-8">
@@ -326,38 +337,71 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
   return (
       <>
         <style>{boosterAnimations}</style>
-        <div className="container animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="container animate-fade-in shop-page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div className="shop-page__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
             <div>
-              <button className="btn-secondary" onClick={onBack} style={{ padding: '8px 12px', marginBottom: '8px' }}>
+              <button className="btn-secondary" onClick={onBack} style={{ padding: '8px 16px', marginBottom: '8px', borderRadius: '12px' }}>
                 <ArrowLeft size={16} /> Retour
               </button>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 800 }}>
+              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em', color: '#fff' }}>
                 {mode === 'collection' ? 'Mon Album de Collection' : 'Boutique du QG'}
               </h1>
-            </div>
-
-            <div className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', borderRadius: '12px' }}>
-              <Coins size={22} style={{ color: '#ffb300' }} />
-              <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Mon solde</div>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-primary)' }}>{coins} 🪙</div>
-              </div>
+              <p className="shop-page__subtitle">
+                {mode === 'collection' ? 'Chaque carte raconte un morceau de ta progression.' : 'Ouvre ton booster ou personnalise ton identité.'}
+              </p>
             </div>
           </div>
 
           {mode === 'shop' && (
-              <div className="tab-container" style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '1px' }}>
+              <div className="tab-group shop-tabs" style={{ 
+                display: 'inline-flex', 
+                background: 'rgba(15,23,42,0.35)', 
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderRadius: '14px', 
+                padding: '4px',
+                gap: '4px',
+                width: 'fit-content'
+              }}>
                 <button
                     className={`tab-btn ${activeTab === 'cosmetics' ? 'active' : ''}`}
                     onClick={() => setActiveTab('cosmetics')}
+                    style={{
+                      background: activeTab === 'cosmetics' ? 'rgba(45,212,191,0.15)' : 'transparent',
+                      color: activeTab === 'cosmetics' ? '#2dd4bf' : '#aab7ce',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '8px 16px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      fontFamily: "'Manrope', sans-serif"
+                    }}
                 >
                   <Sparkles size={16} /> Boutique de Cosmétiques
                 </button>
                 <button
                     className={`tab-btn ${activeTab === 'booster' ? 'active' : ''}`}
                     onClick={() => setActiveTab('booster')}
+                    style={{
+                      background: activeTab === 'booster' ? 'rgba(45,212,191,0.15)' : 'transparent',
+                      color: activeTab === 'booster' ? '#2dd4bf' : '#aab7ce',
+                      border: 'none',
+                      borderRadius: '10px',
+                      padding: '8px 16px',
+                      fontWeight: 800,
+                      fontSize: '0.85rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      fontFamily: "'Manrope', sans-serif"
+                    }}
                 >
                   <Sparkles size={16} /> Booster de Cartes
                 </button>
@@ -365,7 +409,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
           )}
 
           {activeTab === 'cosmetics' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              <div className="cosmetics-view" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
                 <div>
                   <h3 style={{ fontSize: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginBottom: '16px' }}>
@@ -422,7 +466,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                         </>
                                     ) : (
                                         <>
-                                          Acheter — {item.price} 🪙
+                                          Acheter — {item.price} <Coins size={14} />
                                         </>
                                     )}
                                   </button>
@@ -487,7 +531,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                         </>
                                     ) : (
                                         <>
-                                          Acheter — {item.price} 🪙
+                                          Acheter — {item.price} <Coins size={14} />
                                         </>
                                     )}
                                   </button>
@@ -548,7 +592,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                         </>
                                     ) : (
                                         <>
-                                          Acheter — {item.price} 🪙
+                                          Acheter — {item.price} <Coins size={14} />
                                         </>
                                     )}
                                   </button>
@@ -564,9 +608,9 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
           )}
 
           {activeTab === 'album' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="collection-view" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-                <div className="glass-card" style={{
+                <div className="glass-card collection-toolbar" style={{
                   padding: '16px 20px',
                   display: 'flex',
                   justifyContent: 'space-between',
@@ -688,7 +732,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                   const progressRatio = ownedInSet / set.cardIds.length;
 
                   return (
-                      <div key={set.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}>
+                      <div key={set.id} className="glass-card collection-set" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                           {(() => {
@@ -760,9 +804,9 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                           });
 
                           return (
-                              <div style={{
+                              <div className="collection-set__rail" onWheelCapture={handleCollectionRailWheel} style={{
                                 display: 'grid',
-                                gridTemplateColumns: 'repeat(5, 140px)',
+                                gridTemplateColumns: 'repeat(5, 160px)',
                                 gap: '30px 40px',
                                 justifyContent: 'center',
                                 justifyItems: 'center',
@@ -781,8 +825,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                             key={cid}
                                             className="glass-card"
                                             style={{
-                                              width: '140px',
-                                              height: '215px',
+                                              width: '160px',
+                                              height: '236px',
                                               display: 'flex',
                                               flexDirection: 'column',
                                               alignItems: 'center',
@@ -855,7 +899,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                         return (
                             <div style={{
                               display: 'grid',
-                              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
                               gap: '24px 16px',
                               justifyItems: 'center'
                             }}>
@@ -892,10 +936,12 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
           )}
 
           {activeTab === 'booster' && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '48px', padding: '40px 0' }}>
+              <div className="booster-stage" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '48px', padding: '40px 0' }}>
 
                 {boosterPhase === 'idle' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px', maxWidth: '400px', textAlign: 'center' }}>
+                    <>
+                    <BoosterOffer coins={coins} opening={openingBooster} onBuy={handleBuyBooster} />
+                    <div className="legacy-booster-offer" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px', maxWidth: '400px', textAlign: 'center' }}>
                       <div
                           style={{
                             width: '220px', height: '320px', borderRadius: '12px',
@@ -940,7 +986,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                             onClick={handleBuyBooster}
                             style={{ padding: '16px 32px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center', borderRadius: '12px', fontWeight: 800 }}
                         >
-                          <CreditCard size={20} /> Acheter pour 250 🪙
+                          <CreditCard size={20} /> Acheter pour 250 <Coins size={18} />
                         </button>
                         {coins < 250 && (
                             <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 700, padding: '8px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
@@ -949,6 +995,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                         )}
                       </div>
                     </div>
+                    </>
                 )}
 
                 {boosterPhase === 'shaking' && (
@@ -1121,7 +1168,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                 onClick={handleBuyBooster}
                                 style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: 700 }}
                             >
-                              <Sparkles size={18} /> Ouvrir un autre (250 🪙)
+                              <Sparkles size={18} /> Ouvrir un autre (250 <Coins size={16} />)
                             </button>
                           </div>
                       )}
@@ -1147,8 +1194,9 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                 style={{
                   position: 'fixed',
                   inset: 0,
-                  backgroundColor: 'rgba(0,0,0,0.85)',
-                  backdropFilter: 'blur(8px)',
+                  backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

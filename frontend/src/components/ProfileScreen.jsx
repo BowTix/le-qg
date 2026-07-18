@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, PUBLIC_BASE } from '../utils/api';
 import { ArrowLeft, User, KeyRound, Award, Heart, UserPlus, UserMinus, Check, X, ShieldAlert, BookOpen, Edit3, Image, LogOut, Trophy, Coins } from 'lucide-react';
 import { getLevel, getLevelBadge, getLevelProgressDetails, getUsernameStyle } from '../utils/progression';
 
 export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
+  const navigate = useNavigate();
   // Modal visibility
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -246,8 +248,8 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
           <ArrowLeft size={16} />
           Retour
         </button>
-        <h2 style={{ fontSize: '1.6rem', color: 'var(--accent)', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <User size={22} style={{ color: 'var(--accent)' }} />
+        <h2 style={{ fontSize: '1.6rem', color: '#2dd4bf', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
+          <User size={22} style={{ color: '#2dd4bf' }} />
           Carte de Joueur
         </h2>
       </div>
@@ -287,7 +289,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
           </div>
 
           {/* Bio blockquote */}
-          <div style={{ width: '100%', padding: '16px 20px', backgroundColor: 'var(--bg-input)', borderRadius: '12px', borderLeft: '3px solid var(--accent)', fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '0.95rem', minHeight: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <div style={{ width: '100%', padding: '16px 20px', backgroundColor: 'rgba(15, 23, 42, 0.4)', borderRadius: '14px', borderLeft: '3px solid #2dd4bf', fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '0.95rem', minHeight: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
             {user.bio ? `"${user.bio}"` : "Aucune biographie rédigée pour le moment."}
           </div>
 
@@ -297,26 +299,26 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
               <span>Progression du Niveau</span>
               <span>{currentLevelXp} / {xpNeededForNextLevel} XP</span>
             </div>
-            <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{ width: `${(currentLevelXp / xpNeededForNextLevel) * 100}%`, height: '100%', backgroundColor: 'var(--accent-secondary)', transition: 'width 0.4s ease-out' }} />
+            <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: `${(currentLevelXp / xpNeededForNextLevel) * 100}%`, height: '100%', backgroundColor: '#2dd4bf', transition: 'width 0.4s ease-out' }} />
             </div>
           </div>
 
           {/* Gaming Stats Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', width: '100%', marginTop: '10px' }}>
-            <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ padding: '16px', backgroundColor: 'rgba(15, 23, 42, 0.35)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Niveau Global</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#2dd4bf' }}>
                 <Award size={18} />
                 <strong style={{ fontSize: '1.4rem' }}>Lvl {lvl}</strong>
               </div>
             </div>
 
-            <div style={{ padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ padding: '16px', backgroundColor: 'rgba(15, 23, 42, 0.35)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Monnaie</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Coins size={18} style={{ color: '#ffb300' }} />
-                <strong style={{ fontSize: '1.4rem', color: '#ffb300' }}>{user.coins || 0}</strong>
+                <Coins size={18} style={{ color: '#fbbf24' }} />
+                <strong style={{ fontSize: '1.4rem', color: '#fbbf24' }}>{user.coins || 0}</strong>
               </div>
             </div>
           </div>
@@ -369,16 +371,18 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
                   top: '100%',
                   left: 0,
                   right: 0,
-                  backgroundColor: 'var(--bg-card)',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  boxShadow: 'var(--card-shadow)',
+                  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 32px rgba(2,6,23,0.3)',
                   zIndex: 50,
                   marginTop: '4px',
                   display: 'flex',
                   flexDirection: 'column',
                   maxHeight: '200px',
-                  overflowY: 'auto'
+                  overflowY: 'auto',
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)'
                 }}>
                   {searchResults.map((u) => (
                     <div
@@ -498,14 +502,20 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <button
+                        type="button"
+                        className="user-profile-link"
+                        onClick={() => navigate(`/joueur/${friend.friend_id}`)}
+                        aria-label={`Voir le profil de ${friend.username}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', textAlign: 'left' }}
+                      >
                         {renderAvatar(friend.avatar_url, '36px', '1.25rem')}
                         <span style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
                           <strong style={{ fontSize: '0.95rem' }}>{friend.username}</strong>
                           <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500 }}>#{friend.discriminator}</span>
                         </span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>(Lvl {getLevel(friend.global_score)})</span>
-                      </div>
+                      </button>
                       
                       <button 
                         onClick={() => handleRemoveFriend(friend.friendship_id)}
@@ -558,18 +568,19 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.8)',
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '16px',
           zIndex: 200,
-          backdropFilter: 'blur(8px)'
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)'
         }}>
           <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '580px', display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Edit3 size={18} style={{ color: 'var(--accent)' }} />
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
+                <Edit3 size={18} style={{ color: '#2dd4bf' }} />
                 Modifier mes informations
               </h3>
               <button 
@@ -649,13 +660,6 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
                   placeholder="Décrivez-vous en quelques mots..."
                   rows={3}
                   style={{
-                    width: '100%',
-                    padding: '12px',
-                    backgroundColor: 'var(--bg-input)',
-                    border: '2px solid var(--border-color)',
-                    borderRadius: '12px',
-                    color: 'var(--text-primary)',
-                    fontFamily: 'var(--font-sans)',
                     resize: 'none'
                   }}
                 />

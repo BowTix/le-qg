@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../utils/api';
-import { ArrowLeft, Loader2, Award, Share2 } from 'lucide-react';
+import { ArrowLeft, Coins, Loader2, Award, Share2 } from 'lucide-react';
 
 export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
   const [loading, setLoading] = useState(true);
@@ -194,9 +194,9 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
             flexDirection: 'column',
             alignItems: 'center',
             gap: '12px',
-            backgroundColor: 'var(--bg-input)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '16px',
+            backgroundColor: 'rgba(15, 23, 42, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '14px',
             padding: '24px 16px',
             position: 'relative',
             overflow: 'hidden'
@@ -204,11 +204,11 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
             <div style={{
               position: 'absolute',
               top: 0, left: 0, right: 0, height: '4px',
-              background: 'linear-gradient(90deg, #10b981 0%, #3b82f6 100%)'
+              background: 'linear-gradient(90deg, #2dd4bf 0%, #a855f7 100%)'
             }} />
 
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase' }}>Votre Score</span>
-            <span style={{ fontSize: '2.8rem', fontWeight: 800, color: 'var(--accent)', lineHeight: 1 }}>
+            <span style={{ fontSize: '2.8rem', fontWeight: 800, color: '#2dd4bf', lineHeight: 1 }}>
               {correctCount}/3
             </span>
 
@@ -221,7 +221,7 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
 
             {/* Rewards */}
             <div style={{ display: 'flex', gap: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-              <span>🪙 +{results.coins_earned} pièces</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><Coins size={15} /> +{results.coins_earned} pièces</span>
               <span>⚡ +{results.points_earned} XP</span>
             </div>
           </div>
@@ -246,8 +246,8 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
                   <span>Question 1</span>
                   <strong>{results.stats.q1_pct}% de réussite</strong>
                 </div>
-                <div style={{ height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ width: `${results.stats.q1_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
+                <div style={{ height: '8px', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${results.stats.q1_pct}%`, height: '100%', backgroundColor: '#2dd4bf', borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
                 </div>
               </div>
               <div>
@@ -255,8 +255,8 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
                   <span>Question 2</span>
                   <strong>{results.stats.q2_pct}% de réussite</strong>
                 </div>
-                <div style={{ height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ width: `${results.stats.q2_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
+                <div style={{ height: '8px', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${results.stats.q2_pct}%`, height: '100%', backgroundColor: '#2dd4bf', borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
                 </div>
               </div>
               <div>
@@ -264,8 +264,8 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
                   <span>Question 3</span>
                   <strong>{results.stats.q3_pct}% de réussite</strong>
                 </div>
-                <div style={{ height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ width: `${results.stats.q3_pct}%`, height: '100%', backgroundColor: 'var(--success)', borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
+                <div style={{ height: '8px', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${results.stats.q3_pct}%`, height: '100%', backgroundColor: '#2dd4bf', borderRadius: '4px', transition: 'width 1s ease-out' }}></div>
                 </div>
               </div>
             </div>
@@ -297,23 +297,23 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
           </span>
           <span style={{ 
             fontSize: '0.85rem', 
-            fontWeight: 700, 
-            color: timeLeft <= 5 ? 'var(--error)' : 'var(--accent)',
-            backgroundColor: timeLeft <= 5 ? 'var(--error-glow)' : 'rgba(255, 247, 0, 0.05)',
-            padding: '4px 10px',
-            borderRadius: '20px',
-            border: `1px solid ${timeLeft <= 5 ? 'rgba(255, 59, 105, 0.2)' : 'rgba(255, 247, 0, 0.2)'}`
+            fontWeight: 800, 
+            color: timeLeft <= 5 ? '#fb7185' : '#2dd4bf',
+            backgroundColor: timeLeft <= 5 ? 'rgba(251, 113, 133, 0.15)' : 'rgba(15, 23, 42, 0.4)',
+            padding: '8px 16px',
+            borderRadius: '14px',
+            border: `1px solid ${timeLeft <= 5 ? 'rgba(251, 113, 133, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`
           }}>
             ⏱️ {timeLeft}s
           </span>
         </div>
 
         {/* Shimmer timer progress bar */}
-        <div style={{ height: '4px', backgroundColor: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden', width: '100%' }}>
+        <div style={{ height: '4px', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: '2px', overflow: 'hidden', width: '100%' }}>
           <div style={{ 
             width: `${(timeLeft / 20) * 100}%`, 
             height: '100%', 
-            backgroundColor: timeLeft <= 5 ? 'var(--error)' : 'var(--accent)', 
+            backgroundColor: timeLeft <= 5 ? '#fb7185' : '#2dd4bf', 
             transition: 'width 1s linear'
           }}></div>
         </div>
@@ -335,14 +335,7 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
               onChange={(e) => setOpenAnswer(e.target.value)}
               placeholder={currentQuestion.question_type === 'guess_number' ? 'Entrez votre estimation...' : 'Écrivez votre réponse...'}
               style={{
-                width: '100%',
-                padding: '16px',
-                borderRadius: '12px',
-                border: '1px solid var(--border-color)',
-                backgroundColor: 'var(--bg-input)',
-                color: 'var(--text-primary)',
-                fontSize: '1.1rem',
-                outline: 'none'
+                fontSize: '1.1rem'
               }}
               autoFocus
             />

@@ -113,17 +113,17 @@ class AuthController {
             $uName = trim($parts[0]);
             $uDisc = trim($parts[1]);
             
-            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ? AND discriminator = ?");
+            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ? AND discriminator = ?");
             $stmt->execute([$uName, $uDisc]);
             $user = $stmt->fetch();
         } else {
-            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE email = ?");
+            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE email = ?");
             $stmt->execute([$loginInput]);
             $user = $stmt->fetch();
             
             if (!$user) {
                 // Try searching by username (in case there's only one user with this username, or just fall back)
-                $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, elo, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ?");
+                $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ?");
                 $stmt->execute([$loginInput]);
                 $results = $stmt->fetchAll();
                 if (count($results) === 1) {
@@ -172,7 +172,6 @@ class AuthController {
                 "email" => $user['email'],
                 "role" => $user['role'],
                 "global_score" => (int) $user['global_score'],
-                "elo" => (int) $user['elo'],
                 "coins" => (int) $user['coins'],
                 "bio" => $user['bio'],
                 "avatar_url" => $user['avatar_url'],
@@ -360,7 +359,7 @@ class AuthController {
         }
 
         // Fetch fresh profile data
-        $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, elo, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
+        $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
         $stmtFresh->execute([$userId]);
         $freshUser = $stmtFresh->fetch();
 
@@ -383,7 +382,6 @@ class AuthController {
                 "email" => $freshUser['email'],
                 "role" => $freshUser['role'],
                 "global_score" => (int) $freshUser['global_score'],
-                "elo" => (int) $freshUser['elo'],
                 "coins" => (int) $freshUser['coins'],
                 "bio" => $freshUser['bio'],
                 "avatar_url" => $freshUser['avatar_url'],
@@ -402,7 +400,7 @@ class AuthController {
         \App\Controllers\QuestController::incrementProgress((int) $authUser['user_id'], 'login');
         $db = Database::getConnection();
         
-        $stmt = $db->prepare("SELECT id, username, discriminator, email, role, global_score, elo, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
         $stmt->execute([$authUser['user_id']]);
         $profile = $stmt->fetch();
         
@@ -421,7 +419,6 @@ class AuthController {
                 "email" => $profile['email'],
                 "role" => $profile['role'],
                 "global_score" => (int) $profile['global_score'],
-                "elo" => (int) $profile['elo'],
                 "coins" => (int) $profile['coins'],
                 "bio" => $profile['bio'],
                 "avatar_url" => $profile['avatar_url'],

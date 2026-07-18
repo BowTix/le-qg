@@ -449,25 +449,34 @@ export default function AdminScreen({ onBack }) {
           <ArrowLeft size={16} />
           Retour Dashboard
         </button>
-        <h2 style={{ fontSize: '1.8rem', color: 'var(--error)' }}>
-          🛠️ Espace Administrateur
+        <h2 style={{ fontSize: '1.8rem', color: '#fb7185', fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, letterSpacing: '-0.04em' }}>
+          🛡️ Espace Administrateur
         </h2>
       </div>
 
-      {/* Tabs navigation */}
-      <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '8px', marginTop: '-10px' }}>
+      {/* Tabs navigation - Segmented controller layout */}
+      <div style={{ 
+        display: 'flex', 
+        background: 'rgba(15, 23, 42, 0.35)', 
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+        borderRadius: '14px', 
+        padding: '4px',
+        gap: '4px',
+        width: 'fit-content',
+        marginTop: '-10px',
+        fontFamily: "'Manrope', sans-serif"
+      }}>
         <button 
           onClick={() => { setActiveTab('themes'); setError(''); setSuccess(''); }}
           style={{
-            padding: '10px 20px',
-            backgroundColor: activeTab === 'themes' ? 'rgba(255,247,0,0.05)' : 'transparent',
+            padding: '8px 16px',
+            backgroundColor: activeTab === 'themes' ? 'rgba(45, 212, 191, 0.15)' : 'transparent',
             border: 'none',
-            borderBottom: activeTab === 'themes' ? '3px solid var(--accent)' : '3px solid transparent',
-            color: activeTab === 'themes' ? 'var(--accent)' : 'var(--text-secondary)',
-            fontWeight: 700,
-            fontSize: '1rem',
+            color: activeTab === 'themes' ? '#2dd4bf' : '#aab7ce',
+            fontWeight: 800,
+            fontSize: '0.85rem',
             cursor: 'pointer',
-            borderRadius: '4px 4px 0 0',
+            borderRadius: '10px',
             transition: 'all 0.2s ease'
           }}
         >
@@ -476,15 +485,14 @@ export default function AdminScreen({ onBack }) {
         <button 
           onClick={() => { setActiveTab('daily'); setError(''); setSuccess(''); }}
           style={{
-            padding: '10px 20px',
-            backgroundColor: activeTab === 'daily' ? 'rgba(255,247,0,0.05)' : 'transparent',
+            padding: '8px 16px',
+            backgroundColor: activeTab === 'daily' ? 'rgba(45, 212, 191, 0.15)' : 'transparent',
             border: 'none',
-            borderBottom: activeTab === 'daily' ? '3px solid var(--accent)' : '3px solid transparent',
-            color: activeTab === 'daily' ? 'var(--accent)' : 'var(--text-secondary)',
-            fontWeight: 700,
-            fontSize: '1rem',
+            color: activeTab === 'daily' ? '#2dd4bf' : '#aab7ce',
+            fontWeight: 800,
+            fontSize: '0.85rem',
             cursor: 'pointer',
-            borderRadius: '4px 4px 0 0',
+            borderRadius: '10px',
             transition: 'all 0.2s ease'
           }}
         >
@@ -493,8 +501,8 @@ export default function AdminScreen({ onBack }) {
       </div>
 
       {/* Message alerts */}
-      {error && <div style={{ backgroundColor: 'var(--error-glow)', color: 'var(--error)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255, 59, 105, 0.2)' }}>{error}</div>}
-      {success && <div style={{ backgroundColor: 'var(--success-glow)', color: 'var(--success)', padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(0, 255, 157, 0.2)' }}>{success}</div>}
+      {error && <div style={{ backgroundColor: 'rgba(251,113,133,0.06)', color: '#fb7185', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(251,113,133,0.15)' }}>{error}</div>}
+      {success && <div style={{ backgroundColor: 'rgba(45,212,191,0.06)', color: '#2dd4bf', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(45,212,191,0.15)' }}>{success}</div>}
 
       {/* ACTIVE TAB CONTENT */}
       {activeTab === 'themes' && (
@@ -549,9 +557,9 @@ export default function AdminScreen({ onBack }) {
                         flexDirection: 'column',
                         gap: '8px',
                         padding: '16px',
-                        backgroundColor: selectedPackId === p.id ? 'rgba(255,247,0,0.03)' : 'var(--bg-input)',
-                        border: `1px solid ${selectedPackId === p.id ? 'var(--accent)' : 'var(--border-color)'}`,
-                        borderRadius: '8px',
+                        backgroundColor: selectedPackId === p.id ? 'rgba(45, 212, 191, 0.08)' : 'var(--bg-input)',
+                        border: `1px solid ${selectedPackId === p.id ? '#2dd4bf' : 'var(--border-color)'}`,
+                        borderRadius: '12px',
                         cursor: 'pointer',
                         transition: 'var(--transition-smooth)'
                       }}
@@ -729,16 +737,18 @@ export default function AdminScreen({ onBack }) {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '16px',
-          zIndex: 100
+          zIndex: 100,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)'
         }}>
           <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 600 }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
                 {editingQuestionId ? "Modifier la Question" : "Ajouter une Question"}
               </h3>
               <button 
@@ -816,16 +826,18 @@ export default function AdminScreen({ onBack }) {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: 'rgba(15, 23, 42, 0.75)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '16px',
-          zIndex: 100
+          zIndex: 100,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)'
         }}>
           <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 600 }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
                 📅 Quiz du {selectedDayStr}
               </h3>
               <button 

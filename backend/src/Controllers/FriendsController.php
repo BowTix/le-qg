@@ -18,7 +18,7 @@ class FriendsController {
         // 1. Get accepted friends
         // A friend relation is when user_id = $userId or friend_id = $userId and status = 'accepted'
         $stmtFriends = $db->prepare("
-            SELECT f.id as friendship_id, u.id as friend_id, u.username, u.discriminator, u.global_score, u.elo, u.coins, u.bio, u.avatar_url
+            SELECT f.id as friendship_id, u.id as friend_id, u.username, u.discriminator, u.global_score, u.coins, u.bio, u.avatar_url
             FROM friendships f
             JOIN users u ON (f.user_id = u.id OR f.friend_id = u.id)
             WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
@@ -28,7 +28,7 @@ class FriendsController {
 
         // 2. Get incoming pending requests
         $stmtIncoming = $db->prepare("
-            SELECT f.id as friendship_id, u.id as requester_id, u.username, u.discriminator, u.global_score, u.elo, u.avatar_url
+            SELECT f.id as friendship_id, u.id as requester_id, u.username, u.discriminator, u.global_score, u.avatar_url
             FROM friendships f
             JOIN users u ON f.user_id = u.id
             WHERE f.friend_id = ? AND f.status = 'pending'
@@ -38,7 +38,7 @@ class FriendsController {
 
         // 3. Get outgoing pending requests
         $stmtOutgoing = $db->prepare("
-            SELECT f.id as friendship_id, u.id as receiver_id, u.username, u.discriminator, u.global_score, u.elo, u.avatar_url
+            SELECT f.id as friendship_id, u.id as receiver_id, u.username, u.discriminator, u.global_score, u.avatar_url
             FROM friendships f
             JOIN users u ON f.friend_id = u.id
             WHERE f.user_id = ? AND f.status = 'pending'
@@ -252,7 +252,7 @@ class FriendsController {
         
         $searchTerm = $query . '%';
         $stmt = $db->prepare("
-            SELECT username, discriminator, avatar_url, elo, global_score 
+            SELECT username, discriminator, avatar_url, global_score 
             FROM users 
             WHERE (username LIKE ? OR CONCAT(username, '#', discriminator) LIKE ?) 
               AND id != ? 
