@@ -12,7 +12,7 @@ export default function BoosterOffer({ coins, opening, onBuy }) {
           <span className="booster-pack__seal"><Sparkles size={30} /></span>
           <span className="booster-pack__brand">LE QG</span>
           <strong>Booster</strong>
-          <small>3 cartes · 1 surprise</small>
+          <small>3 cartes uniques</small>
         </button>
       </div>
 

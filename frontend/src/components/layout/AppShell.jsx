@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   CircleHelp,
@@ -14,6 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { PUBLIC_BASE } from '../../utils/api';
+import TradeInbox from '../trades/TradeInbox';
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Accueil', icon: LayoutDashboard },
@@ -42,8 +43,30 @@ function UserAvatar({ user }) {
 }
 
 function HeaderNav() {
+  const location = useLocation();
+  const navRef = useRef(null);
+  const [indicator, setIndicator] = useState({ left: 0, width: 0, visible: false });
+
+  useLayoutEffect(() => {
+    const updateIndicator = () => {
+      const activeLink = navRef.current?.querySelector('.app-nav__link.is-active');
+      if (!activeLink) return;
+      setIndicator({ left: activeLink.offsetLeft, width: activeLink.offsetWidth, visible: true });
+    };
+
+    updateIndicator();
+    const resizeObserver = new ResizeObserver(updateIndicator);
+    if (navRef.current) resizeObserver.observe(navRef.current);
+    return () => resizeObserver.disconnect();
+  }, [location.pathname]);
+
   return (
-    <nav className="app-nav" aria-label="Navigation principale">
+    <nav className="app-nav" aria-label="Navigation principale" ref={navRef}>
+      <span
+        className={`app-nav__indicator${indicator.visible ? ' is-visible' : ''}`}
+        style={{ width: indicator.width, transform: `translateX(${indicator.left}px)` }}
+        aria-hidden="true"
+      />
       {NAV_ITEMS.map(({ to, label, icon: Icon, match }) => (
         <NavLink
           key={to}
@@ -120,9 +143,7 @@ export default function AppShell({ user, theme, onToggleTheme, onLogout, childre
               <Coins size={16} />
               <span>{(user?.coins || 0).toLocaleString('fr-FR')}</span>
             </div>
-            <button className="app-header__icon header-help" type="button" aria-label="Aide">
-              <CircleHelp size={18} />
-            </button>
+            <TradeInbox user={user} />
             <div className="app-user">
               <button
                 className="app-user__trigger"

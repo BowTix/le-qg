@@ -11,7 +11,8 @@ class UserController {
      * Authenticated public profile. Private account fields are deliberately omitted.
      */
     public function publicProfile() {
-        AuthMiddleware::authenticate();
+        $authUser = AuthMiddleware::authenticate();
+        $viewerId = (int) $authUser['user_id'];
         $userId = (int) ($_GET['id'] ?? 0);
 
         if ($userId <= 0) {
@@ -77,10 +78,15 @@ class UserController {
         $stmtCatalogCount = $db->query("SELECT COUNT(*) FROM cards");
         $catalogCount = (int) $stmtCatalogCount->fetchColumn();
 
+        $stmtFriend = $db->prepare("SELECT 1 FROM friendships WHERE status = 'accepted' AND ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)) LIMIT 1");
+        $stmtFriend->execute([$viewerId, $userId, $userId, $viewerId]);
+        $isFriend = (bool) $stmtFriend->fetchColumn();
+
         echo json_encode([
             'success' => true,
             'user' => [
                 'id' => (int) $profile['id'],
+                'is_friend' => $isFriend,
                 'username' => $profile['username'],
                 'discriminator' => $profile['discriminator'],
                 'role' => $profile['role'],

@@ -16,9 +16,9 @@ class QuizController {
         $db = Database::getConnection();
 
         $stmt = $db->prepare("
-            SELECT p.id, p.name, p.description, p.creator_id, p.is_validated, COUNT(q.id) as question_count 
-            FROM packs p 
-            LEFT JOIN questions q ON p.id = q.pack_id 
+            SELECT p.id, p.name, p.description, p.creator_id, p.is_validated, COUNT(q.id) as question_count
+            FROM packs p
+            LEFT JOIN questions q ON p.id = q.pack_id
             WHERE p.is_validated = 1 OR p.creator_id = ?
             GROUP BY p.id
             ORDER BY p.id DESC
@@ -58,9 +58,9 @@ class QuizController {
         }
 
         $db = Database::getConnection();
-        
-        // Admins bypass validation, users default to 0
-        $isValidated = ($user['role'] === 'admin') ? 1 : 0;
+
+        // The public creator flow always creates a proposal. Publication is an explicit admin action.
+        $isValidated = 0;
 
         $stmt = $db->prepare("INSERT INTO packs (name, description, creator_id, is_validated) VALUES (?, ?, ?, ?)");
         $stmt->execute([$name, $description, $user['user_id'], $isValidated]);
@@ -149,7 +149,7 @@ class QuizController {
             $params[] = $packId;
             $excludeClause = " WHERE pack_id = ?";
         }
-        
+
         if (!empty($excludeIds)) {
             $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
             if ($packId > 0) {
@@ -173,7 +173,7 @@ class QuizController {
                 $stmtFallback->execute($excludeIds);
                 $question = $stmtFallback->fetch();
             }
-            
+
             if (!$question) {
                 $question = $db->query("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, media_url FROM questions ORDER BY RAND() LIMIT 1")->fetch();
             }
@@ -189,17 +189,17 @@ class QuizController {
         } else {
             $shuffledValues = [$question['opt_a'], $question['opt_b'], $question['opt_c'], $question['opt_d']];
             shuffle($shuffledValues);
-            
+
             $shuffledOptions = [
                 'A' => $shuffledValues[0],
                 'B' => $shuffledValues[1],
                 'C' => $shuffledValues[2],
                 'D' => $shuffledValues[3]
             ];
-            
+
             $correctKey = strtolower('opt_' . $question['correct_opt']);
             $correctAnswerText = $question[$correctKey] ?? '';
-            
+
             foreach ($shuffledOptions as $key => $val) {
                 if ($val === $correctAnswerText) {
                     $correctOpt = $key;
@@ -232,7 +232,7 @@ class QuizController {
 
     private static function normalizeText($text) {
         $text = mb_strtolower(trim($text), 'UTF-8');
-        
+
         if (class_exists('Transliterator')) {
             $transliterator = \Transliterator::create('Any-Latin; Latin-ASCII');
             if ($transliterator) {
@@ -248,7 +248,7 @@ class QuizController {
             );
             $text = strtr($text, $unwanted_array);
         }
-        
+
         $text = preg_replace('/[^a-z0-9]/', '', $text);
         return $text;
     }
@@ -259,7 +259,7 @@ class QuizController {
      */
     public function submitAnswer(array $data) {
         $user = AuthMiddleware::authenticate();
-        
+
         $answerToken = $data['answer_token'] ?? '';
         $userAnswer = trim($data['answer'] ?? '');
 
@@ -310,8 +310,8 @@ class QuizController {
 
         // Fetch question info and user score in a single query to reduce database roundtrip latency
         $stmt = $db->prepare("
-            SELECT q.question_type, q.correct_value, q.correct_opt, q.opt_a, q.opt_b, q.opt_c, q.opt_d, u.global_score, u.coins 
-            FROM questions q, users u 
+            SELECT q.question_type, q.correct_value, q.correct_opt, q.opt_a, q.opt_b, q.opt_c, q.opt_d, u.global_score, u.coins
+            FROM questions q, users u
             WHERE q.id = ? AND u.id = ?
         ");
         $stmt->execute([$questionId, $user['user_id']]);
@@ -366,7 +366,7 @@ class QuizController {
         $coinsAwarded = 0;
         $newGlobalScore = (int) ($row['global_score'] ?? 0);
         $newCoins = (int) ($row['coins'] ?? 0);
-        
+
         if ($isCorrect) {
             // Award base 10 points + speed bonus in training
             $timeRatio = max(0, ($timeLimitMs - $duration) / $timeLimitMs);
@@ -442,7 +442,7 @@ class QuizController {
 
     /**
      * POST /api/quiz/questions
-     * Authenticated - Add a question (must be creator of the pack or admin)
+     * Authenticated - Add a question to a public pack, or to one of your pending packs
      */
     public function createQuestion(array $data) {
         $user = AuthMiddleware::authenticate();
@@ -483,7 +483,7 @@ class QuizController {
 
         $db = Database::getConnection();
 
-        $stmtCheck = $db->prepare("SELECT creator_id FROM packs WHERE id = ?");
+        $stmtCheck = $db->prepare("SELECT creator_id, is_validated FROM packs WHERE id = ?");
         $stmtCheck->execute([$packId]);
         $pack = $stmtCheck->fetch();
 
@@ -493,14 +493,29 @@ class QuizController {
             return;
         }
 
-        if ((int)$pack['creator_id'] !== $user['user_id'] && $user['role'] !== 'admin') {
+        $canContribute = (int)$pack['is_validated'] === 1
+            || (int)$pack['creator_id'] === (int)$user['user_id']
+            || $user['role'] === 'admin';
+
+        if (!$canContribute) {
             http_response_code(403);
             echo json_encode(["error" => "Interdit. Vous n'êtes pas le créateur de ce thème."]);
             return;
         }
 
+        if ($user['role'] !== 'admin' && (int)$pack['is_validated'] === 1) {
+            $stmt = $db->prepare("
+                INSERT INTO question_proposals
+                    (pack_id, contributor_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, media_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([$packId, $user['user_id'], $questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType, empty($mediaUrl) ? null : $mediaUrl]);
+            echo json_encode(["success" => true, "pending" => true, "message" => "Question envoyee pour validation."]);
+            return;
+        }
+
         $stmt = $db->prepare("
-            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, media_url) 
+            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, media_url)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([$packId, $questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType, empty($mediaUrl) ? null : $mediaUrl]);
@@ -568,8 +583,8 @@ class QuizController {
         }
 
         $stmt = $db->prepare("
-            UPDATE questions 
-            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ?, question_type = ?, media_url = ? 
+            UPDATE questions
+            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ?, question_type = ?, media_url = ?
             WHERE id = ?
         ");
         $stmt->execute([$questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType, empty($mediaUrl) ? null : $mediaUrl, $id]);
@@ -634,7 +649,7 @@ class QuizController {
         }
 
         $db = Database::getConnection();
-        
+
         $stmt = $db->prepare("UPDATE packs SET is_validated = 1 WHERE id = ?");
         $stmt->execute([$packId]);
 
@@ -652,9 +667,9 @@ class QuizController {
 
         if ($packId <= 0) {
             $stmt = $db->query("
-                SELECT q.id, q.question_text, q.question_type, p.name as pack_name 
-                FROM questions q 
-                JOIN packs p ON q.pack_id = p.id 
+                SELECT q.id, q.question_text, q.question_type, p.name as pack_name
+                FROM questions q
+                JOIN packs p ON q.pack_id = p.id
                 ORDER BY p.name ASC, q.id ASC
             ");
             $questions = $stmt->fetchAll();
@@ -715,7 +730,7 @@ class QuizController {
 
         $db = Database::getConnection();
         $stmt = $db->prepare("
-            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, media_url) 
+            INSERT INTO questions (pack_id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, media_url)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([$packId, $questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType, empty($mediaUrl) ? null : $mediaUrl]);
@@ -766,8 +781,8 @@ class QuizController {
 
         $db = Database::getConnection();
         $stmt = $db->prepare("
-            UPDATE questions 
-            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ?, question_type = ?, media_url = ? 
+            UPDATE questions
+            SET question_text = ?, opt_a = ?, opt_b = ?, opt_c = ?, opt_d = ?, correct_opt = ?, question_type = ?, media_url = ?
             WHERE id = ?
         ");
         $stmt->execute([$questionText, $optA, $optB, $optC, $optD, $correctOpt, $questionType, empty($mediaUrl) ? null : $mediaUrl, $id]);
@@ -806,11 +821,11 @@ class QuizController {
         $db = Database::getConnection();
 
         $stmt = $db->query("
-            SELECT p.*, u.username as creator_username, COUNT(q.id) as question_count 
-            FROM packs p 
-            LEFT JOIN users u ON p.creator_id = u.id 
-            LEFT JOIN questions q ON p.id = q.pack_id 
-            GROUP BY p.id 
+            SELECT p.*, u.username as creator_username, COUNT(q.id) as question_count
+            FROM packs p
+            LEFT JOIN users u ON p.creator_id = u.id
+            LEFT JOIN questions q ON p.id = q.pack_id
+            GROUP BY p.id
             ORDER BY p.is_validated ASC, p.id DESC
         ");
         $packs = $stmt->fetchAll();
@@ -872,9 +887,9 @@ class QuizController {
 
         // 1. Top 10 users sorted by collection value
         $stmtUsers = $db->query("
-            SELECT 
-                u.id, 
-                u.username, 
+            SELECT
+                u.id,
+                u.username,
                 u.global_score,
                 COALESCE(SUM(
                     CASE
@@ -882,7 +897,7 @@ class QuizController {
                         WHEN c.rarity = 'legendary' THEN 1000
                         WHEN c.rarity = 'epic' THEN 300
                         WHEN c.rarity = 'rare' THEN 100
-                        ELSE 30 
+                        ELSE 30
                     END
                 ), 0) as collection_value
             FROM users u
@@ -896,9 +911,9 @@ class QuizController {
 
         // 2. Recent 10 matches
         $stmtMatches = $db->query("
-            SELECT * 
-            FROM matches 
-            ORDER BY id DESC 
+            SELECT *
+            FROM matches
+            ORDER BY id DESC
             LIMIT 10
         ");
         $recentMatches = $stmtMatches->fetchAll();
@@ -939,7 +954,7 @@ class QuizController {
         if ($attempt) {
             // Get stats for today
             $stmtStats = $db->prepare("
-                SELECT 
+                SELECT
                     COUNT(*) as total_attempts,
                     COALESCE(AVG(q1_correct) * 100, 0) as q1_pct,
                     COALESCE(AVG(q2_correct) * 100, 0) as q2_pct,
@@ -1027,17 +1042,17 @@ class QuizController {
             } else {
                 $shuffledValues = [$question['opt_a'], $question['opt_b'], $question['opt_c'], $question['opt_d']];
                 shuffle($shuffledValues);
-                
+
                 $shuffledOptions = [
                     'A' => $shuffledValues[0],
                     'B' => $shuffledValues[1],
                     'C' => $shuffledValues[2],
                     'D' => $shuffledValues[3]
                 ];
-                
+
                 $correctKey = strtolower('opt_' . $question['correct_opt']);
                 $correctAnswerText = $question[$correctKey] ?? '';
-                
+
                 foreach ($shuffledOptions as $key => $val) {
                     if ($val === $correctAnswerText) {
                         $correctOpt = $key;
@@ -1190,7 +1205,7 @@ class QuizController {
 
         // Insert attempt
         $stmtInsertAttempt = $db->prepare("
-            INSERT INTO daily_quiz_attempts (user_id, date, q1_correct, q2_correct, q3_correct, score) 
+            INSERT INTO daily_quiz_attempts (user_id, date, q1_correct, q2_correct, q3_correct, score)
             VALUES (?, ?, ?, ?, ?, ?)
         ");
         $stmtInsertAttempt->execute([
@@ -1204,7 +1219,7 @@ class QuizController {
 
         // Get updated stats
         $stmtStats = $db->prepare("
-            SELECT 
+            SELECT
                 COUNT(*) as total_attempts,
                 COALESCE(AVG(q1_correct) * 100, 0) as q1_pct,
                 COALESCE(AVG(q2_correct) * 100, 0) as q2_pct,
@@ -1248,7 +1263,7 @@ class QuizController {
 
         $db = Database::getConnection();
         $stmt = $db->query("
-            SELECT dq.date, 
+            SELECT dq.date,
                    dq.q1_id, dq.q2_id, dq.q3_id,
                    q1.question_text as q1_text, q1.question_type as q1_type,
                    q2.question_text as q2_text, q2.question_type as q2_type,
@@ -1290,7 +1305,7 @@ class QuizController {
 
         // Insert or Update scheduling
         $stmt = $db->prepare("
-            INSERT INTO daily_quizzes (date, q1_id, q2_id, q3_id) 
+            INSERT INTO daily_quizzes (date, q1_id, q2_id, q3_id)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE q1_id = VALUES(q1_id), q2_id = VALUES(q2_id), q3_id = VALUES(q3_id)
         ");

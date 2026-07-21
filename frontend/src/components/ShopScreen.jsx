@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../utils/api';
-import { Coins, Sparkles, Check, CheckCircle2, Lock, Eye, EyeOff, Loader2, ArrowLeft, Trophy, CreditCard, X, ChevronLeft, ChevronRight, GraduationCap, Landmark, Car, Globe, Sword, Heart, Utensils, Gem, CloudLightning, Lightbulb } from 'lucide-react';
+import { ArrowLeftRight, Coins, Sparkles, Check, CheckCircle2, Lock, Eye, EyeOff, Loader2, ArrowLeft, Trophy, CreditCard, X, ChevronLeft, ChevronRight, GraduationCap, Landmark, Car, Globe, Sword, Heart, Utensils, Gem, CloudLightning, Lightbulb } from 'lucide-react';
 import { getUsernameStyle } from '../utils/progression';
 import GameCard, { RARITY_CONFIG, getCardImageSrc as getImgSrc } from './GameCard';
 import BoosterOffer from './shop/BoosterOffer';
+import TradeModal, { FriendPicker } from './trades/TradeModal';
 import VanillaTilt from 'vanilla-tilt';
 
 const cardImages = import.meta.glob('../assets/cards/*.{png,jpg,jpeg,webp,svg}', { eager: true, import: 'default' });
@@ -62,6 +63,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
   const [drawnCards, setDrawnCards] = useState([]);
   const [flippedCards, setFlippedCards] = useState([false, false, false]);
   const [zoomedCard, setZoomedCard] = useState(null);
+  const [tradeCard, setTradeCard] = useState(null);
+  const [tradeFriend, setTradeFriend] = useState(null);
 
   const [viewMode, setViewMode] = useState('sets');
   const [filterOwned, setFilterOwned] = useState('all');
@@ -207,6 +210,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
     try {
       const res = await api.get('/shop/collection');
       if (res.success) {
+        setCoins(res.coins);
         setEquipped(res.equipped);
         setUnlockedCards(res.unlocked_cards || {});
         setUnlockedCosmetics(res.unlocked_cosmetics || []);
@@ -217,6 +221,12 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
       console.error(err);
     }
   };
+
+  useEffect(() => {
+    const refreshAfterTrade = () => fetchCollectionDataSilent();
+    window.addEventListener('trade_inventory_changed', refreshAfterTrade);
+    return () => window.removeEventListener('trade_inventory_changed', refreshAfterTrade);
+  }, []);
 
   const flipCard = (index) => {
     setFlippedCards(prev => {
@@ -1260,7 +1270,10 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                     </button>
                 )}
 
-                <GameCard card={zoomedCard} size="lg" showTilt={true} isFoil={true} />
+                <div className="collection-card-preview">
+                  <GameCard card={zoomedCard} size="lg" showTilt={true} isFoil={true} />
+                  {(unlockedCards[zoomedCard.id] || 0) > 1 && <button className="btn-primary" onClick={() => { setTradeCard(zoomedCard); setTradeFriend(null); setZoomedCard(null); }}><ArrowLeftRight size={17} /> Échanger cette carte</button>}
+                </div>
 
                 {ownedCardsList.length > 1 && (
                     <button
@@ -1288,6 +1301,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
               </div>
             </div>
         )}
+        {tradeCard && !tradeFriend && <FriendPicker card={tradeCard} onSelect={setTradeFriend} onClose={() => setTradeCard(null)} />}
+        {tradeCard && tradeFriend && <TradeModal friendId={tradeFriend.id} initialOfferedCardId={tradeCard.id} onClose={() => { setTradeCard(null); setTradeFriend(null); }} onSent={() => { fetchCollectionDataSilent(); alert('Proposition envoyée !'); }} />}
       </>
   );
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, Copy, Layers3, Sparkles, Trophy } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, BookOpen, Copy, Layers3, Sparkles, Trophy } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, PUBLIC_BASE } from '../utils/api';
 import { getLevel } from '../utils/progression';
 import GameCard from './GameCard';
+import TradeModal from './trades/TradeModal';
 
 function PublicAvatar({ user }) {
   const value = user?.avatar_url;
@@ -19,6 +20,7 @@ export default function PublicProfileScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tradeOpen, setTradeOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -61,7 +63,10 @@ export default function PublicProfileScreen() {
     <div className="public-profile animate-fade-in">
       <div className="public-profile__toolbar">
         <button className="btn-secondary" onClick={() => navigate(-1)}><ArrowLeft size={16} /> Retour</button>
-        <button className="public-profile__share" onClick={() => navigator.clipboard?.writeText(window.location.href)}><Copy size={14} /> Copier le lien</button>
+        <div className="public-profile__toolbar-actions">
+          {user.is_friend && <button className="btn-primary" onClick={() => setTradeOpen(true)}><ArrowLeftRight size={15} /> Proposer un échange</button>}
+          <button className="public-profile__share" onClick={() => navigator.clipboard?.writeText(window.location.href)}><Copy size={14} /> Copier le lien</button>
+        </div>
       </div>
 
       <section className="public-profile__hero">
@@ -91,6 +96,7 @@ export default function PublicProfileScreen() {
           </article>
         )) : <div className="public-profile__empty"><Layers3 size={34} /><h3>Collection encore vide</h3><p>Ce joueur n’a pas encore découvert de carte.</p></div>}
       </section>
+      {tradeOpen && <TradeModal friendId={user.id} onClose={() => setTradeOpen(false)} onSent={() => alert('Proposition envoyée !')} />}
     </div>
   );
 }

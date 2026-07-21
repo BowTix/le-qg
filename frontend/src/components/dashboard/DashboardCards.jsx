@@ -153,7 +153,7 @@ export function CreatorCard({ onOpen }) {
   return (
     <button className="dashboard-card dashboard-card--creator" type="button" onClick={onOpen}>
       <div className="card-topline"><span className="icon-box"><Plus size={20} /></span><span className="mono-note">Créatif</span></div>
-      <div className="card-bottom"><h2>Créer un thème</h2><p>Propose tes questions et défie la communauté avec tes créations.</p><span className="button button--dark"><Plus size={14} /> Commencer</span></div>
+      <div className="card-bottom"><h2>Mode création</h2><p>Propose tes questions et défie la communauté avec tes créations.</p><span className="button button--dark"><Plus size={14} /> Commencer</span></div>
     </button>
   );
 }

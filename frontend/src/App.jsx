@@ -74,6 +74,20 @@ export default function App() {
       .catch((error) => console.error('Failed to fetch daily quiz status', error));
   }, [user, location.pathname]);
 
+  useEffect(() => {
+    if (!user) return undefined;
+    const refreshAfterTrade = () => {
+      api.get('/auth/profile').then((res) => {
+        if (res.success && res.user) {
+          setUser(res.user);
+          localStorage.setItem('quiz_user', JSON.stringify(res.user));
+        }
+      }).catch((error) => console.error('Failed to refresh after trade:', error));
+    };
+    window.addEventListener('trade_inventory_changed', refreshAfterTrade);
+    return () => window.removeEventListener('trade_inventory_changed', refreshAfterTrade);
+  }, [user]);
+
   const updateUserStats = (stats) => {
     setUser((current) => {
       if (!current) return current;

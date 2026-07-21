@@ -101,7 +101,7 @@ export default function DashboardScreen({
   return (
     <div className="page page--dashboard">
       <header className="page-intro">
-        <div><span className="kicker">{today} · Saison 04</span><h1>Bonjour, {user.username}.</h1></div>
+        <div><span className="kicker">{today} · Saison 01</span><h1>Bonjour, {user.username}.</h1></div>
       </header>
 
       <section className="dashboard-grid">

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
-import { ArrowLeft, Plus, Trash2, Edit3, Save, X, BookOpen, HelpCircle, Check, Calendar, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit3, Save, X, BookOpen, HelpCircle, Check, Calendar, ChevronLeft, ChevronRight, Search, ClipboardCheck } from 'lucide-react';
+import ProposalModeration from './admin/ProposalModeration';
 
 export default function AdminScreen({ onBack }) {
   const [activeTab, setActiveTab] = useState('themes'); // 'themes' | 'daily'
-  
+
   // Theme & Question States
   const [packs, setPacks] = useState([]);
   const [selectedPackId, setSelectedPackId] = useState(null);
@@ -12,6 +13,8 @@ export default function AdminScreen({ onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [proposals, setProposals] = useState([]);
+  const [moderatingId, setModeratingId] = useState(null);
 
   // Pack Form State
   const [newPackName, setNewPackName] = useState('');
@@ -62,6 +65,9 @@ export default function AdminScreen({ onBack }) {
   }, [selectedPackId]);
 
   useEffect(() => {
+    if (activeTab === 'moderation') {
+      fetchProposals();
+    }
     if (activeTab === 'daily') {
       fetchScheduledQuizzes();
       fetchAllQuestions();
@@ -157,6 +163,37 @@ export default function AdminScreen({ onBack }) {
       await fetchPacks();
     } catch (err) {
       setError(err.message || "Erreur lors de la validation du pack.");
+    }
+  };
+
+  const fetchProposals = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/admin/question-proposals');
+      setProposals(data.proposals || []);
+    } catch (err) {
+      setError(err.message || 'Impossible de charger les propositions.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleModerateProposal = async (id, action) => {
+    setModeratingId(id);
+    setError('');
+    setSuccess('');
+    try {
+      const result = await api.post('/admin/question-proposals', { id, action });
+      setSuccess(result.message);
+      setProposals(current => current.filter(proposal => proposal.id !== id));
+      if (action === 'approve') {
+        fetchPacks();
+        if (selectedPackId) fetchQuestions(selectedPackId);
+      }
+    } catch (err) {
+      setError(err.message || 'Impossible de traiter cette proposition.');
+    } finally {
+      setModeratingId(null);
     }
   };
 
@@ -355,8 +392,8 @@ export default function AdminScreen({ onBack }) {
 
     if (!query) return available;
     const q = query.toLowerCase();
-    return available.filter(item => 
-      item.question_text.toLowerCase().includes(q) || 
+    return available.filter(item =>
+      item.question_text.toLowerCase().includes(q) ||
       item.pack_name.toLowerCase().includes(q)
     );
   };
@@ -380,7 +417,7 @@ export default function AdminScreen({ onBack }) {
       const scheduledQuiz = scheduledQuizzes.find(q => q.date === dateStr);
 
       cells.push(
-        <div 
+        <div
           key={`day-${day}`}
           onClick={() => handleOpenDayModal(dateStr, scheduledQuiz)}
           style={{
@@ -399,8 +436,8 @@ export default function AdminScreen({ onBack }) {
           }}
           className="calendar-day-cell"
         >
-          <span style={{ 
-            fontSize: '1.05rem', 
+          <span style={{
+            fontSize: '1.05rem',
             fontWeight: isToday ? 'bold' : '600',
             color: isToday ? 'var(--accent)' : 'inherit'
           }}>
@@ -442,7 +479,7 @@ export default function AdminScreen({ onBack }) {
 
   return (
     <div className="container animate-slide-up" style={{ gap: '32px' }}>
-      
+
       {/* Top Header Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button className="btn-secondary" onClick={onBack}>
@@ -455,18 +492,18 @@ export default function AdminScreen({ onBack }) {
       </div>
 
       {/* Tabs navigation - Segmented controller layout */}
-      <div style={{ 
-        display: 'flex', 
-        background: 'rgba(15, 23, 42, 0.35)', 
+      <div style={{
+        display: 'flex',
+        background: 'rgba(15, 23, 42, 0.35)',
         border: '1px solid rgba(255, 255, 255, 0.06)',
-        borderRadius: '14px', 
+        borderRadius: '14px',
         padding: '4px',
         gap: '4px',
         width: 'fit-content',
         marginTop: '-10px',
         fontFamily: "'Manrope', sans-serif"
       }}>
-        <button 
+        <button
           onClick={() => { setActiveTab('themes'); setError(''); setSuccess(''); }}
           style={{
             padding: '8px 16px',
@@ -482,7 +519,10 @@ export default function AdminScreen({ onBack }) {
         >
           📚 Gestion des Thèmes
         </button>
-        <button 
+        <button className={`admin-moderation-tab ${activeTab === 'moderation' ? 'is-active' : ''}`} onClick={() => { setActiveTab('moderation'); setError(''); setSuccess(''); }}>
+          <ClipboardCheck size={16} /> Questions a valider {proposals.length > 0 && <span>{proposals.length}</span>}
+        </button>
+        <button
           onClick={() => { setActiveTab('daily'); setError(''); setSuccess(''); }}
           style={{
             padding: '8px 16px',
@@ -507,10 +547,10 @@ export default function AdminScreen({ onBack }) {
       {/* ACTIVE TAB CONTENT */}
       {activeTab === 'themes' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', md: '1fr 2fr', gap: '32px', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
-          
+
           {/* Left Side: Packs CRUD */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            
+
             {/* Create Pack Form */}
             <div className="glass-card">
               <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -543,14 +583,14 @@ export default function AdminScreen({ onBack }) {
                 <BookOpen size={18} style={{ color: 'var(--accent)' }} />
                 Packs Existants
               </h3>
-              
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', maxHeight: '350px' }}>
                 {packs.map(p => {
                   const isValidated = parseInt(p.is_validated) === 1;
 
                   return (
-                    <div 
-                      key={p.id} 
+                    <div
+                      key={p.id}
                       onClick={() => setSelectedPackId(p.id)}
                       style={{
                         display: 'flex',
@@ -571,19 +611,19 @@ export default function AdminScreen({ onBack }) {
                             {p.question_count} questions {p.creator_username && `| par ${p.creator_username}`}
                           </span>
                         </div>
-                        
+
                         <div style={{ display: 'flex', gap: '6px' }}>
                           {!isValidated && (
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleValidatePack(p.id); }} 
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleValidatePack(p.id); }}
                               style={{ background: 'transparent', border: 'none', color: 'var(--success)', cursor: 'pointer', padding: '4px' }}
                               title="Approuver et publier le pack"
                             >
                               <Check size={18} />
                             </button>
                           )}
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleDeletePack(p.id); }} 
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeletePack(p.id); }}
                             style={{ background: 'transparent', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '4px' }}
                             title="Supprimer le pack"
                           >
@@ -610,7 +650,7 @@ export default function AdminScreen({ onBack }) {
 
           {/* Right Side: Questions CRUD */}
           <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: '400px' }}>
-            
+
             {selectedPackId ? (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
@@ -649,15 +689,15 @@ export default function AdminScreen({ onBack }) {
                             <span style={{ color: q.correct_opt === 'D' ? 'var(--success)' : 'inherit' }}>D: {q.opt_d}</span>
                           </div>
                         </div>
-                        
+
                         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                          <button 
+                          <button
                             onClick={() => handleOpenQuestionForm(q)}
                             style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: '4px' }}
                           >
                             <Edit3 size={16} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleDeleteQuestion(q.id)}
                             style={{ background: 'transparent', border: 'none', color: 'var(--error)', cursor: 'pointer', padding: '4px' }}
                           >
@@ -666,7 +706,7 @@ export default function AdminScreen({ onBack }) {
                         </div>
                       </div>
                     ))}
-                    
+
                     {questions.length === 0 && (
                       <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
                         Aucune question dans ce pack. Cliquez sur "Ajouter Question" pour commencer !
@@ -686,16 +726,20 @@ export default function AdminScreen({ onBack }) {
         </div>
       )}
 
+      {activeTab === 'moderation' && (
+        <ProposalModeration proposals={proposals} loading={loading} moderatingId={moderatingId} onModerate={handleModerateProposal} />
+      )}
+
       {activeTab === 'daily' && (
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
+
           {/* Calendar Header Control */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
             <h3 style={{ fontSize: '1.3rem', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 600 }}>
               <Calendar size={22} style={{ color: 'var(--accent)' }} />
               Planification des Quiz Quotidiens
             </h3>
-            
+
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <button className="btn-secondary" onClick={prevMonth} style={{ padding: '8px' }}>
                 <ChevronLeft size={18} />
@@ -751,7 +795,7 @@ export default function AdminScreen({ onBack }) {
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
                 {editingQuestionId ? "Modifier la Question" : "Ajouter une Question"}
               </h3>
-              <button 
+              <button
                 onClick={() => setShowQuestionForm(false)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
               >
@@ -840,7 +884,7 @@ export default function AdminScreen({ onBack }) {
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
                 📅 Quiz du {selectedDayStr}
               </h3>
-              <button 
+              <button
                 onClick={() => setSelectedDayStr(null)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
               >
@@ -897,9 +941,9 @@ export default function AdminScreen({ onBack }) {
                   <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: 0 }}>
                     Sélectionnez 3 questions pour créer le quiz quotidien. Recherchez par mot-clé ou nom de pack.
                   </p>
-                  <button 
-                    type="button" 
-                    className="btn-secondary" 
+                  <button
+                    type="button"
+                    className="btn-secondary"
                     onClick={handleRandomFill}
                     style={{ fontSize: '0.8rem', padding: '6px 12px', whiteSpace: 'nowrap', flexShrink: 0 }}
                   >
@@ -922,16 +966,16 @@ export default function AdminScreen({ onBack }) {
                     </div>
                   ) : (
                     <div style={{ position: 'relative' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Rechercher une question..." 
-                        value={searchQuery1} 
+                      <input
+                        type="text"
+                        placeholder="Rechercher une question..."
+                        value={searchQuery1}
                         onChange={(e) => { setSearchQuery1(e.target.value); setShowDropdown1(true); }}
                         onFocus={() => setShowDropdown1(true)}
                         style={{ paddingLeft: '36px' }}
                       />
                       <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                      
+
                       {showDropdown1 && (
                         <div style={{
                           position: 'absolute', top: '100%', left: 0, right: 0,
@@ -940,8 +984,8 @@ export default function AdminScreen({ onBack }) {
                           boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                         }}>
                           {getFilteredQuestions(searchQuery1, 1).map(q => (
-                            <div 
-                              key={q.id} 
+                            <div
+                              key={q.id}
                               onClick={() => { setQ1(q); setShowDropdown1(false); }}
                               style={{ padding: '10px 12px', borderBottom: '1px solid #2A2A2A', cursor: 'pointer', transition: 'background 0.2s' }}
                               className="dropdown-item-hover"
@@ -974,16 +1018,16 @@ export default function AdminScreen({ onBack }) {
                     </div>
                   ) : (
                     <div style={{ position: 'relative' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Rechercher une question..." 
-                        value={searchQuery2} 
+                      <input
+                        type="text"
+                        placeholder="Rechercher une question..."
+                        value={searchQuery2}
                         onChange={(e) => { setSearchQuery2(e.target.value); setShowDropdown2(true); }}
                         onFocus={() => setShowDropdown2(true)}
                         style={{ paddingLeft: '36px' }}
                       />
                       <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                      
+
                       {showDropdown2 && (
                         <div style={{
                           position: 'absolute', top: '100%', left: 0, right: 0,
@@ -992,8 +1036,8 @@ export default function AdminScreen({ onBack }) {
                           boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                         }}>
                           {getFilteredQuestions(searchQuery2, 2).map(q => (
-                            <div 
-                              key={q.id} 
+                            <div
+                              key={q.id}
                               onClick={() => { setQ2(q); setShowDropdown2(false); }}
                               style={{ padding: '10px 12px', borderBottom: '1px solid #2A2A2A', cursor: 'pointer', transition: 'background 0.2s' }}
                               className="dropdown-item-hover"
@@ -1026,16 +1070,16 @@ export default function AdminScreen({ onBack }) {
                     </div>
                   ) : (
                     <div style={{ position: 'relative' }}>
-                      <input 
-                        type="text" 
-                        placeholder="Rechercher une question..." 
-                        value={searchQuery3} 
+                      <input
+                        type="text"
+                        placeholder="Rechercher une question..."
+                        value={searchQuery3}
                         onChange={(e) => { setSearchQuery3(e.target.value); setShowDropdown3(true); }}
                         onFocus={() => setShowDropdown3(true)}
                         style={{ paddingLeft: '36px' }}
                       />
                       <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                      
+
                       {showDropdown3 && (
                         <div style={{
                           position: 'absolute', top: '100%', left: 0, right: 0,
@@ -1044,8 +1088,8 @@ export default function AdminScreen({ onBack }) {
                           boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
                         }}>
                           {getFilteredQuestions(searchQuery3, 3).map(q => (
-                            <div 
-                              key={q.id} 
+                            <div
+                              key={q.id}
                               onClick={() => { setQ3(q); setShowDropdown3(false); }}
                               style={{ padding: '10px 12px', borderBottom: '1px solid #2A2A2A', cursor: 'pointer', transition: 'background 0.2s' }}
                               className="dropdown-item-hover"

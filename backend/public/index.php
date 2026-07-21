@@ -411,6 +411,17 @@ try {
             }
             break;
 
+        case '/api/admin/question-proposals':
+            if ($method === 'GET') {
+                (new \App\Controllers\QuestionProposalController())->index();
+            } elseif ($method === 'POST') {
+                (new \App\Controllers\QuestionProposalController())->moderate(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         case '/api/admin/packs/validate':
             if ($method === 'POST') {
                 (new \App\Controllers\QuizController())->validatePack(getRequestBody());
@@ -427,6 +438,60 @@ try {
                 (new \App\Controllers\QuizController())->createAdminPack(getRequestBody());
             } elseif ($method === 'DELETE') {
                 (new \App\Controllers\QuizController())->deleteAdminPack(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/trades':
+            if ($method === 'GET') {
+                (new \App\Controllers\TradeController())->index();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/trades/context':
+            if ($method === 'GET') {
+                (new \App\Controllers\TradeController())->context();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/trades/friends-for-card':
+            if ($method === 'GET') {
+                (new \App\Controllers\TradeController())->friendsForCard();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/trades/propose':
+            if ($method === 'POST') {
+                (new \App\Controllers\TradeController())->propose(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/trades/respond':
+            if ($method === 'POST') {
+                (new \App\Controllers\TradeController())->respond(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/trades/cancel':
+            if ($method === 'POST') {
+                (new \App\Controllers\TradeController())->cancel(getRequestBody());
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);
