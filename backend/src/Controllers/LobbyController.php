@@ -29,7 +29,8 @@ class LobbyController
             $checkStmt->execute([$roomCode]);
         } while ($checkStmt->fetch());
 
-        $gameMode = 'kculture';
+        $requestedMode = $data['game_mode'] ?? 'kculture';
+        $gameMode = in_array($requestedMode, ['kculture', 'chrono_bomb'], true) ? $requestedMode : 'kculture';
 
         // Insert lobby
         $stmt = $db->prepare("INSERT INTO lobbies (room_code, host_id, pack_id, status, game_mode, tribunal_phase, tribunal_phase_ends_at, current_question_index) VALUES (?, ?, ?, 'waiting', ?, NULL, NULL, 0)");
@@ -107,10 +108,12 @@ class LobbyController
 
         // Fetch lobby with host username and pack name
         $stmt = $db->prepare("
-            SELECT l.*, u.username as host_username, p.name as pack_name
+            SELECT l.*, u.username as host_username, p.name as pack_name,
+                   cbp.prompt_text as chrono_prompt_text
             FROM lobbies l
             JOIN users u ON l.host_id = u.id
             LEFT JOIN packs p ON l.pack_id = p.id
+            LEFT JOIN chrono_bomb_prompts cbp ON l.chrono_prompt_id = cbp.id
             WHERE l.room_code = ?
         ");
         $stmt->execute([$roomCode]);
@@ -122,10 +125,22 @@ class LobbyController
             return;
         }
 
+        if ($lobby['game_mode'] === 'chrono_bomb' && $lobby['status'] === 'playing') {
+            $nowMs = (int) round(microtime(true) * 1000);
+            $transitionAt = $lobby['chrono_phase'] === 'active'
+                ? $lobby['chrono_explodes_at']
+                : $lobby['chrono_phase_ends_at'];
+            if ($transitionAt !== null && $nowMs >= (int) $transitionAt) {
+                (new ChronoBombController())->checkTransition($db, $lobby);
+            }
+        }
+
         // Fetch all players sorted by score
         $stmtPlayers = $db->prepare("
             SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
                    lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
+                   lp.chrono_lives, lp.chrono_turn_order,
+                   lp.imposteur_role, lp.imposteur_word, lp.imposteur_voted_for_user_id,
                    u.username, u.global_score, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
@@ -167,6 +182,7 @@ class LobbyController
 
         // Build players array
         $players = [];
+        $imposteurStates = [];
         foreach ($playersRaw as $p) {
             // Reactions with 3-second TTL
             $reaction = null;
@@ -203,6 +219,21 @@ class LobbyController
                 }
             }
 
+            if ($lobby['game_mode'] === 'chrono_bomb') {
+                $playerData['chrono_lives'] = (int) $p['chrono_lives'];
+                $playerData['chrono_turn_order'] = $p['chrono_turn_order'] === null
+                    ? null
+                    : (int) $p['chrono_turn_order'];
+            }
+
+            $playerId = (int) $p['user_id'];
+            $imposteurStates[$playerId] = [
+                'role' => $p['imposteur_role'],
+                'word' => $p['imposteur_word'],
+                'vote' => $p['imposteur_voted_for_user_id'] === null
+                    ? null
+                    : (int) $p['imposteur_voted_for_user_id'],
+            ];
             $players[] = $playerData;
         }
 
@@ -231,6 +262,10 @@ class LobbyController
             'pusher_key' => getenv('PUSHER_KEY') ?: ($_ENV['PUSHER_KEY'] ?? ($_SERVER['PUSHER_KEY'] ?? null)),
             'pusher_cluster' => getenv('PUSHER_CLUSTER') ?: ($_ENV['PUSHER_CLUSTER'] ?? ($_SERVER['PUSHER_CLUSTER'] ?? 'eu'))
         ];
+
+        if ($lobby['game_mode'] === 'chrono_bomb' && $lobby['status'] !== 'waiting') {
+            (new ChronoBombController())->decorateState($db, $lobby, $response);
+        }
 
         if ($lobby['game_mode'] === 'tribunal' && $lobby['status'] === 'playing') {
             $phase = $lobby['tribunal_phase'];
@@ -365,71 +400,49 @@ class LobbyController
 
         if ($lobby['game_mode'] === 'imposteur' && $lobby['status'] !== 'waiting') {
             $phase = $lobby['imposteur_phase'];
-            $theme = $lobby['imposteur_theme'];
-            $eliminatedUserId = $lobby['imposteur_eliminated_user_id'] ? intval($lobby['imposteur_eliminated_user_id']) : null;
+            $eliminatedUserId = $lobby['imposteur_eliminated_user_id']
+                ? (int) $lobby['imposteur_eliminated_user_id']
+                : null;
+            $myState = $currentUserId === null
+                ? null
+                : ($imposteurStates[(int) $currentUserId] ?? null);
 
-            $myRole = null;
-            $myWord = null;
-            $myVote = null;
-
-            if ($currentUserId !== null) {
-                $stmtMyState = $db->prepare("SELECT imposteur_role, imposteur_word, imposteur_voted_for_user_id FROM lobby_players WHERE lobby_id = ? AND user_id = ?");
-                $stmtMyState->execute([$lobby['id'], $currentUserId]);
-                $myState = $stmtMyState->fetch();
-                if ($myState) {
-                    $myRole = $myState['imposteur_role'];
-                    $myWord = $myState['imposteur_word'];
-                    $myVote = $myState['imposteur_voted_for_user_id'] ? intval($myState['imposteur_voted_for_user_id']) : null;
+            $voteCounts = [];
+            foreach ($imposteurStates as $state) {
+                if ($state['vote'] !== null) {
+                    $voteCounts[$state['vote']] = ($voteCounts[$state['vote']] ?? 0) + 1;
                 }
             }
 
-            // Get votes info for active players
-            $stmtVotes = $db->prepare("SELECT user_id, imposteur_voted_for_user_id FROM lobby_players WHERE lobby_id = ? AND is_eliminated = 0");
-            $stmtVotes->execute([$lobby['id']]);
-            $votesRaw = $stmtVotes->fetchAll();
+            foreach ($response['players'] as &$player) {
+                $playerId = $player['user_id'];
+                $state = $imposteurStates[$playerId] ?? ['role' => null, 'word' => null, 'vote' => null];
+                $player['has_voted'] = $state['vote'] !== null;
 
-            $votedUserIds = [];
-            $voteCounts = []; // target_id => vote_count
-            foreach ($votesRaw as $vr) {
-                if ($vr['imposteur_voted_for_user_id'] !== null) {
-                    $votedUserIds[] = intval($vr['user_id']);
-                    $target = intval($vr['imposteur_voted_for_user_id']);
-                    $voteCounts[$target] = ($voteCounts[$target] ?? 0) + 1;
+                if (
+                    $phase === 'results'
+                    || $lobby['status'] === 'finished'
+                    || $player['is_eliminated']
+                    || $playerId === $currentUserId
+                ) {
+                    $player['imposteur_role'] = $state['role'];
+                    $player['imposteur_word'] = $state['word'];
                 }
-            }
 
-            // Populate player list
-            foreach ($response['players'] as &$p) {
-                $pId = $p['user_id'];
-                $p['has_voted'] = in_array($pId, $votedUserIds);
-                
-                $stmtPlayerState = $db->prepare("SELECT imposteur_role, imposteur_word, imposteur_voted_for_user_id FROM lobby_players WHERE lobby_id = ? AND user_id = ?");
-                $stmtPlayerState->execute([$lobby['id'], $pId]);
-                $pState = $stmtPlayerState->fetch();
-                
-                // Only reveal roles/words in results phase, or if player is eliminated, or to the player themselves
-                if ($phase === 'results' || $lobby['status'] === 'finished' || $p['is_eliminated'] || $pId === $currentUserId) {
-                    if ($pState) {
-                        $p['imposteur_role'] = $pState['imposteur_role'];
-                        $p['imposteur_word'] = $pState['imposteur_word'];
-                    }
-                }
-                
                 if ($phase === 'results') {
-                    if ($pState) {
-                        $p['imposteur_voted_for_user_id'] = $pState['imposteur_voted_for_user_id'] ? intval($pState['imposteur_voted_for_user_id']) : null;
-                    }
-                    $p['imposteur_votes_received'] = $voteCounts[$pId] ?? 0;
+                    $player['imposteur_voted_for_user_id'] = $state['vote'];
+                    $player['imposteur_votes_received'] = $voteCounts[$playerId] ?? 0;
                 }
             }
+            unset($player);
 
             $response['imposteur'] = [
                 'phase' => $phase,
-                'theme' => $theme,
-                'my_role' => $myRole,
-                'my_word' => $myWord,
-                'my_vote' => $myVote,
-                'eliminated_user_id' => $eliminatedUserId
+                'theme' => $lobby['imposteur_theme'],
+                'my_role' => $myState['role'] ?? null,
+                'my_word' => $myState['word'] ?? null,
+                'my_vote' => $myState['vote'] ?? null,
+                'eliminated_user_id' => $eliminatedUserId,
             ];
         }
 
@@ -454,10 +467,12 @@ class LobbyController
         // it's still far cheaper than a full client-side re-fetch + the
         // rest of /status's work for every player in the room.
         $stmtLobby = $db->prepare("
-            SELECT l.*, u.username as host_username, p.name as pack_name
+            SELECT l.*, u.username as host_username, p.name as pack_name,
+                   cbp.prompt_text as chrono_prompt_text
             FROM lobbies l
             JOIN users u ON l.host_id = u.id
-            JOIN packs p ON l.pack_id = p.id
+            LEFT JOIN packs p ON l.pack_id = p.id
+            LEFT JOIN chrono_bomb_prompts cbp ON l.chrono_prompt_id = cbp.id
             WHERE l.id = ?
         ");
         $stmtLobby->execute([$lobby['id']]);
@@ -473,6 +488,8 @@ class LobbyController
         $stmtPlayers = $db->prepare("
             SELECT lp.user_id, lp.current_score, lp.current_question_index, lp.finished_at,
                    lp.reaction, lp.reaction_sent_at, lp.is_eliminated,
+                   lp.chrono_lives, lp.chrono_turn_order,
+                   lp.imposteur_role, lp.imposteur_word, lp.imposteur_voted_for_user_id,
                    u.username, u.global_score, u.avatar_url, u.equipped_border, u.equipped_color, u.equipped_title
             FROM lobby_players lp
             JOIN users u ON lp.user_id = u.id
@@ -523,6 +540,11 @@ class LobbyController
         if (intval($lobby['host_id']) !== $user['user_id']) {
             http_response_code(403);
             echo json_encode(['error' => 'Seul l\'hôte peut lancer la partie.']);
+            return;
+        }
+
+        if ($lobby['game_mode'] === 'chrono_bomb') {
+            (new ChronoBombController())->start($db, $lobby);
             return;
         }
 

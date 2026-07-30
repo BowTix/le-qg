@@ -126,7 +126,7 @@ export default function AuthScreen({ onAuthSuccess }) {
       <div className="glass-card w-full max-w-md">
         
         {/* Header Title */}
-        <div className="text-center mb-8" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <div className="text-center mb-8" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
           <h1 style={{ 
             color: '#fff', 
             fontSize: 'clamp(2.2rem, 5vw, 2.8rem)', 
@@ -145,7 +145,7 @@ export default function AuthScreen({ onAuthSuccess }) {
         {/* Verification Screen */}
         {needsVerification ? (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2dd4bf', marginBottom: '16px', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2dd4bf', marginBottom: '16px', fontWeight: 800, fontFamily: "'Cabinet Grotesk', sans-serif" }}>
               <ShieldCheck size={20} />
               Vérifier votre Compte
             </div>
@@ -246,7 +246,7 @@ export default function AuthScreen({ onAuthSuccess }) {
               padding: '4px',
               gap: '4px',
               marginBottom: '28px',
-              fontFamily: "'Manrope', sans-serif"
+              fontFamily: "'Satoshi', sans-serif"
             }}>
               <button
                 type="button"

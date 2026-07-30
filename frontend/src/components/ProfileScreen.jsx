@@ -248,7 +248,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
           <ArrowLeft size={16} />
           Retour
         </button>
-        <h2 style={{ fontSize: '1.6rem', color: '#2dd4bf', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
+        <h2 style={{ fontSize: '1.6rem', color: '#2dd4bf', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Cabinet Grotesk', sans-serif", letterSpacing: '-0.04em' }}>
           <User size={22} style={{ color: '#2dd4bf' }} />
           Carte de Joueur
         </h2>
@@ -579,7 +579,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
         }}>
           <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '580px', display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', fontFamily: "'Cabinet Grotesk', sans-serif", letterSpacing: '-0.04em' }}>
                 <Edit3 size={18} style={{ color: '#2dd4bf' }} />
                 Modifier mes informations
               </h3>

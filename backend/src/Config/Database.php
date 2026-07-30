@@ -48,6 +48,9 @@ class Database {
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES => false,
+                    // Apache workers reuse the remote Aiven connection between requests.
+                    // This avoids a full TCP/TLS/MySQL handshake on every game action.
+                    PDO::ATTR_PERSISTENT => true,
                 ];
 
                 if ($sslCa) {

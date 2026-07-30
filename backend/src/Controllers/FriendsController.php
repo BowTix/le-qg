@@ -15,42 +15,57 @@ class FriendsController {
         $userId = (int) $authUser['user_id'];
         $db = Database::getConnection();
 
-        // 1. Get accepted friends
-        // A friend relation is when user_id = $userId or friend_id = $userId and status = 'accepted'
-        $stmtFriends = $db->prepare("
-            SELECT f.id as friendship_id, u.id as friend_id, u.username, u.discriminator, u.global_score, u.coins, u.bio, u.avatar_url
+        $stmt = $db->prepare("
+            SELECT 'friend' AS relation_type, f.id AS friendship_id,
+                   u.id AS related_user_id, u.username, u.discriminator,
+                   u.global_score, u.coins, u.bio, u.avatar_url
             FROM friendships f
-            JOIN users u ON (f.user_id = u.id OR f.friend_id = u.id)
-            WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted' AND u.id != ?
-        ");
-        $stmtFriends->execute([$userId, $userId, $userId]);
-        $friends = $stmtFriends->fetchAll();
-
-        // 2. Get incoming pending requests
-        $stmtIncoming = $db->prepare("
-            SELECT f.id as friendship_id, u.id as requester_id, u.username, u.discriminator, u.global_score, u.avatar_url
+            JOIN users u ON u.id = IF(f.user_id = ?, f.friend_id, f.user_id)
+            WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted'
+            UNION ALL
+            SELECT 'incoming', f.id, u.id, u.username, u.discriminator,
+                   u.global_score, u.coins, u.bio, u.avatar_url
             FROM friendships f
             JOIN users u ON f.user_id = u.id
             WHERE f.friend_id = ? AND f.status = 'pending'
-        ");
-        $stmtIncoming->execute([$userId]);
-        $incoming = $stmtIncoming->fetchAll();
-
-        // 3. Get outgoing pending requests
-        $stmtOutgoing = $db->prepare("
-            SELECT f.id as friendship_id, u.id as receiver_id, u.username, u.discriminator, u.global_score, u.avatar_url
+            UNION ALL
+            SELECT 'outgoing', f.id, u.id, u.username, u.discriminator,
+                   u.global_score, u.coins, u.bio, u.avatar_url
             FROM friendships f
             JOIN users u ON f.friend_id = u.id
             WHERE f.user_id = ? AND f.status = 'pending'
         ");
-        $stmtOutgoing->execute([$userId]);
-        $outgoing = $stmtOutgoing->fetchAll();
+        $stmt->execute([$userId, $userId, $userId, $userId, $userId]);
+
+        $friends = [];
+        $incoming = [];
+        $outgoing = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $type = $row['relation_type'];
+            unset($row['relation_type']);
+            $relatedUserId = (int) $row['related_user_id'];
+            unset($row['related_user_id']);
+            $row['friendship_id'] = (int) $row['friendship_id'];
+            $row['global_score'] = (int) $row['global_score'];
+            $row['coins'] = (int) $row['coins'];
+
+            if ($type === 'friend') {
+                $row['friend_id'] = $relatedUserId;
+                $friends[] = $row;
+            } elseif ($type === 'incoming') {
+                $row['requester_id'] = $relatedUserId;
+                $incoming[] = $row;
+            } else {
+                $row['receiver_id'] = $relatedUserId;
+                $outgoing[] = $row;
+            }
+        }
 
         echo json_encode([
-            "success" => true,
-            "friends" => $friends,
-            "incoming" => $incoming,
-            "outgoing" => $outgoing
+            'success' => true,
+            'friends' => $friends,
+            'incoming' => $incoming,
+            'outgoing' => $outgoing,
         ]);
     }
 

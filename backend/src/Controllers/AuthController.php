@@ -397,7 +397,7 @@ class AuthController {
      */
     public function profile() {
         $authUser = \App\Middleware\AuthMiddleware::authenticate();
-        \App\Controllers\QuestController::incrementProgress((int) $authUser['user_id'], 'login');
+
         $db = Database::getConnection();
         
         $stmt = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");

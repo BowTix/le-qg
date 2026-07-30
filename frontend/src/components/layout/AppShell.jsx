@@ -1,27 +1,35 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
+  ArrowLeftRight,
   ChevronDown,
-  CircleHelp,
   Coins,
+  Download,
   LayoutDashboard,
   LayoutGrid,
   LogOut,
   Moon,
+  RefreshCw,
   ShieldAlert,
   ShoppingBag,
   Sun,
   User,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { PUBLIC_BASE } from '../../utils/api';
-import TradeInbox from '../trades/TradeInbox';
+import NotificationsMenu from '../notifications/NotificationsMenu';
+import usePwaControls from '../../pwa/usePwaControls';
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Accueil', icon: LayoutDashboard },
   { to: '/collection', label: 'Collection', icon: LayoutGrid },
+  { to: '/echanges', label: 'Échanges', icon: ArrowLeftRight },
   { to: '/boutique', label: 'Boutique', icon: ShoppingBag },
   { to: '/profil', label: 'Profil', icon: User },
 ];
+
+const HEADER_NAV_ITEMS = NAV_ITEMS.filter(({ to }) => to !== '/profil');
 
 function Brand({ onClick }) {
   return (
@@ -67,7 +75,7 @@ function HeaderNav() {
         style={{ width: indicator.width, transform: `translateX(${indicator.left}px)` }}
         aria-hidden="true"
       />
-      {NAV_ITEMS.map(({ to, label, icon: Icon, match }) => (
+      {HEADER_NAV_ITEMS.map(({ to, label, icon: Icon, match }) => (
         <NavLink
           key={to}
           to={to}
@@ -104,20 +112,50 @@ function MobileNav() {
   );
 }
 
+function NetworkPill({ isOnline }) {
+  return (
+    <span className={`network-pill${isOnline ? ' is-online' : ' is-offline'}`} role="status" aria-live="polite">
+      {isOnline ? <Wifi size={15} /> : <WifiOff size={15} />}
+      <span>{isOnline ? 'En ligne' : 'Hors ligne'}</span>
+    </span>
+  );
+}
+
+function UpdateNotice({ onUpdate }) {
+  return (
+    <div className="pwa-update" role="status">
+      <RefreshCw size={18} />
+      <span><strong>Le QG a ete mis a jour.</strong><small>Recharge pour utiliser la nouvelle version.</small></span>
+      <button type="button" onClick={onUpdate}>Mettre a jour</button>
+    </div>
+  );
+}
+
 export function AuthHeader({ theme, onToggleTheme }) {
   const navigate = useNavigate();
+  const pwa = usePwaControls();
   return (
     <header className="app-header app-header--auth">
       <Brand onClick={() => navigate('/')} />
-      <button className="app-header__icon" onClick={onToggleTheme} type="button" aria-label="Changer de thème">
-        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-      </button>
+      <div className="app-header__actions">
+        <NetworkPill isOnline={pwa.isOnline} />
+        {pwa.canInstall && (
+          <button className="app-header__icon" onClick={pwa.install} type="button" aria-label="Installer Le QG">
+            <Download size={18} />
+          </button>
+        )}
+        <button className="app-header__icon" onClick={onToggleTheme} type="button" aria-label="Changer de theme">
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+      </div>
+      {pwa.updateAvailable && <UpdateNotice onUpdate={pwa.applyUpdate} />}
     </header>
   );
 }
 
 export default function AppShell({ user, theme, onToggleTheme, onLogout, children }) {
   const navigate = useNavigate();
+  const pwa = usePwaControls();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -139,11 +177,12 @@ export default function AppShell({ user, theme, onToggleTheme, onLogout, childre
           <HeaderNav />
 
           <div className="app-header__actions">
+            <NetworkPill isOnline={pwa.isOnline} />
             <div className="coin-pill" title="Votre solde">
               <Coins size={16} />
               <span>{(user?.coins || 0).toLocaleString('fr-FR')}</span>
             </div>
-            <TradeInbox user={user} />
+            <NotificationsMenu />
             <div className="app-user">
               <button
                 className="app-user__trigger"
@@ -170,6 +209,11 @@ export default function AppShell({ user, theme, onToggleTheme, onLogout, childre
                   <button type="button" onClick={() => { navigate('/profil'); setOpen(false); }}>
                     <User size={15} /> Mon profil
                   </button>
+                  {pwa.canInstall && (
+                    <button type="button" onClick={pwa.install}>
+                      <Download size={15} /> Installer l'application
+                    </button>
+                  )}
                   <button type="button" onClick={onToggleTheme}>
                     {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
                     {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
@@ -186,6 +230,7 @@ export default function AppShell({ user, theme, onToggleTheme, onLogout, childre
 
         <main className="app-content">{children}</main>
       </div>
+      {pwa.updateAvailable && <UpdateNotice onUpdate={pwa.applyUpdate} />}
       <MobileNav />
     </div>
   );

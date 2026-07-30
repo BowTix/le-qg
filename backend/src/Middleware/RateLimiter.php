@@ -5,26 +5,31 @@ use App\Config\Database;
 
 class RateLimiter {
     /**
-     * Checks if the client has exceeded the rate limit (5 requests per second)
+     * Production uses one atomic database operation per request. The local
+     * PHP development server skips this remote-DB limiter entirely.
      */
     public static function checkLimit() {
+        if (PHP_SAPI === 'cli-server') {
+            return;
+        }
+
         $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-        $endpoint = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
         $now = time();
 
         try {
             $db = Database::getConnection();
+            $stmt = $db->prepare("
+                INSERT INTO rate_limit_buckets (ip, window_start, request_count)
+                VALUES (?, ?, 1)
+                ON DUPLICATE KEY UPDATE
+                    request_count = LAST_INSERT_ID(request_count + 1)
+            ");
+            $stmt->execute([$ip, $now]);
+            $requestCount = $stmt->rowCount() === 1
+                ? 1
+                : (int) $db->lastInsertId();
 
-            // 1. Purge entries older than 2 seconds (buffer to keep table size tiny)
-            $stmtClean = $db->prepare("DELETE FROM rate_limits WHERE timestamp < ?");
-            $stmtClean->execute([$now - 2]);
-
-            // 2. Count requests in the last 1 second
-            $stmtCount = $db->prepare("SELECT COUNT(*) FROM rate_limits WHERE ip = ? AND timestamp >= ?");
-            $stmtCount->execute([$ip, $now - 1]);
-            $requestCount = (int) $stmtCount->fetchColumn();
-
-            if ($requestCount >= 30) {
+            if ($requestCount > 30) {
                 http_response_code(429);
                 header('Content-Type: application/json');
                 echo json_encode([
@@ -33,10 +38,11 @@ class RateLimiter {
                 exit();
             }
 
-            // 3. Record the current request
-            $stmtInsert = $db->prepare("INSERT INTO rate_limits (ip, endpoint, timestamp) VALUES (?, ?, ?)");
-            $stmtInsert->execute([$ip, $endpoint, $now]);
-
+            // Keep cleanup off the hot path for 99.9% of requests.
+            if (random_int(1, 1000) === 1) {
+                $db->prepare("DELETE FROM rate_limit_buckets WHERE window_start < ?")
+                    ->execute([$now - 3600]);
+            }
         } catch (\PDOException $e) {
             // Log database errors silently, but don't crash the request if rate limiting table fails
             error_log("RateLimiter DB Error: " . $e->getMessage());

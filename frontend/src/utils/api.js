@@ -9,6 +9,8 @@ const API_BASE = ENV_API_URL
 
 export const PUBLIC_BASE = API_BASE.replace('/api', '');
 
+const inFlightGets = new Map();
+
 /**
  * Perform an HTTP request
  */
@@ -50,6 +52,11 @@ async function request(endpoint, options = {}) {
     
     return data;
   } catch (error) {
+    if (!navigator.onLine) {
+      const offlineError = new Error('Connexion indisponible. Les donnees locales restent accessibles.');
+      offlineError.code = 'OFFLINE';
+      throw offlineError;
+    }
     console.error(`API Error on ${endpoint}:`, error.message);
     throw error;
   }
@@ -61,11 +68,19 @@ export const api = {
       .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
       .join('&');
     const url = query ? `${endpoint}?${query}` : endpoint;
-    return request(url, { method: 'GET' });
+    if (inFlightGets.has(url)) return inFlightGets.get(url);
+
+    const pending = request(url, { method: 'GET' });
+    inFlightGets.set(url, pending);
+    pending.finally(() => {
+      if (inFlightGets.get(url) === pending) inFlightGets.delete(url);
+    }).catch(() => {});
+    return pending;
   },
   
-  post: (endpoint, data = {}) => {
+  post: (endpoint, data = {}, requestOptions = {}) => {
     return request(endpoint, {
+      ...requestOptions,
       method: 'POST',
       body: JSON.stringify(data),
     });

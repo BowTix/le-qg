@@ -933,62 +933,54 @@ class QuizController {
         $db = Database::getConnection();
         $today = date('Y-m-d');
 
-        // Check if daily quiz exists for today
-        $stmtQuiz = $db->prepare("SELECT * FROM daily_quizzes WHERE date = ?");
-        $stmtQuiz->execute([$today]);
-        $quiz = $stmtQuiz->fetch();
+        $stmt = $db->prepare("
+            SELECT dq.date AS quiz_date,
+                   dqa.id AS attempt_id, dqa.q1_correct, dqa.q2_correct,
+                   dqa.q3_correct, dqa.score,
+                   stats.total_attempts, stats.q1_pct, stats.q2_pct, stats.q3_pct
+            FROM daily_quizzes dq
+            LEFT JOIN daily_quiz_attempts dqa
+              ON dqa.date = dq.date AND dqa.user_id = ?
+            LEFT JOIN (
+                SELECT date, COUNT(*) AS total_attempts,
+                       COALESCE(AVG(q1_correct) * 100, 0) AS q1_pct,
+                       COALESCE(AVG(q2_correct) * 100, 0) AS q2_pct,
+                       COALESCE(AVG(q3_correct) * 100, 0) AS q3_pct
+                FROM daily_quiz_attempts
+                WHERE date = ?
+                GROUP BY date
+            ) stats ON stats.date = dq.date
+            WHERE dq.date = ?
+        ");
+        $stmt->execute([$user['user_id'], $today, $today]);
+        $status = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$quiz) {
-            echo json_encode([
-                "success" => true,
-                "scheduled" => false
-            ]);
+        if (!$status) {
+            echo json_encode(['success' => true, 'scheduled' => false]);
+            return;
+        }
+        if (!$status['attempt_id']) {
+            echo json_encode(['success' => true, 'scheduled' => true, 'completed' => false]);
             return;
         }
 
-        // Check user's attempt for today
-        $stmtAttempt = $db->prepare("SELECT * FROM daily_quiz_attempts WHERE user_id = ? AND date = ?");
-        $stmtAttempt->execute([$user['user_id'], $today]);
-        $attempt = $stmtAttempt->fetch();
-
-        if ($attempt) {
-            // Get stats for today
-            $stmtStats = $db->prepare("
-                SELECT
-                    COUNT(*) as total_attempts,
-                    COALESCE(AVG(q1_correct) * 100, 0) as q1_pct,
-                    COALESCE(AVG(q2_correct) * 100, 0) as q2_pct,
-                    COALESCE(AVG(q3_correct) * 100, 0) as q3_pct
-                FROM daily_quiz_attempts
-                WHERE date = ?
-            ");
-            $stmtStats->execute([$today]);
-            $stats = $stmtStats->fetch();
-
-            echo json_encode([
-                "success" => true,
-                "scheduled" => true,
-                "completed" => true,
-                "attempt" => [
-                    "q1_correct" => (int)$attempt['q1_correct'] === 1,
-                    "q2_correct" => (int)$attempt['q2_correct'] === 1,
-                    "q3_correct" => (int)$attempt['q3_correct'] === 1,
-                    "score" => (int)$attempt['score']
-                ],
-                "stats" => [
-                    "total" => (int)$stats['total_attempts'],
-                    "q1_pct" => round($stats['q1_pct']),
-                    "q2_pct" => round($stats['q2_pct']),
-                    "q3_pct" => round($stats['q3_pct'])
-                ]
-            ]);
-        } else {
-            echo json_encode([
-                "success" => true,
-                "scheduled" => true,
-                "completed" => false
-            ]);
-        }
+        echo json_encode([
+            'success' => true,
+            'scheduled' => true,
+            'completed' => true,
+            'attempt' => [
+                'q1_correct' => (int) $status['q1_correct'] === 1,
+                'q2_correct' => (int) $status['q2_correct'] === 1,
+                'q3_correct' => (int) $status['q3_correct'] === 1,
+                'score' => (int) $status['score'],
+            ],
+            'stats' => [
+                'total' => (int) ($status['total_attempts'] ?? 0),
+                'q1_pct' => round((float) ($status['q1_pct'] ?? 0)),
+                'q2_pct' => round((float) ($status['q2_pct'] ?? 0)),
+                'q3_pct' => round((float) ($status['q3_pct'] ?? 0)),
+            ],
+        ]);
     }
 
     public function getDailyQuestions() {
@@ -996,9 +988,14 @@ class QuizController {
         $db = Database::getConnection();
         $today = date('Y-m-d');
 
-        // Check if daily quiz exists for today
-        $stmtQuiz = $db->prepare("SELECT * FROM daily_quizzes WHERE date = ?");
-        $stmtQuiz->execute([$today]);
+        $stmtQuiz = $db->prepare("
+            SELECT dq.*, dqa.id AS attempt_id
+            FROM daily_quizzes dq
+            LEFT JOIN daily_quiz_attempts dqa
+              ON dqa.date = dq.date AND dqa.user_id = ?
+            WHERE dq.date = ?
+        ");
+        $stmtQuiz->execute([$user['user_id'], $today]);
         $quiz = $stmtQuiz->fetch();
 
         if (!$quiz) {
@@ -1006,11 +1003,7 @@ class QuizController {
             echo json_encode(["error" => "Aucun quiz n'est planifié pour aujourd'hui."]);
             return;
         }
-
-        // Check if already completed
-        $stmtAttempt = $db->prepare("SELECT id FROM daily_quiz_attempts WHERE user_id = ? AND date = ?");
-        $stmtAttempt->execute([$user['user_id'], $today]);
-        if ($stmtAttempt->fetch()) {
+        if ($quiz['attempt_id']) {
             http_response_code(403);
             echo json_encode(["error" => "Vous avez déjà joué le quiz du jour."]);
             return;
@@ -1019,17 +1012,23 @@ class QuizController {
         // Fetch the 3 questions
         $questionIds = [$quiz['q1_id'], $quiz['q2_id'], $quiz['q3_id']];
         $questions = [];
+        $placeholders = implode(',', array_fill(0, count($questionIds), '?'));
+        $stmtQ = $db->prepare("
+            SELECT id, question_text, opt_a, opt_b, opt_c, opt_d,
+                   correct_opt, question_type, correct_value
+            FROM questions
+            WHERE id IN ($placeholders)
+            ORDER BY FIELD(id, $placeholders)
+        ");
+        $stmtQ->execute(array_merge($questionIds, $questionIds));
+        $questionRows = $stmtQ->fetchAll(PDO::FETCH_ASSOC);
+        if (count($questionRows) !== count($questionIds)) {
+            http_response_code(500);
+            echo json_encode(["error" => "Une question du quiz est introuvable."]);
+            return;
+        }
 
-        foreach ($questionIds as $idx => $qId) {
-            $stmtQ = $db->prepare("SELECT id, question_text, opt_a, opt_b, opt_c, opt_d, correct_opt, question_type, correct_value FROM questions WHERE id = ?");
-            $stmtQ->execute([$qId]);
-            $question = $stmtQ->fetch();
-
-            if (!$question) {
-                http_response_code(500);
-                echo json_encode(["error" => "Une question du quiz est introuvable."]);
-                return;
-            }
+        foreach ($questionRows as $question) {
 
             $questionType = $question['question_type'] ?? 'multiple_choice';
             $shuffledOptions = null;

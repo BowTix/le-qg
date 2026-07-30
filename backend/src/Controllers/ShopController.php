@@ -9,6 +9,33 @@ use Exception;
 class ShopController {
 
     /**
+     * GET /api/shop/summary
+     * Lightweight dashboard payload: one database round-trip.
+     */
+    public function getCollectionSummary() {
+        $authUser = AuthMiddleware::authenticate();
+        $userId = (int) $authUser['user_id'];
+        $db = Database::getConnection();
+
+        $stmt = $db->prepare("
+            SELECT u.coins,
+                   (SELECT COUNT(*) FROM cards) AS total_cards,
+                   (SELECT COUNT(*) FROM user_cards uc WHERE uc.user_id = ? AND uc.quantity > 0) AS unlocked_cards
+            FROM users u
+            WHERE u.id = ?
+        ");
+        $stmt->execute([$userId, $userId]);
+        $summary = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        echo json_encode([
+            'success' => true,
+            'coins' => (int) ($summary['coins'] ?? 0),
+            'total_cards' => (int) ($summary['total_cards'] ?? 0),
+            'unlocked_cards' => (int) ($summary['unlocked_cards'] ?? 0),
+        ]);
+    }
+
+    /**
      * GET /api/shop/collection
      */
     public function getCollection() {

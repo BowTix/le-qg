@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>Le QG - Hors ligne</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 20% 10%, #134e4a 0, transparent 38%), #0f172a; color: #f8fafc; }
+      main { width: min(460px, 100%); padding: 34px; border: 1px solid rgba(148,163,184,.24); border-radius: 28px; background: rgba(30,41,59,.72); box-shadow: 0 24px 70px rgba(2,6,23,.4); text-align: center; }
+      .mark { display: grid; place-items: center; width: 58px; height: 58px; margin: 0 auto 22px; border-radius: 18px; background: #2dd4bf; color: #062a2b; font-weight: 900; }
+      h1 { margin: 0 0 10px; font-size: 2rem; }
+      p { margin: 0 0 24px; color: #aab7ce; line-height: 1.6; }
+      button { min-height: 44px; padding: 10px 18px; border: 0; border-radius: 13px; background: #2dd4bf; color: #062a2b; font: inherit; font-weight: 800; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">QG</div>
+      <h1>Connexion perdue</h1>
+      <p>Le Hub sera disponible ici apr&egrave;s une premi&egrave;re visite en ligne. Retente la connexion pour reprendre ta partie.</p>
+      <button type="button" onclick="location.reload()">R&eacute;essayer</button>
+    </main>
+  </body>
+</html>

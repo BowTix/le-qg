@@ -14,6 +14,7 @@ const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
 const PublicProfileScreen = lazy(() => import('./components/PublicProfileScreen'));
 const ShopScreen = lazy(() => import('./components/ShopScreen'));
 const SoloQuizScreen = lazy(() => import('./components/SoloQuizScreen'));
+const TradeScreen = lazy(() => import('./components/trades/TradeScreen'));
 
 function PrivateRoute({ user, authLoading, children }) {
   if (authLoading) return null;
@@ -31,6 +32,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dailyStatus, setDailyStatus] = useState({ scheduled: false, completed: false });
   const [theme, setTheme] = useState(() => localStorage.getItem('quiz_theme') || 'dark');
+  const userId = user?.id;
   const { soloPackId, soloGameMode, roomCode } = location.state || {};
 
   useEffect(() => {
@@ -58,21 +60,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user || location.pathname !== '/dashboard') return;
+    if (!userId || location.pathname !== '/dashboard') return;
     api.get('/auth/profile').then((res) => {
       if (res.success && res.user) {
         setUser(res.user);
         localStorage.setItem('quiz_user', JSON.stringify(res.user));
       }
     }).catch((error) => console.error('Failed to refresh user profile statistics:', error));
-  }, [location.pathname]);
+  }, [userId, location.pathname]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId || location.pathname !== '/dashboard') return;
     api.get('/quiz/daily/status')
       .then((res) => { if (res.success) setDailyStatus(res); })
       .catch((error) => console.error('Failed to fetch daily quiz status', error));
-  }, [user, location.pathname]);
+  }, [userId, location.pathname]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -145,6 +147,7 @@ export default function App() {
             <Route path="/joueur/:userId" element={protectedScreen(<PublicProfileScreen />)} />
             <Route path="/boutique" element={protectedScreen(<ShopScreen key="shop" user={user} mode="shop" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
             <Route path="/collection" element={protectedScreen(<ShopScreen key="collection" user={user} mode="collection" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
+            <Route path="/echanges" element={protectedScreen(<TradeScreen user={user} />)} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
           </Suspense>

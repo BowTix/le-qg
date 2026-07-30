@@ -486,7 +486,7 @@ export default function AdminScreen({ onBack }) {
           <ArrowLeft size={16} />
           Retour Dashboard
         </button>
-        <h2 style={{ fontSize: '1.8rem', color: '#fb7185', fontFamily: "'Plus Jakarta Sans', sans-serif", fontWeight: 800, letterSpacing: '-0.04em' }}>
+        <h2 style={{ fontSize: '1.8rem', color: '#fb7185', fontFamily: "'Cabinet Grotesk', sans-serif", fontWeight: 800, letterSpacing: '-0.04em' }}>
           🛡️ Espace Administrateur
         </h2>
       </div>
@@ -501,7 +501,7 @@ export default function AdminScreen({ onBack }) {
         gap: '4px',
         width: 'fit-content',
         marginTop: '-10px',
-        fontFamily: "'Manrope', sans-serif"
+        fontFamily: "'Satoshi', sans-serif"
       }}>
         <button
           onClick={() => { setActiveTab('themes'); setError(''); setSuccess(''); }}
@@ -792,7 +792,7 @@ export default function AdminScreen({ onBack }) {
         }}>
           <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Cabinet Grotesk', sans-serif", letterSpacing: '-0.04em' }}>
                 {editingQuestionId ? "Modifier la Question" : "Ajouter une Question"}
               </h3>
               <button
@@ -881,7 +881,7 @@ export default function AdminScreen({ onBack }) {
         }}>
           <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Cabinet Grotesk', sans-serif", letterSpacing: '-0.04em' }}>
                 📅 Quiz du {selectedDayStr}
               </h3>
               <button

@@ -177,30 +177,23 @@ class QuestController {
      */
     private function generateQuestsIfNeeded($db, $userId) {
         $now = date('Y-m-d H:i:s');
-
-        // 1. Check daily quests
-        $stmtDaily = $db->prepare("
-            SELECT COUNT(*) FROM user_quests uq
+        $stmt = $db->prepare("
+            SELECT q.type, COUNT(*) AS active_count
+            FROM user_quests uq
             JOIN quests q ON uq.quest_id = q.id
-            WHERE uq.user_id = ? AND q.type = 'daily' AND uq.expires_at > ?
+            WHERE uq.user_id = ? AND uq.expires_at > ?
+            GROUP BY q.type
         ");
-        $stmtDaily->execute([$userId, $now]);
-        $hasDaily = $stmtDaily->fetchColumn() > 0;
-
-        if (!$hasDaily) {
-            $this->assignNewQuests($db, $userId, 'daily');
+        $stmt->execute([$userId, $now]);
+        $active = ['daily' => 0, 'weekly' => 0];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $active[$row['type']] = (int) $row['active_count'];
         }
 
-        // 2. Check weekly quests
-        $stmtWeekly = $db->prepare("
-            SELECT COUNT(*) FROM user_quests uq
-            JOIN quests q ON uq.quest_id = q.id
-            WHERE uq.user_id = ? AND q.type = 'weekly' AND uq.expires_at > ?
-        ");
-        $stmtWeekly->execute([$userId, $now]);
-        $hasWeekly = $stmtWeekly->fetchColumn() > 0;
-
-        if (!$hasWeekly) {
+        if ($active['daily'] === 0) {
+            $this->assignNewQuests($db, $userId, 'daily');
+        }
+        if ($active['weekly'] === 0) {
             $this->assignNewQuests($db, $userId, 'weekly');
         }
     }

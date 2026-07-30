@@ -324,6 +324,15 @@ try {
             }
             break;
 
+        case '/api/lobby/chrono-bomb/answer':
+            if ($method === 'POST') {
+                (new \App\Controllers\ChronoBombController())->submit(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(['error' => 'Method not allowed']);
+            }
+            break;
+
         case '/api/lobby/tribunal/submit':
             if ($method === 'POST') {
                 (new \App\Controllers\LobbyController())->submitTribunalAnswer(getRequestBody());
@@ -492,6 +501,15 @@ try {
         case '/api/trades/cancel':
             if ($method === 'POST') {
                 (new \App\Controllers\TradeController())->cancel(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shop/summary':
+            if ($method === 'GET') {
+                (new \App\Controllers\ShopController())->getCollectionSummary();
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);

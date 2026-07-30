@@ -4,6 +4,8 @@ import { api, PUBLIC_BASE } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
 import { Users, User, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins, Eye, EyeOff, MessageSquare } from 'lucide-react';
 import Pusher from 'pusher-js';
+import ChronoBombGame from './ChronoBombGame';
+import '../chrono-bomb.css';
 
 function PlayerProfileLink({ player, children, className = '', style }) {
   const navigate = useNavigate();
@@ -70,6 +72,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   const feedbackRef = useRef(null);
   const totalQuestions = useRef(10);
   const gamePhaseRef = useRef('waiting');
+  const gameModeRef = useRef(null);
 
   // === WEBSOCKET REFS ===
   const pusherRef = useRef(null);
@@ -88,6 +91,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   const handleAnswerRef = useRef(null);
   const handleFinishRef = useRef(null);
   const fetchStatusRef = useRef(null);
+  const applyChronoPassRef = useRef(null);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -109,7 +113,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
         if (prev <= 100) {
           clearInterval(countdownRef.current);
           setGamePhase('playing');
-          if (fetchQuestionRef.current) fetchQuestionRef.current(0);
+          if (gameModeRef.current !== 'chrono_bomb' && fetchQuestionRef.current) fetchQuestionRef.current(0);
+          else if (gameModeRef.current === 'chrono_bomb' && fetchStatusRef.current) fetchStatusRef.current();
           return 0;
         }
         const nextValue = prev - 100;
@@ -223,6 +228,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
       }
     }
 
+    gameModeRef.current = data.game_mode;
     setLobbyState(data);
     
     if (data.status === 'playing' && data.game_mode === 'imposteur' && data.imposteur && !data.imposteur.my_word) {
@@ -248,7 +254,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
       } else {
         // Countdown already elapsed (e.g. reconnect)
         setGamePhase('playing');
-        if (fetchQuestionRef.current) fetchQuestionRef.current(0);
+        if (gameModeRef.current !== 'chrono_bomb' && fetchQuestionRef.current) fetchQuestionRef.current(0);
       }
     }
 
@@ -259,10 +265,37 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
     }
   }, [user.id, startCountdown]);
 
+  const applyChronoPass = useCallback((pass) => {
+    setLobbyState((previous) => {
+      if (!previous?.chrono_bomb || previous.chrono_bomb.round !== pass.round) return previous;
+      const alreadyApplied = previous.chrono_bomb.used_answers.some(
+        (item) => item.user_id === pass.user_id && item.answer === pass.accepted_answer,
+      );
+      if (alreadyApplied) return previous;
+      const author = previous.players.find((player) => player.user_id === pass.user_id);
+      return {
+        ...previous,
+        players: previous.players.map((player) => player.user_id === pass.user_id
+          ? { ...player, score: player.score + 1 }
+          : player),
+        chrono_bomb: {
+          ...previous.chrono_bomb,
+          current_player_id: pass.next_player_id,
+          used_answers: [...previous.chrono_bomb.used_answers, {
+            answer: pass.accepted_answer,
+            user_id: pass.user_id,
+            username: author?.username || 'Joueur',
+          }].slice(-12),
+        },
+      };
+    });
+  }, []);
+
   const applyLobbyStateRef = useRef(null);
   useEffect(() => {
     applyLobbyStateRef.current = applyLobbyState;
-  }, [applyLobbyState]);
+    applyChronoPassRef.current = applyChronoPass;
+  }, [applyLobbyState, applyChronoPass]);
 
   // ============================================================
   // INITIALIZE PUSHER (once we know the credentials from /status)
@@ -280,7 +313,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
       }
       const pusher = new Pusher(data.pusher_key, {
         cluster: data.pusher_cluster || 'eu',
-        forceTLS: true
+        forceTLS: true,
+        enabledTransports: ['ws']
       });
       pusherRef.current = pusher;
 
@@ -291,6 +325,14 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
       // payload, so we apply it immediately — no follow-up HTTP request.
       // This is what makes actions feel instant to OTHER players: they
       // never wait on a fetch, they just receive the new state.
+      channel.bind('chrono_bomb_passed', (pass) => {
+        if (applyChronoPassRef.current) applyChronoPassRef.current(pass);
+      });
+
+      channel.bind('lobby_refresh', () => {
+        if (fetchStatusRef.current) fetchStatusRef.current();
+      });
+
       channel.bind('lobby_state', (state) => {
         if (applyLobbyStateRef.current) {
           applyLobbyStateRef.current(state);
@@ -633,7 +675,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   const handleStartGame = async () => {
     try {
       await api.post('/lobby/start', { room_code: roomCode });
-      fetchStatus();
+      if (!pusherActiveRef.current) fetchStatus();
     } catch (err) {
       setError(err.message || 'Erreur au démarrage.');
     }
@@ -734,6 +776,8 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                   lobbyState.game_mode === 'sudden_death' && "Mort Subite"
               }{
                   lobbyState.game_mode === 'guess_number' && "Le Juste Nombre"
+              }{
+                  lobbyState.game_mode === 'chrono_bomb' && "Chrono-Bomb"
               }
               </span>
                 <h2 style={{ fontSize: '1.5rem', marginTop: '4px' }}>Thème : {lobbyState.pack_name}</h2>
@@ -831,7 +875,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
             {isHost ? (
                 <button className="btn-primary" onClick={handleStartGame}
                         style={{ width: '100%', padding: '14px', fontSize: '1rem' }}
-                        disabled={lobbyState.players.length < 1}>
+                        disabled={lobbyState.players.length < (lobbyState.game_mode === 'chrono_bomb' ? 2 : 1)}>
                   <Play size={20} /> Lancer la Partie ({lobbyState.players.length} joueur{lobbyState.players.length > 1 ? 's' : ''})
                 </button>
             ) : (
@@ -892,6 +936,20 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
   }
 
   // ============================================================
+  if (lobbyState.game_mode === 'chrono_bomb' && gamePhase === 'playing' && lobbyState.chrono_bomb) {
+    return (
+      <ChronoBombGame
+        data={lobbyState.chrono_bomb}
+        players={lobbyState.players}
+        userId={user.id}
+        roomCode={roomCode}
+        api={api}
+        onRefresh={fetchStatus}
+        onPass={applyChronoPass}
+      />
+    );
+  }
+
   // RENDER: TRIBUNAL
   // ============================================================
   const renderTribunalGame = () => {

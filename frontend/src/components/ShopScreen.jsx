@@ -354,7 +354,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
               <button className="btn-secondary" onClick={onBack} style={{ padding: '8px 16px', marginBottom: '8px', borderRadius: '12px' }}>
                 <ArrowLeft size={16} /> Retour
               </button>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: "'Plus Jakarta Sans', sans-serif", letterSpacing: '-0.04em', color: '#fff' }}>
+              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: "'Cabinet Grotesk', sans-serif", letterSpacing: '-0.04em', color: '#fff' }}>
                 {mode === 'collection' ? 'Mon Album de Collection' : 'Boutique du QG'}
               </h1>
               <p className="shop-page__subtitle">
@@ -389,7 +389,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                       gap: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      fontFamily: "'Manrope', sans-serif"
+                      fontFamily: "'Satoshi', sans-serif"
                     }}
                 >
                   <Sparkles size={16} /> Boutique de Cosmétiques
@@ -410,7 +410,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                       gap: '6px',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
-                      fontFamily: "'Manrope', sans-serif"
+                      fontFamily: "'Satoshi', sans-serif"
                     }}
                 >
                   <Sparkles size={16} /> Booster de Cartes

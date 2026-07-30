@@ -2,12 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import { getLevel, getLevelBadge, getLevelProgressDetails } from '../utils/progression';
 import {
-  ArenaCard,
   CollectionCard,
   CreatorCard,
-  DailyHero,
+  MultiplayerPortal,
   ProgressCard,
-  SoloCard,
+  SoloPortal,
   WalletCard,
 } from './dashboard/DashboardCards';
 import MissionsPanel from './dashboard/MissionsPanel';
@@ -29,7 +28,7 @@ export default function DashboardScreen({
   onOpenCollection,
   onOpenCreator,
 }) {
-  const [collectionData, setCollectionData] = useState(() => readCache('cache_collection', null));
+  const [collectionData, setCollectionData] = useState(() => readCache('cache_collection_summary', null));
   const [quests, setQuests] = useState(() => readCache('cache_quests', []));
   const [activeTab, setActiveTab] = useState('daily');
   const [claimingQuestId, setClaimingQuestId] = useState(null);
@@ -41,8 +40,11 @@ export default function DashboardScreen({
 
   const fetchCollection = async () => {
     try {
-      const data = await api.get('/shop/collection');
-      if (data) { setCollectionData(data); localStorage.setItem('cache_collection', JSON.stringify(data)); }
+      const data = await api.get('/shop/summary');
+      if (data?.success) {
+        setCollectionData(data);
+        localStorage.setItem('cache_collection_summary', JSON.stringify(data));
+      }
     } catch (error) { console.error('Failed to fetch collection data', error); }
   };
 
@@ -80,10 +82,10 @@ export default function DashboardScreen({
     finally { setJoining(false); }
   };
 
-  const handleCreateLobby = async () => {
+  const handleCreateLobby = async (gameMode = 'chrono_bomb') => {
     setCreating(true); setCreateError('');
     try {
-      const data = await api.post('/lobby/create', { pack_id: 0, game_mode: 'kculture' });
+      const data = await api.post('/lobby/create', { pack_id: 0, game_mode: gameMode });
       if (data.success && data.room_code) onCreateLobby(data.room_code);
     } catch (error) { setCreateError(error.message || 'Impossible de créer le salon.'); }
     finally { setCreating(false); }
@@ -93,25 +95,47 @@ export default function DashboardScreen({
   const badge = getLevelBadge(level);
   const { currentLevelXp, xpNeededForNextLevel } = getLevelProgressDetails(user.global_score);
   const xpPercentage = xpNeededForNextLevel > 0 ? Math.min(Math.round((currentLevelXp / xpNeededForNextLevel) * 100), 100) : 0;
-  const totalCards = collectionData?.catalog?.cards?.length || 0;
-  const unlockedCards = Object.keys(collectionData?.unlocked_cards || {}).length;
+  const totalCards = collectionData?.total_cards || 0;
+  const unlockedCards = collectionData?.unlocked_cards || 0;
   const collectionPercentage = totalCards > 0 ? Math.round((unlockedCards / totalCards) * 100) : 0;
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^\w/, (letter) => letter.toUpperCase());
 
   return (
     <div className="page page--dashboard">
       <header className="page-intro">
-        <div><span className="kicker">{today} · Saison 01</span><h1>Bonjour, {user.username}.</h1></div>
+        <div>
+          <span className="kicker">{today} · Saison 01</span>
+          <h1>Bonjour {user.username}.</h1>
+        </div>
       </header>
 
       <section className="dashboard-grid">
-        <DailyHero completed={dailyStatus?.completed} attempt={dailyStatus?.attempt} stats={dailyStatus?.stats} onStart={onStartDailyQuiz} />
-        <ProgressCard level={level} badge={badge} currentXp={currentLevelXp} neededXp={xpNeededForNextLevel} percentage={xpPercentage} onOpenLeaderboard={onOpenLeaderboard} />
-        <CollectionCard unlocked={unlockedCards} total={totalCards} percentage={collectionPercentage} onOpen={onOpenCollection} />
-        <WalletCard coins={user.coins || 0} onOpenShop={onOpenShop} onOpenCollection={onOpenCollection} />
+        <div className="dashboard-modes">
+          <SoloPortal
+            completed={dailyStatus?.completed}
+            attempt={dailyStatus?.attempt}
+            onStartDaily={onStartDailyQuiz}
+            onStartQuiz={() => onStartSolo(0, 'kculture')}
+          />
+          <MultiplayerPortal
+            roomCode={roomCode}
+            setRoomCode={setRoomCode}
+            joining={joining}
+            creating={creating}
+            joinError={joinError}
+            createError={createError}
+            onJoin={handleJoinLobby}
+            onCreate={handleCreateLobby}
+          />
+        </div>
+
+        <div className="dashboard-progression" aria-label="Votre progression">
+          <CollectionCard unlocked={unlockedCards} total={totalCards} percentage={collectionPercentage} onOpen={onOpenCollection} />
+          <WalletCard coins={user.coins || 0} onOpenShop={onOpenShop} />
+          <ProgressCard level={level} badge={badge} currentXp={currentLevelXp} neededXp={xpNeededForNextLevel} percentage={xpPercentage} onOpenLeaderboard={onOpenLeaderboard} />
+        </div>
+
         <CreatorCard onOpen={onOpenCreator} />
-        <SoloCard onStart={() => onStartSolo(0, 'kculture')} />
-        <ArenaCard roomCode={roomCode} setRoomCode={setRoomCode} joining={joining} creating={creating} joinError={joinError} createError={createError} onJoin={handleJoinLobby} onCreate={handleCreateLobby} />
         <MissionsPanel quests={quests} activeTab={activeTab} onTabChange={setActiveTab} claimingId={claimingQuestId} onClaim={handleClaimQuest} />
       </section>
     </div>

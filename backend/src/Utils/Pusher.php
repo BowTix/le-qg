@@ -39,15 +39,15 @@ class Pusher {
         $stringToSign = "POST\n$path\n$queryString";
         $signature = hash_hmac('sha256', $stringToSign, $appSecret);
 
-        $url = "http://api-$cluster.pusher.com$path?$queryString&auth_signature=$signature";
+        $url = "https://api-$cluster.pusher.com$path?$queryString&auth_signature=$signature";
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         // Force IPv4 resolution to prevent slow IPv6 lookup on Windows local dev
         curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
         // Short, hard timeouts: this call must never become the bottleneck
