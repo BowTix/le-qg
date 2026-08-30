@@ -65,6 +65,15 @@ try {
             }
             break;
 
+        case '/api/auth/google':
+            if ($method === 'POST') {
+                (new \App\Controllers\AuthController())->googleAuth(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         case '/api/auth/profile':
             if ($method === 'GET') {
                 (new \App\Controllers\AuthController())->profile();

@@ -1,5 +1,6 @@
 # Secret Environment Variables
 backend/.env
+/frontend/.env
 
 # Aiven SSL Certificates
 backend/ca.pem

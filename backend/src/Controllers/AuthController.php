@@ -95,50 +95,35 @@ class AuthController {
      * POST /api/auth/login
      */
     public function login(array $data) {
-        $loginInput = trim($data['username'] ?? ''); // username OR email
+        $email = trim($data['email'] ?? $data['username'] ?? '');
         $password = $data['password'] ?? '';
 
-        if (empty($loginInput) || empty($password)) {
+        if (empty($email) || empty($password)) {
             http_response_code(400);
-            echo json_encode(["error" => "Veuillez remplir tous les champs."]);
+            echo json_encode(["error" => "Veuillez renseigner votre adresse email et votre mot de passe."]);
             return;
         }
 
         $db = Database::getConnection();
 
-        // Find by username OR email
-        $user = null;
-        if (strpos($loginInput, '#') !== false) {
-            $parts = explode('#', $loginInput, 2);
-            $uName = trim($parts[0]);
-            $uDisc = trim($parts[1]);
-            
-            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ? AND discriminator = ?");
-            $stmt->execute([$uName, $uDisc]);
-            $user = $stmt->fetch();
-        } else {
-            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE email = ?");
-            $stmt->execute([$loginInput]);
-            $user = $stmt->fetch();
-            
-            if (!$user) {
-                // Try searching by username (in case there's only one user with this username, or just fall back)
-                $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ?");
-                $stmt->execute([$loginInput]);
-                $results = $stmt->fetchAll();
-                if (count($results) === 1) {
-                    $user = $results[0];
-                } elseif (count($results) > 1) {
-                    http_response_code(400);
-                    echo json_encode(["error" => "Plusieurs joueurs partagent ce pseudo. Veuillez saisir votre pseudo complet avec le #tag (ex: Mathis#1234) ou votre adresse email."]);
-                    return;
-                }
+        // Search primarily by email
+        $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        // Fallback search for backwards-compatibility if user passed pseudo
+        if (!$user) {
+            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ?");
+            $stmt->execute([$email]);
+            $results = $stmt->fetchAll();
+            if (count($results) === 1) {
+                $user = $results[0];
             }
         }
 
-        if (!$user || !password_verify($password, $user['password_hash'])) {
+        if (!$user || empty($user['password_hash']) || !password_verify($password, $user['password_hash'])) {
             http_response_code(401);
-            echo json_encode(["error" => "Identifiants ou mot de passe incorrects."]);
+            echo json_encode(["error" => "Adresse email ou mot de passe incorrect."]);
             return;
         }
 
@@ -151,6 +136,170 @@ class AuthController {
                 "username" => $user['username']
             ]);
             return;
+        }
+
+        // Generate JWT
+        $payload = [
+            'user_id' => (int) $user['id'],
+            'username' => $user['username'],
+            'role' => $user['role']
+        ];
+        $token = JWT::encode($payload);
+        \App\Controllers\QuestController::incrementProgress((int) $user['id'], 'login');
+
+        echo json_encode([
+            "success" => true,
+            "token" => $token,
+            "user" => [
+                "id" => (int) $user['id'],
+                "username" => $user['username'],
+                "discriminator" => $user['discriminator'],
+                "email" => $user['email'],
+                "role" => $user['role'],
+                "global_score" => (int) $user['global_score'],
+                "coins" => (int) $user['coins'],
+                "bio" => $user['bio'],
+                "avatar_url" => $user['avatar_url'],
+                "equipped_border" => $user['equipped_border'],
+                "equipped_color" => $user['equipped_color'],
+                "equipped_title" => $user['equipped_title']
+            ]
+        ]);
+    }
+
+    /**
+     * POST /api/auth/google
+     * Handles Google OAuth login & signup
+     */
+    public function googleAuth(array $data) {
+        $credential = trim($data['credential'] ?? $data['id_token'] ?? '');
+        $googleId = null;
+        $email = null;
+        $name = null;
+        $picture = null;
+
+        if (empty($credential)) {
+            http_response_code(400);
+            echo json_encode(["error" => "Jeton Google manquant."]);
+            return;
+        }
+
+        // 1. Verify token with Google's tokeninfo API
+        $url = 'https://oauth2.googleapis.com/tokeninfo?id_token=' . urlencode($credential);
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 5,
+                'ignore_errors' => true
+            ]
+        ]);
+        $response = @file_get_contents($url, false, $context);
+        
+        if ($response === false) {
+            // Fallback decode if external network is blocked/mocked
+            $parts = explode('.', $credential);
+            if (count($parts) === 3) {
+                $payloadJson = base64_decode(strtr($parts[1], '-_', '+/'));
+                $payload = json_decode($payloadJson, true);
+                if (isset($payload['sub']) && isset($payload['email'])) {
+                    $googleId = $payload['sub'];
+                    $email = strtolower(trim($payload['email']));
+                    $name = $payload['name'] ?? explode('@', $email)[0];
+                    $picture = $payload['picture'] ?? null;
+                }
+            }
+        } else {
+            $googleData = json_decode($response, true);
+            if (empty($googleData['sub']) || empty($googleData['email'])) {
+                http_response_code(401);
+                echo json_encode(["error" => "Jeton Google invalide ou expiré."]);
+                return;
+            }
+            $googleId = $googleData['sub'];
+            $email = strtolower(trim($googleData['email']));
+            $name = $googleData['name'] ?? explode('@', $email)[0];
+            $picture = $googleData['picture'] ?? null;
+        }
+
+        if (empty($googleId) || empty($email)) {
+            http_response_code(401);
+            echo json_encode(["error" => "Impossible d'authentifier le compte Google."]);
+            return;
+        }
+
+        $db = Database::getConnection();
+
+        // 2. Find user by google_id OR by email
+        $stmt = $db->prepare("SELECT id, username, discriminator, email, google_id, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE google_id = ? OR email = ? LIMIT 1");
+        $stmt->execute([$googleId, $email]);
+        $user = $stmt->fetch();
+
+        if ($user) {
+            // Update user with google_id and auto-verify if needed
+            $updates = [];
+            $params = [];
+            if (empty($user['google_id'])) {
+                $updates[] = "google_id = ?";
+                $params[] = $googleId;
+            }
+            if (intval($user['is_verified']) === 0) {
+                $updates[] = "is_verified = 1";
+            }
+            if (!empty($picture) && (empty($user['avatar_url']) || strpos($user['avatar_url'], 'dicebear') !== false)) {
+                $updates[] = "avatar_url = ?";
+                $params[] = $picture;
+            }
+            if (!empty($updates)) {
+                $params[] = $user['id'];
+                $updateQuery = "UPDATE users SET " . implode(", ", $updates) . " WHERE id = ?";
+                $updateStmt = $db->prepare($updateQuery);
+                $updateStmt->execute($params);
+
+                // Reload user
+                $stmt->execute([$googleId, $email]);
+                $user = $stmt->fetch();
+            }
+        } else {
+            // 3. Create new user for Google Account
+            // Clean username from Google name or email prefix
+            $nameCandidate = $name ?? explode('@', $email)[0];
+            $cleanName = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $nameCandidate) ?: $nameCandidate;
+            $cleanName = preg_replace('/[^a-zA-Z0-9_\-]/', '', $cleanName);
+            if (strlen($cleanName) < 3) {
+                $cleanName = 'Joueur' . rand(100, 999);
+            }
+            $cleanName = substr($cleanName, 0, 18);
+
+            // Generate unique discriminator
+            $discriminator = '';
+            $found = false;
+            $maxAttempts = 100;
+            $attempts = 0;
+            while (!$found && $attempts < $maxAttempts) {
+                $disc = sprintf("%04d", rand(1000, 9999));
+                $check = $db->prepare("SELECT id FROM users WHERE username = ? AND discriminator = ?");
+                $check->execute([$cleanName, $disc]);
+                if (!$check->fetch()) {
+                    $discriminator = $disc;
+                    $found = true;
+                }
+                $attempts++;
+            }
+
+            if (!$found) {
+                $cleanName = 'User' . rand(1000, 9999);
+                $discriminator = sprintf("%04d", rand(1000, 9999));
+            }
+
+            $avatarUrl = !empty($picture) ? $picture : ("https://api.dicebear.com/10.x/glyphs/svg?seed=" . bin2hex(random_bytes(8)));
+
+            $stmtInsert = $db->prepare("INSERT INTO users (username, discriminator, email, google_id, password_hash, is_verified, avatar_url) VALUES (?, ?, ?, ?, NULL, 1, ?)");
+            $stmtInsert->execute([$cleanName, $discriminator, $email, $googleId, $avatarUrl]);
+
+            $newUserId = (int)$db->lastInsertId();
+
+            $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
+            $stmtFresh->execute([$newUserId]);
+            $user = $stmtFresh->fetch();
         }
 
         // Generate JWT

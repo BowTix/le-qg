@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ArrowRight,
   Bomb,
@@ -7,6 +7,7 @@ import {
   Gamepad2,
   Grid3X3,
   LayoutGrid,
+  Lightbulb,
   LockKeyhole,
   Play,
   Plus,
@@ -18,6 +19,7 @@ import {
   Zap,
   X,
 } from 'lucide-react';
+import { GAME_CATEGORIES, getSoloGamesByCategory } from '../../utils/gamesCatalog';
 
 export function ProgressBar({ value, color = '#2dd4bf' }) {
   const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
@@ -140,15 +142,24 @@ function PortalGame({
 }
 
 export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz }) {
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const answers = [attempt?.q1_correct, attempt?.q2_correct, attempt?.q3_correct];
   const correctCount = answers.filter(Boolean).length;
+
+  const filteredGames = getSoloGamesByCategory(selectedCategory);
+
+  const handleGameAction = (gameId) => {
+    if (gameId === 'kculture') {
+      onStartQuiz();
+    }
+  };
 
   return (
     <article className="mode-portal mode-portal--solo">
       <span className="mode-portal__glow" aria-hidden="true" />
       <header className="mode-portal__header">
         <div>
-          <span className="mode-portal__eyebrow"><Sparkles size={13} /> Mode solo & passe-temps</span>
+          <span className="mode-portal__eyebrow"><Gamepad2 size={13} /> Mode solo & passe-temps</span>
           <h2>Pause & Détente</h2>
           <p>Quelques minutes devant toi ? Choisis ton défi et joue à ton rythme.</p>
         </div>
@@ -159,41 +170,45 @@ export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz }) {
         <button className={`daily-portal${completed ? ' is-completed' : ''}`} type="button" onClick={onStartDaily} disabled={completed}>
           <span className="daily-portal__copy">
             <small>Le défi à ne pas manquer</small>
-            <strong>{completed ? 'Quiz du Jour termin\u00e9' : 'Quiz du Jour'}</strong>
-            <span>{completed ? `${correctCount}/3 bonnes r\u00e9ponses \u00b7 Reviens demain` : '3 questions \u00b7 Bonus quotidien'}</span>
+            <strong>{completed ? 'Quiz du Jour terminé' : 'Quiz du Jour'}</strong>
+            <span>{completed ? `${correctCount}/3 bonnes réponses · Reviens demain` : '3 questions · Bonus quotidien'}</span>
             <b>{completed ? <><Check size={15} /> Défi relevé</> : <>Jouer maintenant <ArrowRight size={15} /></>}</b>
           </span>
           <span className="daily-portal__visual"><DailyQuizArtwork completed={completed} /></span>
         </button>
 
-        <div className="solo-portal__quick">
-          <PortalGame
-            icon={Gamepad2}
-            eyebrow="Quiz libre"
-            title="Pop-culture"
-            description="Sans chrono"
-            action="Jouer"
-            onClick={onStartQuiz}
-            accent="teal"
-          />
-          <PortalGame
-            icon={Grid3X3}
-            eyebrow="6 essais"
-            title={'Mot Myst\u00e8re'}
-            description="Pop-culture"
-            action={'Bient\u00f4t'}
-            disabled
-            accent="lime"
-          />
-          <PortalGame
-            icon={LayoutGrid}
-            eyebrow={'3 difficult\u00e9s'}
-            title="Sudoku"
-            description={'\u00c0 ton rythme'}
-            action={'Bient\u00f4t'}
-            disabled
-            accent="amber"
-          />
+        <div className="solo-portal__catalog">
+          <div className="solo-portal__catalog-header">
+            <div className="solo-category-tabs">
+              {GAME_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={`solo-category-tab ${selectedCategory === cat.id ? 'is-active' : ''}`}
+                  onClick={() => setSelectedCategory(cat.id)}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+            <span className="solo-catalog-count">{filteredGames.length} jeux</span>
+          </div>
+
+          <div className="solo-portal__scrollable">
+            {filteredGames.map((game) => (
+              <PortalGame
+                key={game.id}
+                icon={game.icon}
+                eyebrow={game.eyebrow}
+                title={game.title}
+                description={game.description}
+                action={game.actionLabel}
+                disabled={game.status !== 'available'}
+                onClick={() => handleGameAction(game.id)}
+                accent={game.accent}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </article>
@@ -268,45 +283,101 @@ export function MultiplayerPortal({
   );
 }
 
-export function ProgressCard({ level, badge, currentXp, neededXp, percentage, onOpenLeaderboard }) {
-  return (
-    <button
-      className="dashboard-card dashboard-card--glass dashboard-card--progress"
-      type="button"
-      onClick={onOpenLeaderboard}
-      aria-label={`Voir le classement, niveau ${level}`}
-    >
-      <div className="card-topline"><span className="icon-box"><Trophy size={20} /></span><ChevronRight size={20} /></div>
-      <div className="card-bottom">
-        <span className="card-label">Progression <span aria-hidden="true">&middot;</span> {badge}</span>
-        <div className="value-row"><h2>Niveau {level}</h2><strong>{percentage}%</strong></div>
-        <ProgressBar value={percentage} />
-        <span className="mono-note progress-card__xp">{currentXp} / {neededXp} XP</span>
-      </div>
-    </button>
-  );
-}
-
 export function CollectionCard({ unlocked, total, percentage, onOpen }) {
+  const safeUnlocked = unlocked || 0;
+  const safeTotal = total || 0;
+  const remaining = Math.max(0, safeTotal - safeUnlocked);
+
   return (
-    <button className="dashboard-card dashboard-card--collection" type="button" onClick={onOpen}>
-      <div className="card-topline"><span className="icon-box"><LayoutGrid size={19} /></span><ChevronRight size={20} /></div>
+    <button className="dashboard-card dashboard-card--kpi dashboard-card--collection" type="button" onClick={onOpen}>
+      <div className="card-topline">
+        <span className="kpi-header-label kpi-header-label--fuchsia">
+          <Sparkles size={14} /> Album & Cartes
+        </span>
+        <ChevronRight size={17} className="kpi-chevron" />
+      </div>
       <div className="card-bottom">
-        <span className="card-label">Album & Deck</span>
-        <div className="value-row"><h2>{unlocked} / {total}</h2><span>cartes</span></div>
+        <div className="value-row">
+          <h2>{safeUnlocked} <span className="value-total">/ {safeTotal}</span></h2>
+          <strong className="kpi-badge kpi-badge--fuchsia">{percentage}%</strong>
+        </div>
         <ProgressBar value={percentage} color="#e879f9" />
+        <div className="kpi-footer-row">
+          <span className="mono-note">
+            {safeUnlocked === 0 ? 'Ouvre tes premiers boosters' : remaining === 0 ? 'Collection complète !' : `Encore ${remaining} cartes à découvrir`}
+          </span>
+        </div>
       </div>
     </button>
   );
 }
 
 export function WalletCard({ coins, onOpenShop }) {
+  const safeCoins = coins || 0;
+  const boosterCount = Math.floor(safeCoins / 250);
+  const boosterProgress = Math.min(100, Math.round(((safeCoins % 250) / 250) * 100));
+  const neededForBooster = Math.max(0, 250 - (safeCoins % 250));
+
   return (
-    <button className="dashboard-card dashboard-card--glass" type="button" onClick={onOpenShop} aria-label="Ouvrir la boutique">
-      <div className="card-topline"><span className="icon-box icon-box--teal"><WalletCards size={20} /></span><ChevronRight size={20} /></div>
+    <button className="dashboard-card dashboard-card--kpi dashboard-card--wallet" type="button" onClick={onOpenShop} aria-label="Ouvrir la boutique">
+      <div className="card-topline">
+        <span className="kpi-header-label kpi-header-label--amber">
+          <Coins size={14} /> Portefeuille
+        </span>
+        <ChevronRight size={17} className="kpi-chevron" />
+      </div>
       <div className="card-bottom">
-        <span className="card-label">Portefeuille</span>
-        <div className="value-row value-row--coins"><Coins size={22} /><h2>{coins.toLocaleString('fr-FR')}</h2><span>coins</span></div>
+        <div className="value-row value-row--coins">
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+            <h2>{safeCoins.toLocaleString('fr-FR')}</h2>
+            <span>coins</span>
+          </div>
+          {safeCoins >= 250 && (
+            <strong className="kpi-badge kpi-badge--amber">{boosterCount} booster{boosterCount > 1 ? 's' : ''}</strong>
+          )}
+        </div>
+        <ProgressBar value={safeCoins >= 250 ? 100 : boosterProgress} color="#fbbf24" />
+        <div className="kpi-footer-row">
+          <span className="mono-note">
+            {safeCoins >= 250 ? (
+              <span style={{ color: '#fcd34d', fontWeight: 650 }}>Prêt pour l'ouverture de booster</span>
+            ) : (
+              `Encore ${neededForBooster} coins pour un booster`
+            )}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+export function ProgressCard({ level, badge, currentXp, neededXp, percentage, onOpenLeaderboard }) {
+  const remainingXp = Math.max(0, (neededXp || 0) - (currentXp || 0));
+
+  return (
+    <button
+      className="dashboard-card dashboard-card--kpi dashboard-card--progress"
+      type="button"
+      onClick={onOpenLeaderboard}
+      aria-label={`Voir le classement, niveau ${level}`}
+    >
+      <div className="card-topline">
+        <span className="kpi-header-label kpi-header-label--teal">
+          <Trophy size={14} /> Progression
+        </span>
+        <ChevronRight size={17} className="kpi-chevron" />
+      </div>
+      <div className="card-bottom">
+        <div className="value-row">
+          <h2>Niveau {level}</h2>
+          <strong className="kpi-badge kpi-badge--teal">{badge}</strong>
+        </div>
+        <ProgressBar value={percentage} color="#2dd4bf" />
+        <div className="kpi-footer-row">
+          <span className="mono-note">
+            {remainingXp > 0 ? `Encore ${remainingXp} XP pour Niv.${level + 1}` : 'Niveau maximal atteint'}
+          </span>
+        </div>
       </div>
     </button>
   );
@@ -315,9 +386,19 @@ export function WalletCard({ coins, onOpenShop }) {
 export function CreatorCard({ onOpen }) {
   return (
     <button className="dashboard-card dashboard-card--creator" type="button" onClick={onOpen}>
-      <span className="icon-box"><Plus size={20} /></span>
-      <span className="creator-card__copy"><small>Mode cr&eacute;ation</small><strong>Une question en t&ecirc;te ? Partage-la avec la communaut&eacute;.</strong></span>
-      <span className="creator-card__action">Cr&eacute;er une question <ArrowRight size={15} /></span>
+      <div className="creator-card__left">
+        <div className="creator-card__icon-box">
+          <Lightbulb size={24} />
+        </div>
+        <div className="creator-card__copy">
+          <h3>Enrichis le Quiz avec tes questions</h3>
+          <p>Propose de nouvelles questions aux packs existants ou crée tes propres thèmes.</p>
+        </div>
+      </div>
+      <div className="creator-card__action">
+        <span>Créer une question</span>
+        <ArrowRight size={15} />
+      </div>
     </button>
   );
 }
