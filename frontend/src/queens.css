@@ -1,0 +1,695 @@
+/* =========================================================
+   QUEENS (JEU DES REINES) — LE QG
+   ========================================================= */
+
+.queens-page {
+  width: min(700px, 98vw);
+  margin: 20px auto 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  user-select: none;
+}
+
+/* 1. Top Header */
+.queens-top-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.queens-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.queens-main-title {
+  margin: 0;
+  font-family: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: clamp(20px, 2.5vw, 28px);
+  font-weight: 800;
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.queens-crown-icon {
+  color: #f59e0b;
+}
+
+.queens-sub-title {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #94a3b8;
+}
+
+.queens-all-grids-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: #1e293b;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #f1f5f9;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.queens-all-grids-btn:hover {
+  background: #334155;
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+/* 2. Control Toolbar */
+.queens-toolbar {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 8px 14px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.queens-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.queens-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.queens-tool-btn:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.85);
+  color: #fff;
+}
+
+.queens-tool-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.queens-date-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  padding: 0 4px;
+}
+
+.queens-timer,
+.queens-tool-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f59e0b;
+  padding: 0 8px;
+}
+
+.queens-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #f1f5f9;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.queens-nav-btn:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.9);
+}
+
+.queens-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.queens-validate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #d946ef, #a855f7);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.35);
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.queens-validate-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.45);
+}
+
+.queens-validate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 3. Queens Board Container */
+.queens-board-card {
+  width: min(480px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  margin-bottom: 20px;
+}
+
+.queens-board-meta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+
+.queens-counter {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.queens-counter-pill {
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(168, 85, 247, 0.2);
+  color: #d8b4fe;
+  font-size: 0.85rem;
+  font-weight: 800;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.queens-counter-pill.is-complete {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.queens-rules-hint {
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+/* 4. The 8x8 Grid */
+.queens-grid-wrapper {
+  width: min(480px, 92vw);
+  aspect-ratio: 1 / 1;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  background: #0f172a;
+  border: 3px solid #334155;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Region Colors (Dark Theme) */
+.queens-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.queens-cell:hover {
+  filter: brightness(1.18);
+}
+
+/* 8 Distinct Region Color Palettes */
+.queens-cell.reg-0 { background-color: #2e1065; } /* Deep Purple */
+.queens-cell.reg-1 { background-color: #451a03; } /* Amber Bronze */
+.queens-cell.reg-2 { background-color: #064e3b; } /* Emerald */
+.queens-cell.reg-3 { background-color: #0c4a6e; } /* Sky Blue */
+.queens-cell.reg-4 { background-color: #4c0519; } /* Rose */
+.queens-cell.reg-5 { background-color: #365314; } /* Lime Olive */
+.queens-cell.reg-6 { background-color: #1e1b4b; } /* Indigo */
+.queens-cell.reg-7 { background-color: #134e4a; } /* Teal */
+
+/* Light Theme Region Colors */
+[data-theme='light'] .queens-cell.reg-0 { background-color: #e0e7ff; }
+[data-theme='light'] .queens-cell.reg-1 { background-color: #fef3c7; }
+[data-theme='light'] .queens-cell.reg-2 { background-color: #d1fae5; }
+[data-theme='light'] .queens-cell.reg-3 { background-color: #e0f2fe; }
+[data-theme='light'] .queens-cell.reg-4 { background-color: #ffe4e6; }
+[data-theme='light'] .queens-cell.reg-5 { background-color: #ecfccb; }
+[data-theme='light'] .queens-cell.reg-6 { background-color: #f3e8ff; }
+[data-theme='light'] .queens-cell.reg-7 { background-color: #ccfbf1; }
+
+[data-theme='light'] .queens-grid-wrapper {
+  background: #f8fafc;
+  border-color: #64748b;
+}
+
+/* Region Borders (Thick separation between different regions) */
+.queens-cell.border-top-diff {
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+}
+.queens-cell.border-bottom-diff {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+}
+.queens-cell.border-left-diff {
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
+}
+.queens-cell.border-right-diff {
+  border-right: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.queens-cell.border-top-same {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.queens-cell.border-bottom-same {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.queens-cell.border-left-same {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+.queens-cell.border-right-same {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='light'] .queens-cell.border-top-diff { border-top: 3px solid #1e293b; }
+[data-theme='light'] .queens-cell.border-bottom-diff { border-bottom: 3px solid #1e293b; }
+[data-theme='light'] .queens-cell.border-left-diff { border-left: 3px solid #1e293b; }
+[data-theme='light'] .queens-cell.border-right-diff { border-right: 3px solid #1e293b; }
+
+[data-theme='light'] .queens-cell.border-top-same { border-top: 1px solid rgba(0, 0, 0, 0.08); }
+[data-theme='light'] .queens-cell.border-bottom-same { border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+[data-theme='light'] .queens-cell.border-left-same { border-left: 1px solid rgba(0, 0, 0, 0.08); }
+[data-theme='light'] .queens-cell.border-right-same { border-right: 1px solid rgba(0, 0, 0, 0.08); }
+
+/* Cell Content: Queen */
+.queens-piece-crown {
+  color: #facc15;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  animation: queenAppear 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes queenAppear {
+  from {
+    transform: scale(0.3) rotate(-15deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* Cell Content: Cross / Marker 'X' */
+.queens-piece-cross {
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 1.1rem;
+  line-height: 1;
+  font-weight: 700;
+  user-select: none;
+}
+
+[data-theme='light'] .queens-piece-cross {
+  color: rgba(71, 85, 105, 0.6);
+}
+
+/* Conflict Indicator */
+.queens-cell.has-conflict {
+  background-color: #7f1d1d !important;
+  animation: conflictPulse 1s infinite alternate;
+}
+
+.queens-cell.has-conflict .queens-piece-crown {
+  color: #f87171 !important;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.8));
+}
+
+@keyframes conflictPulse {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(1.3); }
+}
+
+/* Surlignage de sélection */
+.queens-cell.is-selected {
+  outline: 2px solid #38bdf8;
+  outline-offset: -2px;
+  z-index: 2;
+}
+
+/* 5. Quick Actions Toolbar (below grid) */
+.queens-actions-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  gap: 8px;
+}
+
+.queens-mode-toggle {
+  display: flex;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.queens-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.queens-mode-btn.is-active {
+  background: #334155;
+  color: #f8fafc;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.queens-mode-btn.is-active.queen-mode {
+  color: #facc15;
+}
+
+.queens-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.queens-action-btn:hover:not(:disabled) {
+  background: #334155;
+  color: #fff;
+}
+
+.queens-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 6. Toast notifications */
+.queens-toast {
+  margin-top: 14px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.queens-toast--error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.queens-toast--success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #6ee7b7;
+}
+
+/* 7. Victory Modal */
+.queens-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.queens-modal-card {
+  width: min(440px, 94vw);
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 20px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  animation: scaleUp 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  position: relative;
+}
+
+.queens-victory-crown {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.25), rgba(217, 70, 239, 0.25));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #facc15;
+  margin-bottom: 16px;
+  border: 2px solid rgba(250, 204, 21, 0.4);
+}
+
+.queens-modal-title {
+  margin: 0 0 6px;
+  font-family: 'Cabinet Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.queens-modal-desc {
+  margin: 0 0 20px;
+  color: #94a3b8;
+  font-size: 0.92rem;
+}
+
+.queens-stats-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 22px;
+}
+
+.queens-stat-box {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.queens-stat-val {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.queens-stat-lbl {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.queens-modal-btns {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.queens-modal-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.queens-modal-btn--primary {
+  background: linear-gradient(135deg, #d946ef, #a855f7);
+  color: #fff;
+}
+
+.queens-modal-btn--secondary {
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.queens-modal-btn--secondary:hover {
+  background: #334155;
+  color: #fff;
+}
+
+/* 8. Archives Calendar Modal */
+.queens-calendar-card {
+  width: min(520px, 96vw);
+  background: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+.queens-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.queens-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.queens-cal-day {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.queens-cal-day:hover:not(:disabled) {
+  background: #334155;
+  border-color: #64748b;
+  color: #fff;
+}
+
+.queens-cal-day.is-today {
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.queens-cal-day.is-completed {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.queens-cal-day.is-in-progress {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+}
+
+.queens-cal-day:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.queens-cal-badge {
+  position: absolute;
+  bottom: 2px;
+  font-size: 0.65rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

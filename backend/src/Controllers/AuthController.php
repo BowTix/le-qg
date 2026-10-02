@@ -107,13 +107,13 @@ class AuthController {
         $db = Database::getConnection();
 
         // Search primarily by email
-        $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE email = ?");
+        $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, craft_stars, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
         // Fallback search for backwards-compatibility if user passed pseudo
         if (!$user) {
-            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ?");
+            $stmt = $db->prepare("SELECT id, username, discriminator, email, password_hash, role, global_score, coins, craft_stars, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE username = ?");
             $stmt->execute([$email]);
             $results = $stmt->fetchAll();
             if (count($results) === 1) {
@@ -146,6 +146,7 @@ class AuthController {
         ];
         $token = JWT::encode($payload);
         \App\Controllers\QuestController::incrementProgress((int) $user['id'], 'login');
+        self::trackDailyLogin($db, (int) $user['id']);
 
         echo json_encode([
             "success" => true,
@@ -158,6 +159,7 @@ class AuthController {
                 "role" => $user['role'],
                 "global_score" => (int) $user['global_score'],
                 "coins" => (int) $user['coins'],
+                "craft_stars" => (int) ($user['craft_stars'] ?? 0),
                 "bio" => $user['bio'],
                 "avatar_url" => $user['avatar_url'],
                 "equipped_border" => $user['equipped_border'],
@@ -229,7 +231,7 @@ class AuthController {
         $db = Database::getConnection();
 
         // 2. Find user by google_id OR by email
-        $stmt = $db->prepare("SELECT id, username, discriminator, email, google_id, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE google_id = ? OR email = ? LIMIT 1");
+        $stmt = $db->prepare("SELECT id, username, discriminator, email, google_id, role, global_score, coins, craft_stars, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE google_id = ? OR email = ? LIMIT 1");
         $stmt->execute([$googleId, $email]);
         $user = $stmt->fetch();
 
@@ -297,7 +299,7 @@ class AuthController {
 
             $newUserId = (int)$db->lastInsertId();
 
-            $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
+            $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, craft_stars, is_verified, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
             $stmtFresh->execute([$newUserId]);
             $user = $stmtFresh->fetch();
         }
@@ -310,6 +312,7 @@ class AuthController {
         ];
         $token = JWT::encode($payload);
         \App\Controllers\QuestController::incrementProgress((int) $user['id'], 'login');
+        self::trackDailyLogin($db, (int) $user['id']);
 
         echo json_encode([
             "success" => true,
@@ -322,6 +325,7 @@ class AuthController {
                 "role" => $user['role'],
                 "global_score" => (int) $user['global_score'],
                 "coins" => (int) $user['coins'],
+                "craft_stars" => (int) ($user['craft_stars'] ?? 0),
                 "bio" => $user['bio'],
                 "avatar_url" => $user['avatar_url'],
                 "equipped_border" => $user['equipped_border'],
@@ -508,7 +512,7 @@ class AuthController {
         }
 
         // Fetch fresh profile data
-        $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
+        $stmtFresh = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, craft_stars, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
         $stmtFresh->execute([$userId]);
         $freshUser = $stmtFresh->fetch();
 
@@ -532,6 +536,7 @@ class AuthController {
                 "role" => $freshUser['role'],
                 "global_score" => (int) $freshUser['global_score'],
                 "coins" => (int) $freshUser['coins'],
+                "craft_stars" => (int) ($freshUser['craft_stars'] ?? 0),
                 "bio" => $freshUser['bio'],
                 "avatar_url" => $freshUser['avatar_url'],
                 "equipped_border" => $freshUser['equipped_border'],
@@ -549,7 +554,7 @@ class AuthController {
 
         $db = Database::getConnection();
         
-        $stmt = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
+        $stmt = $db->prepare("SELECT id, username, discriminator, email, role, global_score, coins, craft_stars, bio, avatar_url, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
         $stmt->execute([$authUser['user_id']]);
         $profile = $stmt->fetch();
         
@@ -558,6 +563,8 @@ class AuthController {
             echo json_encode(["error" => "Utilisateur introuvable."]);
             return;
         }
+
+        self::trackDailyLogin($db, (int) $authUser['user_id']);
         
         echo json_encode([
             "success" => true,
@@ -569,6 +576,7 @@ class AuthController {
                 "role" => $profile['role'],
                 "global_score" => (int) $profile['global_score'],
                 "coins" => (int) $profile['coins'],
+                "craft_stars" => (int) ($profile['craft_stars'] ?? 0),
                 "bio" => $profile['bio'],
                 "avatar_url" => $profile['avatar_url'],
                 "equipped_border" => $profile['equipped_border'],
@@ -650,5 +658,21 @@ class AuthController {
             "message" => "Avatar téléversé avec succès !",
             "avatar_url" => $avatarUrl
         ]);
+    }
+
+    private static function trackDailyLogin(\PDO $db, int $userId): void {
+        try {
+            $today = date('Y-m-d');
+            $stmt = $db->prepare("SELECT last_login_date FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $lastDate = $stmt->fetchColumn();
+
+            if ($lastDate !== $today) {
+                $db->prepare("UPDATE users SET last_login_date = ? WHERE id = ?")->execute([$today, $userId]);
+                \App\Controllers\QuestController::incrementProgress($userId, 'login_days', 1);
+            }
+        } catch (\Throwable $e) {
+            error_log("Failed tracking login_days: " . $e->getMessage());
+        }
     }
 }

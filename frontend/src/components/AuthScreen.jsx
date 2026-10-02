@@ -282,20 +282,16 @@ export default function AuthScreen({ onAuthSuccess }) {
       >
         
         {/* Header Title */}
-        <div className="text-center" style={{ fontFamily: "'Cabinet Grotesk', sans-serif", marginBottom: '28px' }}>
+        <div className="text-center" style={{ fontFamily: "'Cabinet Grotesk', sans-serif", marginBottom: '8px' }}>
           <h1 style={{ 
             color: '#fff', 
-            fontSize: 'clamp(2.2rem, 5vw, 2.8rem)', 
-            marginBottom: '8px', 
+            fontSize: 'clamp(2.2rem, 5vw, 2.8rem)',
             fontWeight: 800, 
             letterSpacing: '-0.06em',
             textShadow: '0 0 40px rgba(45,212,191,0.2)'
           }}>
-            LE <span style={{ color: '#2dd4bf' }}>QG</span>
+            OMNIA
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500, margin: 0 }}>
-            Défiez vos amis sur le Quiz Général
-          </p>
         </div>
 
         {/* Verification Screen */}

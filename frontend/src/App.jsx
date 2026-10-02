@@ -1,8 +1,9 @@
-import React, { lazy, Suspense, useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState, useCallback } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import AuthScreen from './components/AuthScreen';
 import DashboardScreen from './components/DashboardScreen';
 import AppShell, { AuthHeader } from './components/layout/AppShell';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import { api } from './utils/api';
 
 const AdminScreen = lazy(() => import('./components/AdminScreen'));
@@ -14,6 +15,10 @@ const ProfileScreen = lazy(() => import('./components/ProfileScreen'));
 const PublicProfileScreen = lazy(() => import('./components/PublicProfileScreen'));
 const ShopScreen = lazy(() => import('./components/ShopScreen'));
 const SoloQuizScreen = lazy(() => import('./components/SoloQuizScreen'));
+const MysteryWordScreen = lazy(() => import('./components/MysteryWordScreen'));
+const SudokuScreen = lazy(() => import('./components/SudokuScreen'));
+const QueensScreen = lazy(() => import('./components/QueensScreen'));
+const ShikakuScreen = lazy(() => import('./components/ShikakuScreen'));
 const TradeScreen = lazy(() => import('./components/trades/TradeScreen'));
 
 function PrivateRoute({ user, authLoading, children }) {
@@ -31,14 +36,13 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [dailyStatus, setDailyStatus] = useState({ scheduled: false, completed: false });
-  const [theme, setTheme] = useState(() => localStorage.getItem('quiz_theme') || 'dark');
   const userId = user?.id;
   const { soloPackId, soloGameMode, roomCode } = location.state || {};
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('quiz_theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.removeItem('quiz_theme');
+  }, []);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('quiz_token');
@@ -90,14 +94,17 @@ export default function App() {
     return () => window.removeEventListener('trade_inventory_changed', refreshAfterTrade);
   }, [user]);
 
-  const updateUserStats = (stats) => {
+  const updateUserStats = useCallback((stats, maybeCoins) => {
     setUser((current) => {
       if (!current) return current;
-      const updated = { ...current, ...stats };
+      const patch = typeof stats === 'object' && stats !== null
+        ? stats
+        : { global_score: stats, ...(maybeCoins !== undefined ? { coins: maybeCoins } : {}) };
+      const updated = { ...current, ...patch };
       localStorage.setItem('quiz_user', JSON.stringify(updated));
       return updated;
     });
-  };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('quiz_token');
@@ -115,49 +122,58 @@ export default function App() {
       {user ? (
         <AppShell
           user={user}
-          theme={theme}
-          onToggleTheme={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')}
           onLogout={handleLogout}
         >
-          <Suspense fallback={<ScreenLoader />}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={protectedScreen(
-              <DashboardScreen
-                user={user}
-                dailyStatus={dailyStatus}
-                onStartSolo={(packId, mode) => navigate('/quiz/solo', { state: { soloPackId: packId, soloGameMode: mode } })}
-                onCreateLobby={(code) => navigate(`/quiz/multi/${code}`, { state: { roomCode: code } })}
-                onJoinLobby={(code) => navigate(`/quiz/multi/${code}`, { state: { roomCode: code } })}
-                onOpenCreator={() => navigate('/creer')}
-                onOpenLeaderboard={() => navigate('/classement')}
-                onStartDailyQuiz={() => navigate('/quiz/jour')}
-                onUpdateUserStats={updateUserStats}
-                onOpenShop={() => navigate('/boutique')}
-                onOpenCollection={() => navigate('/collection')}
-              />
-            )} />
-            <Route path="/quiz/jour" element={protectedScreen(<DailyQuizScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
-            <Route path="/quiz/solo" element={protectedScreen(<SoloQuizScreen packId={soloPackId} gameMode={soloGameMode || 'classic'} onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
-            <Route path="/quiz/multi/:roomCode" element={protectedScreen(<MultiplayerArena roomCode={roomCode} user={user} onBack={() => navigate('/dashboard')} />)} />
-            <Route path="/admin" element={protectedScreen(<AdminScreen onBack={() => navigate('/dashboard')} />)} />
-            <Route path="/creer" element={protectedScreen(<CreatorScreen onBack={() => navigate('/dashboard')} />)} />
-            <Route path="/classement" element={protectedScreen(<LeaderboardScreen onBack={() => navigate('/dashboard')} />)} />
-            <Route path="/profil" element={protectedScreen(<ProfileScreen user={user} onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
-            <Route path="/joueur/:userId" element={protectedScreen(<PublicProfileScreen />)} />
-            <Route path="/boutique" element={protectedScreen(<ShopScreen key="shop" user={user} mode="shop" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
-            <Route path="/collection" element={protectedScreen(<ShopScreen key="collection" user={user} mode="collection" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
-            <Route path="/echanges" element={protectedScreen(<TradeScreen user={user} />)} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-          </Suspense>
+          <ErrorBoundary>
+            <Suspense fallback={<ScreenLoader />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={protectedScreen(
+                <DashboardScreen
+                  user={user}
+                  dailyStatus={dailyStatus}
+                  onStartSolo={(packId, mode) => navigate('/quiz/solo', { state: { soloPackId: packId, soloGameMode: mode } })}
+                  onCreateLobby={(code) => navigate(`/quiz/multi/${code}`, { state: { roomCode: code } })}
+                  onJoinLobby={(code) => navigate(`/quiz/multi/${code}`, { state: { roomCode: code } })}
+                  onOpenCreator={() => navigate('/creer')}
+                  onOpenLeaderboard={() => navigate('/performance')}
+                  onStartDailyQuiz={() => navigate('/quiz/jour')}
+                  onStartMotMystere={() => navigate('/solo/mot-mystere')}
+                  onStartSudoku={() => navigate('/solo/sudoku')}
+                  onStartQueens={() => navigate('/solo/queens')}
+                  onStartShikaku={() => navigate('/solo/shikaku')}
+                  onUpdateUserStats={updateUserStats}
+                  onOpenShop={() => navigate('/boutique')}
+                  onOpenCollection={() => navigate('/collection')}
+                />
+              )} />
+              <Route path="/quiz/jour" element={protectedScreen(<DailyQuizScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/quiz/solo" element={protectedScreen(<SoloQuizScreen packId={soloPackId} gameMode={soloGameMode || 'classic'} onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/solo/mot-mystere" element={protectedScreen(<MysteryWordScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/solo/sudoku" element={protectedScreen(<SudokuScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/solo/queens" element={protectedScreen(<QueensScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/solo/shikaku" element={protectedScreen(<ShikakuScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/quiz/multi/:roomCode" element={protectedScreen(<MultiplayerArena roomCode={roomCode} user={user} onBack={() => navigate('/dashboard')} />)} />
+              <Route path="/admin" element={protectedScreen(<AdminScreen onBack={() => navigate('/dashboard')} />)} />
+              <Route path="/creer" element={protectedScreen(<CreatorScreen onBack={() => navigate('/dashboard')} />)} />
+              <Route path="/performance" element={protectedScreen(<LeaderboardScreen user={user} onBack={() => navigate('/dashboard')} />)} />
+              <Route path="/classement" element={<Navigate to="/performance" replace />} />
+              <Route path="/profil" element={protectedScreen(<ProfileScreen user={user} onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/joueur/:userId" element={protectedScreen(<PublicProfileScreen />)} />
+              <Route path="/boutique" element={protectedScreen(<ShopScreen key="shop" user={user} mode="shop" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
+              <Route path="/collection" element={protectedScreen(<ShopScreen key="collection" user={user} mode="collection" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
+              <Route path="/echanges" element={protectedScreen(<TradeScreen user={user} />)} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </AppShell>
       ) : (
         <div className="app-shell app-shell--public">
           <div className="ambient ambient--teal" />
           <div className="ambient ambient--fuchsia" />
           <div className="app-shell__frame">
-            <AuthHeader theme={theme} onToggleTheme={() => setTheme((value) => value === 'dark' ? 'light' : 'dark')} />
+            <AuthHeader />
             <main className="app-content">
               <Routes>
                 <Route path="/" element={authLoading ? null : <AuthScreen onAuthSuccess={(data) => { setUser(data); navigate('/dashboard', { replace: true }); }} />} />

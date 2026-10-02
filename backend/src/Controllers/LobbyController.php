@@ -623,9 +623,9 @@ class LobbyController
             return;
         }
 
-        // Select random questions globally (10 questions)
+        // Select random questions globally (10 questions, exclusively QCM with 4 choices)
         $limit = 10;
-        $stmtQuestions = $db->query("SELECT id FROM questions ORDER BY RAND() LIMIT " . $limit);
+        $stmtQuestions = $db->query("SELECT id FROM questions WHERE question_type = 'qcm' ORDER BY RAND() LIMIT " . $limit);
         $questionRows = $stmtQuestions->fetchAll();
 
         if (empty($questionRows)) {
@@ -1132,26 +1132,51 @@ class LobbyController
         $minScore = end($distinctScores);
         $secondScore = count($distinctScores) >= 2 ? $distinctScores[1] : null;
 
+        $isChronoBomb = ($lobby['game_mode'] === 'chrono_bomb');
+
         foreach ($players as $p) {
             $score = intval($p['current_score']);
             $coinBonus = 0;
+            $xpBonus = 0;
 
-            if ($score === $maxScore) {
-                $coinBonus = 100;
-            } elseif ($score === $minScore && $minScore !== $maxScore) {
-                $coinBonus = 10;
-            } elseif (count($players) >= 3 && $secondScore !== null && $score === $secondScore) {
-                $coinBonus = 50;
+            if ($isChronoBomb) {
+                // Section 4.2: Chrono-Bomb: Winner 40 coins / 35 XP, Others 10 coins / 10 XP
+                if ($score === $maxScore) {
+                    $coinBonus = 40;
+                    $xpBonus = 35;
+                } else {
+                    $coinBonus = 10;
+                    $xpBonus = 10;
+                }
             } else {
-                $coinBonus = 25; // 3rd place / others
+                // Section 4.2: Quiz Flash 1v1: Winner 35 coins / 30 XP, Defeat 10 coins / 10 XP
+                if ($score === $maxScore) {
+                    $coinBonus = 35;
+                    $xpBonus = 30;
+                } else {
+                    $coinBonus = 10;
+                    $xpBonus = 10;
+                }
             }
 
-            $db->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")
-               ->execute([$coinBonus, $p['user_id']]);
+            $db->prepare("UPDATE users SET coins = coins + ?, global_score = global_score + ? WHERE id = ?")
+               ->execute([$coinBonus, $xpBonus, $p['user_id']]);
 
-            // Quests tracking for coins earned
+            // Quests tracking for arena
             \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'coins_earned', $coinBonus);
+            \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'xp_earned', $xpBonus);
+            \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'arena_games', 1);
 
+            if ($score === $maxScore) {
+                \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'arena_wins', 1);
+                if (!$isChronoBomb) {
+                    \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'quiz_flash_wins', 1);
+                }
+            }
+
+            if ($isChronoBomb && $score >= 4) {
+                \App\Controllers\QuestController::incrementProgress((int) $p['user_id'], 'chrono_bomb_survive', 1);
+            }
         }
     }
 

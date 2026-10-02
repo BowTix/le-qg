@@ -4,7 +4,7 @@ const ENV_API_URL = import.meta.env.VITE_API_URL;
 const API_BASE = ENV_API_URL
     ? `${ENV_API_URL}/api`
     : (window.location.port && window.location.port !== '80'
-        ? 'http://127.0.0.1:8000/api'
+        ? 'http://localhost:8080/api'
         : `${window.location.origin}/quiz/backend/public/api`);
 
 export const PUBLIC_BASE = API_BASE.replace('/api', '');
@@ -43,7 +43,15 @@ async function request(endpoint, options = {}) {
       window.dispatchEvent(new Event('auth_session_expired'));
     }
 
-    const data = await response.json().catch(() => ({}));
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      if (response.ok) {
+        throw new Error("Réponse serveur invalide (format JSON attendu).");
+      }
+      data = {};
+    }
     
     if (!response.ok) {
       const errorMsg = data.error || `Erreur serveur (${response.status})`;

@@ -3,26 +3,25 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeftRight,
   ChevronDown,
-  Coins,
   Download,
   LayoutDashboard,
   LayoutGrid,
   LogOut,
-  Moon,
   RefreshCw,
   ShieldAlert,
   ShoppingBag,
-  Sun,
+  Trophy,
   User,
   Wifi,
   WifiOff,
 } from 'lucide-react';
 import { PUBLIC_BASE } from '../../utils/api';
-import NotificationsMenu from '../notifications/NotificationsMenu';
+import { useNotifications, ProfileNotifications } from '../notifications/NotificationsMenu';
 import usePwaControls from '../../pwa/usePwaControls';
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Accueil', icon: LayoutDashboard },
+  { to: '/performance', label: 'Performance', icon: Trophy, match: '/classement' },
   { to: '/collection', label: 'Collection', icon: LayoutGrid },
   { to: '/echanges', label: 'Échanges', icon: ArrowLeftRight },
   { to: '/boutique', label: 'Boutique', icon: ShoppingBag },
@@ -34,20 +33,22 @@ const HEADER_NAV_ITEMS = NAV_ITEMS.filter(({ to }) => to !== '/profil');
 function Brand({ onClick }) {
   return (
     <button className="app-brand" type="button" onClick={onClick} aria-label="Retour à l'accueil">
-      <span className="app-brand__mark">QG</span>
-      <span className="app-brand__name">Le QG</span>
+      <span className="app-brand__mark">O</span>
+      <span className="app-brand__name">Omnia</span>
     </button>
   );
 }
 
 function UserAvatar({ user }) {
   const value = user?.avatar_url;
-  const className = `app-user__avatar ${user?.equipped_border || ''}`;
+  const hasBorder = !!user?.equipped_border;
+  const className = `app-user__avatar ${user?.equipped_border || ''}`.trim();
+  const avatarStyle = { borderRadius: '50%', border: hasBorder ? undefined : 'none', boxShadow: hasBorder ? undefined : 'none' };
 
-  if (value?.startsWith('/uploads/')) return <img src={`${PUBLIC_BASE}${value}`} alt="" className={className} />;
-  if (value?.startsWith('http')) return <img src={value} alt="" className={className} />;
+  if (value?.startsWith('/uploads/')) return <img src={`${PUBLIC_BASE}${value}`} alt="" className={className} style={avatarStyle} />;
+  if (value?.startsWith('http')) return <img src={value} alt="" className={className} style={avatarStyle} />;
 
-  return <span className={className}>{value || user?.username?.[0]?.toUpperCase() || 'U'}</span>;
+  return <span className={className} style={avatarStyle}>{value || user?.username?.[0]?.toUpperCase() || 'U'}</span>;
 }
 
 function HeaderNav() {
@@ -125,13 +126,13 @@ function UpdateNotice({ onUpdate }) {
   return (
     <div className="pwa-update" role="status">
       <RefreshCw size={18} />
-      <span><strong>Le QG a ete mis a jour.</strong><small>Recharge pour utiliser la nouvelle version.</small></span>
-      <button type="button" onClick={onUpdate}>Mettre a jour</button>
+      <span><strong>Omnia a été mis à jour.</strong><small>Recharge pour utiliser la nouvelle version.</small></span>
+      <button type="button" onClick={onUpdate}>Mettre à jour</button>
     </div>
   );
 }
 
-export function AuthHeader({ theme, onToggleTheme }) {
+export function AuthHeader() {
   const navigate = useNavigate();
   const pwa = usePwaControls();
   return (
@@ -140,23 +141,23 @@ export function AuthHeader({ theme, onToggleTheme }) {
       <div className="app-header__actions">
         <NetworkPill isOnline={pwa.isOnline} />
         {pwa.canInstall && (
-          <button className="app-header__icon" onClick={pwa.install} type="button" aria-label="Installer Le QG">
+          <button className="app-header__icon" onClick={pwa.install} type="button" aria-label="Installer Omnia">
             <Download size={18} />
           </button>
         )}
-        <button className="app-header__icon" onClick={onToggleTheme} type="button" aria-label="Changer de theme">
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
       </div>
       {pwa.updateAvailable && <UpdateNotice onUpdate={pwa.applyUpdate} />}
     </header>
   );
 }
 
-export default function AppShell({ user, theme, onToggleTheme, onLogout, children }) {
+export default function AppShell({ user, onLogout, children }) {
   const navigate = useNavigate();
   const pwa = usePwaControls();
+  const notifications = useNotifications();
   const [open, setOpen] = useState(false);
+  const count = notifications.count;
+  const hasNotifications = count > 0;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -177,12 +178,6 @@ export default function AppShell({ user, theme, onToggleTheme, onLogout, childre
           <HeaderNav />
 
           <div className="app-header__actions">
-            <NetworkPill isOnline={pwa.isOnline} />
-            <div className="coin-pill" title="Votre solde">
-              <Coins size={16} />
-              <span>{(user?.coins || 0).toLocaleString('fr-FR')}</span>
-            </div>
-            <NotificationsMenu />
             <div className="app-user">
               <button
                 className="app-user__trigger"
@@ -190,17 +185,37 @@ export default function AppShell({ user, theme, onToggleTheme, onLogout, childre
                 onClick={(event) => { event.stopPropagation(); setOpen((value) => !value); }}
                 aria-expanded={open}
               >
-                <UserAvatar user={user} />
-                <span className="app-user__name">{user?.username}</span>
+                <div style={{ position: 'relative', display: 'inline-flex' }}>
+                  <UserAvatar user={user} />
+                  {hasNotifications && (
+                    <span className="app-user__notification-dot" title={`${count} nouvelle(s) notification(s)`} />
+                  )}
+                </div>
+                <span
+                  className={`app-user__name ${user?.equipped_color === 'rainbow' ? 'text-rainbow' : (user?.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}`}
+                  style={user?.equipped_color && !['rainbow', 'cyberpunk'].includes(user.equipped_color) ? { color: user.equipped_color } : undefined}
+                >
+                  {user?.username}
+                </span>
                 <ChevronDown size={14} />
               </button>
 
               {open && (
                 <div className="app-user__menu" onClick={(event) => event.stopPropagation()}>
                   <div className="app-user__summary">
-                    <strong>{user?.username}<small>#{user?.discriminator}</small></strong>
-                    <span>{user?.role === 'admin' ? 'Administrateur' : 'Joueur'}</span>
+                    <strong
+                      className={user?.equipped_color === 'rainbow' ? 'text-rainbow' : (user?.equipped_color === 'cyberpunk' ? 'text-cyberpunk' : '')}
+                      style={user?.equipped_color && !['rainbow', 'cyberpunk'].includes(user.equipped_color) ? { color: user.equipped_color } : undefined}
+                    >
+                      {user?.username}<small>#{user?.discriminator}</small>
+                    </strong>
+                    <span>{user?.equipped_title || (user?.role === 'admin' ? 'Administrateur' : 'Joueur')}</span>
                   </div>
+
+                  <ProfileNotifications notifications={notifications} onClose={() => setOpen(false)} />
+
+                  <span className="app-user__divider" />
+
                   {user?.role === 'admin' && (
                     <button type="button" onClick={() => { navigate('/admin'); setOpen(false); }}>
                       <ShieldAlert size={15} /> Espace Admin
@@ -209,15 +224,14 @@ export default function AppShell({ user, theme, onToggleTheme, onLogout, childre
                   <button type="button" onClick={() => { navigate('/profil'); setOpen(false); }}>
                     <User size={15} /> Mon profil
                   </button>
+                  <button type="button" onClick={() => { navigate('/echanges'); setOpen(false); }}>
+                    <ArrowLeftRight size={15} /> Mes échanges
+                  </button>
                   {pwa.canInstall && (
                     <button type="button" onClick={pwa.install}>
                       <Download size={15} /> Installer l'application
                     </button>
                   )}
-                  <button type="button" onClick={onToggleTheme}>
-                    {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
-                    {theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
-                  </button>
                   <span className="app-user__divider" />
                   <button type="button" onClick={onLogout}>
                     <LogOut size={15} /> Déconnexion

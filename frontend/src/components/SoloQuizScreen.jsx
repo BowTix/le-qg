@@ -1,26 +1,40 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
-import { ArrowLeft, Clock, Award, CheckCircle2, Coins, XCircle, ChevronRight, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Coins, XCircle, ChevronRight, Trophy } from 'lucide-react';
 
-export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, onUpdateUserStats }) {
-  const timeLimit = gameMode === 'speed_blitz' ? 5 : 20;
+export default function SoloQuizScreen({ packId, gameMode = 'kculture', onBack, onUpdateUserStats }) {
+  const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [questionIndex, setQuestionIndex] = useState(0); // 0 to 9
   const [selectedOption, setSelectedOption] = useState(null);
   const [answered, setAnswered] = useState(false);
   const [result, setResult] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(timeLimit);
   const [initialLoading, setInitialLoading] = useState(true); // true only for the very first load
   const [transitioning, setTransitioning] = useState(false); // true between questions
   const [error, setError] = useState('');
-  const [score, setScore] = useState(0);
   const [history, setHistory] = useState([]);
   const [gameFinished, setGameFinished] = useState(false);
   const [seenQuestionIds, setSeenQuestionIds] = useState([]);
   const [openAnswer, setOpenAnswer] = useState('');
+  const [totalXp, setTotalXp] = useState(0);
+  const [totalCoins, setTotalCoins] = useState(0);
 
-  const timerRef = useRef(null);
-  const answeredRef = useRef(false); // ref mirror of answered to avoid stale closures in timer
+  const answeredRef = useRef(false);
+  const latestUserStatsRef = useRef(null);
+  const userStatsUpdatedRef = useRef(false);
+
+  const handleBack = () => {
+    if (!userStatsUpdatedRef.current && latestUserStatsRef.current && onUpdateUserStats) {
+      userStatsUpdatedRef.current = true;
+      onUpdateUserStats(latestUserStatsRef.current);
+    }
+    if (typeof onBack === 'function') {
+      onBack();
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   // Keep ref in sync
   useEffect(() => {
@@ -48,7 +62,6 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
         setOpenAnswer('');
         setAnswered(false);
         setResult(null);
-        setTimeLeft(timeLimit);
         setError('');
 
         // Set question — this triggers the card animation via key change
@@ -56,18 +69,6 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
         setSeenQuestionIds(prev => [...prev, qData.id]);
         setInitialLoading(false);
         setTransitioning(false);
-        
-        // Start 20s countdown timer
-        clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              clearInterval(timerRef.current);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
       } catch (err) {
         if (!active) return;
         if (questionIndex > 0) {
@@ -83,16 +84,8 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
 
     return () => {
       active = false;
-      clearInterval(timerRef.current);
     };
   }, [questionIndex]);
-
-  // Handle timer reaching zero
-  useEffect(() => {
-    if (timeLeft === 0 && !answeredRef.current && currentQuestion) {
-      handleTimeOut();
-    }
-  }, [timeLeft]);
 
   // Appuyer sur Entrée pour passer à la suivante après validation
   useEffect(() => {
@@ -104,49 +97,24 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [result]);
+  }, [result, questionIndex]);
 
-  const handleTimeOut = useCallback(async () => {
-    if (answeredRef.current) return;
-    clearInterval(timerRef.current);
-    // Mark answered immediately so UI reacts instantly
-    setAnswered(true);
-    answeredRef.current = true;
-
-    try {
-      const response = await api.post('/quiz/answer', {
-        answer_token: currentQuestion.answer_token,
-        answer: 'TIMEOUT',
-        game_mode: gameMode
-      });
-
-      setResult({
-        ...response,
-        is_timeout: true
-      });
-      setHistory(prev => [...prev, {
-        question_text: currentQuestion.question_text,
-        correct: false,
-        user_answer: 'AUCUNE',
-        correct_text: response.correct_text
-      }]);
-    } catch {
-      setResult({
-        correct: false,
-        correct_option: null,
-        correct_text: '',
-        points_awarded: 0,
-        coins_awarded: 0,
-        is_timeout: true
-      });
-      setHistory(prev => [...prev, {
-        question_text: currentQuestion.question_text,
-        correct: false,
-        user_answer: 'AUCUNE',
-        correct_text: ''
-      }]);
+  // Propagate user stats update when game finishes or on exit (only once)
+  useEffect(() => {
+    if (gameFinished && latestUserStatsRef.current && onUpdateUserStats && !userStatsUpdatedRef.current) {
+      userStatsUpdatedRef.current = true;
+      onUpdateUserStats(latestUserStatsRef.current);
     }
-  }, [currentQuestion]);
+  }, [gameFinished, onUpdateUserStats]);
+
+  useEffect(() => {
+    return () => {
+      if (latestUserStatsRef.current && onUpdateUserStats && !userStatsUpdatedRef.current) {
+        userStatsUpdatedRef.current = true;
+        onUpdateUserStats(latestUserStatsRef.current);
+      }
+    };
+  }, [onUpdateUserStats]);
 
   const handleSelectOption = async (optionKey) => {
     if (answered || transitioning) return;
@@ -155,7 +123,6 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
     setSelectedOption(optionKey);
     setAnswered(true);
     answeredRef.current = true;
-    clearInterval(timerRef.current);
 
     try {
       const response = await api.post('/quiz/answer', {
@@ -165,9 +132,17 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
       });
 
       setResult(response);
-      setScore(prev => prev + response.points_awarded);
-      if (onUpdateUserStats) {
-        onUpdateUserStats({ global_score: response.global_score, coins: response.coins });
+      if (response.points_awarded) {
+        setTotalXp(prev => prev + response.points_awarded);
+      }
+      if (response.coins_awarded) {
+        setTotalCoins(prev => prev + response.coins_awarded);
+      }
+      if (response.global_score !== undefined || response.coins !== undefined) {
+        latestUserStatsRef.current = {
+          global_score: response.global_score,
+          coins: response.coins
+        };
       }
 
       setHistory(prev => [...prev, {
@@ -187,7 +162,6 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
     
     setAnswered(true);
     answeredRef.current = true;
-    clearInterval(timerRef.current);
 
     try {
       const response = await api.post('/quiz/answer', {
@@ -197,9 +171,17 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
       });
 
       setResult(response);
-      setScore(prev => prev + response.points_awarded);
-      if (onUpdateUserStats) {
-        onUpdateUserStats({ global_score: response.global_score, coins: response.coins });
+      if (response.points_awarded) {
+        setTotalXp(prev => prev + response.points_awarded);
+      }
+      if (response.coins_awarded) {
+        setTotalCoins(prev => prev + response.coins_awarded);
+      }
+      if (response.global_score !== undefined || response.coins !== undefined) {
+        latestUserStatsRef.current = {
+          global_score: response.global_score,
+          coins: response.coins
+        };
       }
 
       setHistory(prev => [...prev, {
@@ -214,7 +196,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
   };
 
   const handleNext = () => {
-    if (questionIndex >= 9 || (gameMode === 'sudden_death' && result && !result.correct)) {
+    if (questionIndex >= 9) {
       setGameFinished(true);
     } else {
       // Start transition: keep old question visible but faded while loading
@@ -230,7 +212,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
           <XCircle size={48} style={{ color: 'var(--error)', marginBottom: '16px', display: 'inline-block' }} />
           <h2 style={{ fontSize: '1.5rem', marginBottom: '12px' }}>Erreur</h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>{error}</p>
-          <button className="btn-primary" onClick={onBack}>
+          <button type="button" className="btn-primary" onClick={handleBack}>
             <ArrowLeft size={18} />
             Retour
           </button>
@@ -240,49 +222,70 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
   }
 
   if (gameFinished) {
+    const correctCount = history.filter(h => h.correct).length;
+    const totalCount = history.length || 10;
+
     return (
       <div className="flex-1 max-w-2xl w-full mx-auto p-4 md:p-8 animate-slide-up">
         <div className="glass-card text-center" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           <div>
             <Trophy size={64} style={{ color: 'var(--accent)', display: 'inline-block', marginBottom: '16px' }} />
             <h1 style={{ fontSize: '2.2rem', color: 'var(--accent)', marginBottom: '8px' }}>
-              Entraînement Terminé !
+              Quiz Terminé !
             </h1>
             <p style={{ color: 'var(--text-secondary)' }}>
-              Voici le récapitulatif de votre session
+              Voici le récapitulatif de votre session Culture & Pop
             </p>
           </div>
 
+          {/* Encadré récapitulatif fin de quiz : à gauche réponses correctes/total, au milieu XP gagné, à droite pièces gagnées */}
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-around',
-            alignItems: 'center',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '12px',
             backgroundColor: 'rgba(15, 23, 42, 0.4)',
-            borderRadius: '14px',
-            padding: '24px',
+            borderRadius: '16px',
+            padding: '24px 16px',
             border: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
             <div>
-              <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Questions</span>
-              <span style={{ fontSize: '1.8rem', fontWeight: 800 }}>{history.length}</span>
-            </div>
-            <div style={{ height: '40px', width: '1px', backgroundColor: 'var(--border-color)' }}></div>
-            <div>
-              <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Réponses Correctes</span>
-              <span style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--success)' }}>
-                {history.filter(h => h.correct).length}
+              <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                Réponses Correctes
+              </span>
+              <span style={{ fontSize: '1.9rem', fontWeight: 800, color: 'var(--success)' }}>
+                {correctCount}/{totalCount}
               </span>
             </div>
-            <div style={{ height: '40px', width: '1px', backgroundColor: 'var(--border-color)' }}></div>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              borderLeft: '1px solid var(--border-color)',
+              borderRight: '1px solid var(--border-color)',
+              padding: '0 8px'
+            }}>
+              <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                XP gagné
+              </span>
+              <span style={{ fontSize: '1.9rem', fontWeight: 800, color: '#a855f7' }}>
+                +{totalXp} XP
+              </span>
+            </div>
             <div>
-              <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Points Gagnés</span>
-              <span style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent)' }}>+{score}</span>
+              <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
+                Pièces gagnées
+              </span>
+              <span style={{ fontSize: '1.9rem', fontWeight: 800, color: '#eab308', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                +{totalCoins} <Coins size={20} />
+              </span>
             </div>
           </div>
 
-          {/* History Details */}
+          {/* Détail des questions */}
           <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '300px', overflowY: 'auto', paddingRight: '8px' }}>
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Détail des questions</h3>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
+              Détail des questions
+            </h3>
             {history.map((h, i) => (
               <div key={i} style={{
                 display: 'flex',
@@ -310,7 +313,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
             ))}
           </div>
 
-          <button className="btn-primary" onClick={onBack} style={{ alignSelf: 'center', width: '200px' }}>
+          <button type="button" className="btn-primary" onClick={handleBack} style={{ alignSelf: 'center', minWidth: '200px' }}>
             Retour au Tableau
           </button>
         </div>
@@ -324,37 +327,27 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
   return (
     <div className="container animate-fade-in" style={{ maxWidth: '800px' }}>
       
-      {/* Top Bar Info */}
+      {/* Top Bar Info (No chrono and no score counter during questions) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button className="btn-secondary" onClick={onBack} style={{ padding: '8px 16px' }}>
+        <button type="button" className="btn-secondary" onClick={handleBack} style={{ padding: '8px 16px' }}>
           <ArrowLeft size={16} />
           Quitter
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
-            <Award size={16} />
-            Score : <strong style={{ color: 'var(--text-primary)' }}>{score} pts</strong>
-          </div>
-          
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: timeLeft <= 5 ? 'rgba(251, 113, 133, 0.15)' : 'rgba(15, 23, 42, 0.4)',
-            color: timeLeft <= 5 ? '#fb7185' : '#2dd4bf',
-            padding: '8px 16px',
-            borderRadius: '14px',
-            border: `1px solid ${timeLeft <= 5 ? 'rgba(251, 113, 133, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-            fontWeight: 800,
-            minWidth: '90px',
-            justifyContent: 'center',
-            transition: 'var(--transition-smooth)'
-          }}>
-            <Clock size={16} />
-            {timeLeft}s
-          </div>
-        </div>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '6px 14px',
+          borderRadius: '12px',
+          background: 'rgba(139, 92, 246, 0.15)',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          color: '#c4b5fd',
+          fontWeight: 700,
+          fontSize: '0.85rem'
+        }}>
+          Culture & Pop
+        </span>
       </div>
 
       {/* Progress indicators */}
@@ -395,7 +388,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
           }}
         >
           <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase' }}>
-            Question {questionIndex + 1} de 10
+            Question {questionIndex + 1} / 10
           </span>
           
           <>
@@ -493,7 +486,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
             )}
           </>
 
-          {/* Action Panel after Server Response */}
+          {/* Action Panel after Server Response (without per-question points/coins) */}
           {result && (
             <div className="animate-fade-in" style={{
               display: 'flex',
@@ -503,7 +496,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
               paddingTop: '24px',
               borderTop: '1px solid var(--border-color)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
                 <div>
                   <p style={{
                     color: result.correct ? 'var(--success)' : 'var(--error)',
@@ -516,12 +509,12 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
                     {result.correct ? (
                       <>
                         <CheckCircle2 size={22} />
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Correct ! (+{result.points_awarded} pts, +{result.coins_awarded} <Coins size={14} />)</span>
+                        <span>Correct !</span>
                       </>
                     ) : (
                       <>
                         <XCircle size={22} />
-                        {result.is_timeout ? "Temps écoulé !" : "Incorrect"}
+                        <span>Incorrect</span>
                       </>
                     )}
                   </p>
@@ -535,7 +528,7 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
                 </div>
 
                 <button className="btn-primary" onClick={handleNext} style={{ marginLeft: 'auto' }}>
-                  {(questionIndex >= 9 || (gameMode === 'sudden_death' && result && !result.correct)) ? 'Voir les résultats' : 'Suivant'}
+                  {questionIndex >= 9 ? 'Voir les résultats' : 'Suivant'}
                   <ChevronRight size={18} />
                 </button>
               </div>
@@ -546,4 +539,3 @@ export default function SoloQuizScreen({ packId, gameMode = 'classic', onBack, o
     </div>
   );
 }
-

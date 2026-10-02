@@ -19,15 +19,34 @@ class QuestController {
 
         $this->generateQuestsIfNeeded($db, $userId);
 
+        // Ensure login_days quest has counted today if the user logged in today
+        $today = date('Y-m-d');
+        $stmtDate = $db->prepare("SELECT last_login_date FROM users WHERE id = ?");
+        $stmtDate->execute([$userId]);
+        $lastLoginDate = $stmtDate->fetchColumn();
+
+        if ($lastLoginDate === $today) {
+            $stmtSync = $db->prepare("
+                UPDATE user_quests uq
+                JOIN quests q ON uq.quest_id = q.id
+                SET uq.progress = GREATEST(uq.progress, 1)
+                WHERE uq.user_id = ?
+                  AND q.target_type = 'login_days'
+                  AND uq.expires_at > ?
+                  AND uq.is_claimed = 0
+            ");
+            $stmtSync->execute([$userId, date('Y-m-d H:i:s')]);
+        }
+
         // Fetch active quests
         $now = date('Y-m-d H:i:s');
         $stmt = $db->prepare("
             SELECT uq.id as user_quest_id, uq.progress, uq.is_claimed, uq.expires_at,
-                   q.id as quest_id, q.type, q.title, q.description, q.target_type, q.target_value, q.reward_coins, q.reward_xp
+                   q.id as quest_id, q.type, q.pool, q.title, q.description, q.target_type, q.target_value, q.reward_coins, q.reward_xp
             FROM user_quests uq
             JOIN quests q ON uq.quest_id = q.id
             WHERE uq.user_id = ? AND uq.expires_at > ?
-            ORDER BY q.type ASC, q.id ASC
+            ORDER BY q.type ASC, q.pool ASC, q.id ASC
         ");
         $stmt->execute([$userId, $now]);
         $quests = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -123,8 +142,9 @@ class QuestController {
 
             $db->commit();
 
-            // Fire event for "coins_earned" quest tracking
+            // Fire events for coins and XP earned
             self::incrementProgress($userId, 'coins_earned', (int) $userQuest['reward_coins']);
+            self::incrementProgress($userId, 'xp_earned', (int) $userQuest['reward_xp']);
 
             // Get updated profile statistics
             $stmtProfile = $db->prepare("SELECT coins, global_score FROM users WHERE id = ?");
@@ -174,51 +194,58 @@ class QuestController {
 
     /**
      * Internal generation logic (lazy run)
+     * Assigns 3 daily quests (1 from Pool A, 1 from Pool B, 1 from Pool C)
+     * and 3 weekly quests (1 from Pool 1, 1 from Pool 2, 1 from Pool 3).
      */
     private function generateQuestsIfNeeded($db, $userId) {
         $now = date('Y-m-d H:i:s');
         $stmt = $db->prepare("
-            SELECT q.type, COUNT(*) AS active_count
+            SELECT q.type, q.pool
             FROM user_quests uq
             JOIN quests q ON uq.quest_id = q.id
             WHERE uq.user_id = ? AND uq.expires_at > ?
-            GROUP BY q.type
         ");
         $stmt->execute([$userId, $now]);
-        $active = ['daily' => 0, 'weekly' => 0];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $active[$row['type']] = (int) $row['active_count'];
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $activeDailyPools = [];
+        $activeWeeklyPools = [];
+
+        foreach ($rows as $row) {
+            if ($row['type'] === 'daily') {
+                $activeDailyPools[$row['pool']] = true;
+            } elseif ($row['type'] === 'weekly') {
+                $activeWeeklyPools[$row['pool']] = true;
+            }
         }
 
-        if ($active['daily'] === 0) {
-            $this->assignNewQuests($db, $userId, 'daily');
+        // Daily requires 1 from pool A, 1 from pool B, 1 from pool C
+        $missingDailyPools = array_values(array_diff(['A', 'B', 'C'], array_keys($activeDailyPools)));
+        if (!empty($missingDailyPools)) {
+            $this->assignQuestsForPools($db, $userId, 'daily', $missingDailyPools);
         }
-        if ($active['weekly'] === 0) {
-            $this->assignNewQuests($db, $userId, 'weekly');
+
+        // Weekly requires 1 from pool 1, 1 from pool 2, 1 from pool 3
+        $missingWeeklyPools = array_values(array_diff(['1', '2', '3'], array_keys($activeWeeklyPools)));
+        if (!empty($missingWeeklyPools)) {
+            $this->assignQuestsForPools($db, $userId, 'weekly', $missingWeeklyPools);
         }
     }
 
     /**
-     * Pick random quests from catalogue and assign them to user
+     * Pick random quests from specified pools and assign them to user
      */
-    private function assignNewQuests($db, $userId, $type) {
-        // Fetch all quests of this type from catalog
-        $stmtCatalog = $db->prepare("SELECT id FROM quests WHERE type = ?");
-        $stmtCatalog->execute([$type]);
-        $questIds = $stmtCatalog->fetchAll(PDO::FETCH_COLUMN);
-
-        if (empty($questIds)) return;
-
-        // Select a subset of quests (3 for daily, 2 for weekly)
-        $countToSelect = ($type === 'daily') ? 3 : 2;
-        shuffle($questIds);
-        $selectedIds = array_slice($questIds, 0, min(count($questIds), $countToSelect));
-
-        // Compute expiry dates
+    private function assignQuestsForPools($db, $userId, $type, array $pools) {
         if ($type === 'daily') {
             $expiresAt = date('Y-m-d 23:59:59'); // end of today
         } else {
-            $expiresAt = date('Y-m-d 23:59:59', strtotime('next Sunday')); // end of Sunday
+            // Weekly: end of current week Sunday 23:59:59
+            $dayOfWeek = date('w'); // 0 (Sunday) to 6 (Saturday)
+            if ($dayOfWeek == 0) {
+                $expiresAt = date('Y-m-d 23:59:59');
+            } else {
+                $expiresAt = date('Y-m-d 23:59:59', strtotime('next Sunday'));
+            }
         }
 
         $stmtInsert = $db->prepare("
@@ -227,8 +254,13 @@ class QuestController {
             ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at), progress = 0, is_claimed = 0
         ");
 
-        foreach ($selectedIds as $qid) {
-            $stmtInsert->execute([$userId, $qid, $expiresAt]);
+        foreach ($pools as $pool) {
+            $stmt = $db->prepare("SELECT id FROM quests WHERE type = ? AND pool = ? ORDER BY RAND() LIMIT 1");
+            $stmt->execute([$type, $pool]);
+            $qid = $stmt->fetchColumn();
+            if ($qid) {
+                $stmtInsert->execute([$userId, (int) $qid, $expiresAt]);
+            }
         }
     }
 }

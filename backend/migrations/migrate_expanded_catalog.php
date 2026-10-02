@@ -192,14 +192,24 @@ try {
     ];
 
     $stmtCard = $db->prepare("
-        INSERT INTO cards (id, name, rarity, card_set, description, image_url) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO cards (id, name, rarity, card_set, season_id, card_number, is_collector, description, image_url) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
-    foreach ($cardsData as $card) {
-        // Double check escaping strings if any double quotes in future, but prepare handles it
-        $stmtCard->execute($card);
+    foreach ($cardsData as $idx => $card) {
+        $num = $idx + 1;
+        $stmtCard->execute([
+            $card[0], // id
+            $card[1], // name
+            $card[2], // rarity
+            $card[3], // card_set
+            1,        // season_id
+            $num,     // card_number (1-100)
+            0,        // is_collector
+            $card[4], // description
+            $card[5]  // image_url
+        ]);
     }
-    echo "✅ Seeded " . count($cardsData) . " cards successfully.\n";
+    echo "✅ Seeded " . count($cardsData) . " cards successfully (numbered 1 to 100 for Season 1).\n";
 
     $db->commit();
     echo "=== EXPANDED CATALOG SEEDING COMPLETED SUCCESSFULLY ===\n";

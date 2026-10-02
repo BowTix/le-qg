@@ -20,8 +20,13 @@ try {
             name VARCHAR(100) NOT NULL,
             rarity VARCHAR(20) NOT NULL,
             card_set VARCHAR(50) NOT NULL,
+            season_id INT NOT NULL DEFAULT 1,
+            card_number INT NOT NULL DEFAULT 1,
+            is_collector TINYINT(1) NOT NULL DEFAULT 0,
             description TEXT DEFAULT NULL,
-            image_url VARCHAR(255) DEFAULT NULL
+            image_url VARCHAR(255) DEFAULT NULL,
+            INDEX idx_cards_season_number (season_id, card_number),
+            INDEX idx_cards_collector (is_collector)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
     echo "✅ Success creating cards table!\n";
@@ -107,7 +112,7 @@ try {
 
     echo "-> Seeding collectible cards...\n";
     $cardsData = [
-        ['card_novice', 'Le Débutant', 'common', 'Les Clichés', 'Un joueur fraîchement arrivé sur Le QG, plein d\'ambitions.', null],
+        ['card_novice', 'Le Débutant', 'common', 'Les Clichés', 'Un joueur fraîchement arrivé sur Omnia, plein d\'ambitions.', null],
         ['card_rubis', 'Rubis', 'common', 'Les Couleurs', 'La couleur rouge, chaude et intense, symbole de passion.', null],
         ['card_saphir', 'Saphir', 'common', 'Les Couleurs', 'Le bleu profond de la sagesse et de la tranquillité.', null],
         ['card_emeraude', 'Émeraude', 'common', 'Les Couleurs', 'Un éclat vert brillant représentant la croissance et l\'espoir.', null],

@@ -10,7 +10,7 @@ export default function BoosterOffer({ coins, opening, onBuy }) {
         <span className="booster-offer__halo" />
         <button className="booster-pack" type="button" onClick={onBuy} disabled={!canBuy} tabIndex={-1}>
           <span className="booster-pack__seal"><Sparkles size={30} /></span>
-          <span className="booster-pack__brand">LE QG</span>
+          <span className="booster-pack__brand">Omnia</span>
           <strong>Booster</strong>
           <small>3 cartes uniques</small>
         </button>

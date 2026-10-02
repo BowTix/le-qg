@@ -266,6 +266,159 @@ try {
             }
             break;
 
+        case '/api/mystery-word/status':
+            if ($method === 'GET') {
+                (new \App\Controllers\MysteryWordController())->getStatus();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/mystery-word/guess':
+            if ($method === 'POST') {
+                (new \App\Controllers\MysteryWordController())->submitGuess(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/sudoku/grid':
+            if ($method === 'GET') {
+                (new \App\Controllers\SudokuController())->getGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/sudoku/save':
+            if ($method === 'POST') {
+                (new \App\Controllers\SudokuController())->saveState(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/sudoku/validate':
+            if ($method === 'POST') {
+                (new \App\Controllers\SudokuController())->validateGrid(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/sudoku/practice':
+            if ($method === 'GET') {
+                (new \App\Controllers\SudokuController())->getPracticeGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/sudoku/calendar':
+            if ($method === 'GET') {
+                (new \App\Controllers\SudokuController())->getCalendar();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/queens/grid':
+            if ($method === 'GET') {
+                (new \App\Controllers\QueensController())->getGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/queens/practice':
+            if ($method === 'GET') {
+                (new \App\Controllers\QueensController())->getPracticeGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/queens/save':
+            if ($method === 'POST') {
+                (new \App\Controllers\QueensController())->saveState(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/queens/validate':
+            if ($method === 'POST') {
+                (new \App\Controllers\QueensController())->validateGrid(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/queens/calendar':
+            if ($method === 'GET') {
+                (new \App\Controllers\QueensController())->getCalendar();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shikaku/grid':
+            if ($method === 'GET') {
+                (new \App\Controllers\ShikakuController())->getGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shikaku/practice':
+            if ($method === 'GET') {
+                (new \App\Controllers\ShikakuController())->getPracticeGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shikaku/save':
+            if ($method === 'POST') {
+                (new \App\Controllers\ShikakuController())->saveState(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shikaku/validate':
+            if ($method === 'POST') {
+                (new \App\Controllers\ShikakuController())->validateGrid(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/shikaku/calendar':
+            if ($method === 'GET') {
+                (new \App\Controllers\ShikakuController())->getCalendar();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         case '/api/admin/daily-quizzes':
             if ($method === 'GET') {
                 (new \App\Controllers\QuizController())->getDailyQuizzes();
@@ -555,6 +708,24 @@ try {
         case '/api/shop/equip':
             if ($method === 'POST') {
                 (new \App\Controllers\ShopController())->equipItem();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/cards/recycle':
+            if ($method === 'POST') {
+                (new \App\Controllers\ShopController())->recycleCards(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/cards/craft':
+            if ($method === 'POST') {
+                (new \App\Controllers\ShopController())->craftCard(getRequestBody());
             } else {
                 http_response_code(405);
                 echo json_encode(["error" => "Method not allowed"]);

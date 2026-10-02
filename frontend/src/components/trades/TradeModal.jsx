@@ -7,9 +7,9 @@ const RANK={common:0,rare:1,epic:2,legendary:3};
 
 function Avatar({user}){
  const value=user?.avatar_url;
- if(value?.startsWith('/uploads/'))return <img src={`${PUBLIC_BASE}${value}`} alt=""/>;
- if(value?.startsWith('http'))return <img src={value} alt=""/>;
- return <span>{user?.username?.[0]?.toUpperCase()||'?'}</span>;
+ if(value?.startsWith('/uploads/'))return <img src={`${PUBLIC_BASE}${value}`} alt="" style={{ borderRadius: '50%', objectFit: 'cover' }}/>;
+ if(value?.startsWith('http'))return <img src={value} alt="" style={{ borderRadius: '50%', objectFit: 'cover' }}/>;
+ return <span style={{ borderRadius: '50%' }}>{user?.username?.[0]?.toUpperCase()||'?'}</span>;
 }
 function CardChoice({card,selected,disabled,onClick}){
  return <button className={`trade-card-choice${selected?' is-selected':''}`} disabled={disabled} onClick={onClick} type="button">

@@ -19,6 +19,10 @@ export default function DashboardScreen({
   user,
   dailyStatus,
   onStartSolo,
+  onStartMotMystere,
+  onStartSudoku,
+  onStartQueens,
+  onStartShikaku,
   onCreateLobby,
   onJoinLobby,
   onOpenLeaderboard,
@@ -98,17 +102,8 @@ export default function DashboardScreen({
   const totalCards = collectionData?.total_cards || 0;
   const unlockedCards = collectionData?.unlocked_cards || 0;
   const collectionPercentage = totalCards > 0 ? Math.round((unlockedCards / totalCards) * 100) : 0;
-  const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^\w/, (letter) => letter.toUpperCase());
-
   return (
     <div className="page page--dashboard">
-      <header className="page-intro">
-        <div>
-          <span className="kicker">{today} · Saison 01</span>
-          <h1>Bonjour {user.username}.</h1>
-        </div>
-      </header>
-
       <section className="dashboard-grid">
         <div className="dashboard-modes">
           <SoloPortal
@@ -116,6 +111,10 @@ export default function DashboardScreen({
             attempt={dailyStatus?.attempt}
             onStartDaily={onStartDailyQuiz}
             onStartQuiz={() => onStartSolo(0, 'kculture')}
+            onStartMotMystere={onStartMotMystere}
+            onStartSudoku={onStartSudoku}
+            onStartQueens={onStartQueens}
+            onStartShikaku={onStartShikaku}
           />
           <MultiplayerPortal
             roomCode={roomCode}

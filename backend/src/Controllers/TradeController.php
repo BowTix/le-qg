@@ -161,23 +161,32 @@ class TradeController {
     }
 
     private function cards(PDO $db,int $owner,int $viewer,bool $duplicatesOnly): array {
-        $sql="SELECT c.id,c.name,c.rarity,c.card_set `set`,c.description,c.image_url,uc.quantity,
+        $sql="SELECT c.id,c.name,c.rarity,c.card_set `set`,c.season_id,c.card_number,c.is_collector,c.description,c.image_url,uc.quantity,
           uc.quantity-(SELECT COUNT(*) FROM card_trades t WHERE t.proposer_id=uc.user_id AND t.offered_card_id=uc.card_id AND t.status='pending') available_quantity,
           NOT EXISTS(SELECT 1 FROM user_cards mine WHERE mine.user_id=? AND mine.card_id=c.id AND mine.quantity>0) missing_for_viewer
           FROM user_cards uc JOIN cards c ON c.id=uc.card_id WHERE uc.user_id=? AND uc.quantity>0";
         if($duplicatesOnly)$sql.=" HAVING available_quantity>1";
         $sql.=" ORDER BY FIELD(c.rarity,'legendary','epic','rare','common'),c.name";
         $stmt=$db->prepare($sql);$stmt->execute([$viewer,$owner]);
-        return array_map(static function($c){$c['quantity']=(int)$c['quantity'];$c['available_quantity']=(int)$c['available_quantity'];$c['missing_for_viewer']=(bool)$c['missing_for_viewer'];$c['tradeable']=$c['available_quantity']>1;return $c;},$stmt->fetchAll(PDO::FETCH_ASSOC));
+        return array_map(static function($c){
+            $c['quantity']=(int)$c['quantity'];
+            $c['available_quantity']=(int)$c['available_quantity'];
+            $c['missing_for_viewer']=(bool)$c['missing_for_viewer'];
+            $c['tradeable']=$c['available_quantity']>1;
+            $c['season_id']=(int)($c['season_id']??1);
+            $c['card_number']=(int)($c['card_number']??1);
+            $c['is_collector']=(bool)($c['is_collector']??false);
+            return $c;
+        },$stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     private function snapshot(PDO $db,int $owner,string $cardId,bool $lock,?int $exclude=null): ?array {
-        $stmt=$db->prepare("SELECT uc.quantity,c.id,c.name,c.rarity,c.card_set,c.description,c.image_url FROM user_cards uc JOIN cards c ON c.id=uc.card_id WHERE uc.user_id=? AND uc.card_id=?".($lock?' FOR UPDATE':''));
+        $stmt=$db->prepare("SELECT uc.quantity,c.id,c.name,c.rarity,c.card_set,c.season_id,c.card_number,c.is_collector,c.description,c.image_url FROM user_cards uc JOIN cards c ON c.id=uc.card_id WHERE uc.user_id=? AND uc.card_id=?".($lock?' FOR UPDATE':''));
         $stmt->execute([$owner,$cardId]);$row=$stmt->fetch(PDO::FETCH_ASSOC);if(!$row)return null;
         $sql="SELECT COUNT(*) FROM card_trades WHERE proposer_id=? AND offered_card_id=? AND status='pending'";$params=[$owner,$cardId];
         if($exclude){$sql.=" AND id!=?";$params[]=$exclude;}
         $q=$db->prepare($sql);$q->execute($params);$reserved=(int)$q->fetchColumn();
-        return ['quantity'=>(int)$row['quantity'],'available_quantity'=>(int)$row['quantity']-$reserved,'card'=>['id'=>$row['id'],'name'=>$row['name'],'rarity'=>$row['rarity'],'set'=>$row['card_set'],'description'=>$row['description'],'image_url'=>$row['image_url']]];
+        return ['quantity'=>(int)$row['quantity'],'available_quantity'=>(int)$row['quantity']-$reserved,'card'=>['id'=>$row['id'],'name'=>$row['name'],'rarity'=>$row['rarity'],'set'=>$row['card_set'],'season_id'=>(int)($row['season_id']??1),'card_number'=>(int)($row['card_number']??1),'is_collector'=>(bool)($row['is_collector']??false),'description'=>$row['description'],'image_url'=>$row['image_url']]];
     }
 
     private function fee(string $a,string $b): array {

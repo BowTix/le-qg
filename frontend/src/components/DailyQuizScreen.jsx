@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../utils/api';
-import { ArrowLeft, Coins, Loader2, Award, Share2 } from 'lucide-react';
+import { ArrowLeft, Coins, Loader2, Award, Share2, CheckCircle2, XCircle, Check, Zap, AlertCircle, X } from 'lucide-react';
 
 export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
   const [loading, setLoading] = useState(true);
@@ -8,6 +8,7 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   
   // Answers accumulated locally
   const [userAnswers, setUserAnswers] = useState([]); // [{ answer_token, answer }]
@@ -30,7 +31,11 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
       try {
         const data = await api.get('/quiz/daily/questions');
         if (data.success && active) {
-          setQuestions(data.questions);
+          if (data.already_completed) {
+            setResults(data);
+          } else {
+            setQuestions(data.questions);
+          }
         }
       } catch (err) {
         if (active) {
@@ -97,15 +102,18 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
     setSubmitting(true);
     try {
       const data = await api.post('/quiz/daily/submit', { answers: allAnswers });
-      if (data.success) {
+      if (data && data.success) {
         setResults(data);
-        // Trigger parent profile stats refresh
-        if (data.points_earned > 0) {
-          onUpdateUserStats({
-            global_score: data.points_earned, // This will be added by parent, or we can just fetch profile
-            coins: data.coins_earned
-          });
+        if (data.user_stats && onUpdateUserStats) {
+          onUpdateUserStats(data.user_stats);
+        } else if (data.points_earned > 0 && onUpdateUserStats) {
+          onUpdateUserStats((prev) => ({
+            global_score: (prev?.global_score || 0) + data.points_earned,
+            coins: (prev?.coins || 0) + (data.coins_earned || 0)
+          }));
         }
+      } else {
+        throw new Error(data?.error || "Erreur lors de la soumission de vos réponses.");
       }
     } catch (err) {
       setError(err.message || "Erreur lors de la soumission de vos réponses.");
@@ -126,10 +134,13 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
     const block2 = results.attempt.q2_correct ? '🟩' : '🟥';
     const block3 = results.attempt.q3_correct ? '🟩' : '🟥';
     
-    const shareText = `Le QG - Quiz du Jour #${d}-${m} 📅\n${block1}${block2}${block3} (${correctCount}/3)\nJouez vous aussi sur : ${window.location.origin}`;
+    const shareText = `Quiz du Jour #${d}-${m} 📅\n${block1}${block2}${block3} (${correctCount}/3)\nJouez vous aussi sur : ${window.location.origin}`;
     
-    navigator.clipboard.writeText(shareText);
-    alert("Résultats copiés dans le presse-papiers !");
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareText);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   if (loading) {
@@ -146,8 +157,8 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
   if (error) {
     return (
       <div className="container" style={{ maxWidth: '800px' }}>
-        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '36px', textAlign: 'center', color: 'var(--text-primary)', width: '100%' }}>
-          <div style={{ fontSize: '2.5rem' }}>⚠️</div>
+        <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '36px', textAlign: 'center', color: 'var(--text-primary)', width: '100%', alignItems: 'center' }}>
+          <AlertCircle size={44} style={{ color: 'var(--error)' }} />
           <h3 style={{ color: 'var(--error)', fontWeight: 700 }}>Une erreur est survenue</h3>
           <p style={{ color: 'var(--text-secondary)' }}>{error}</p>
           <button className="btn-primary" onClick={onBack} style={{ marginTop: '12px' }}>
@@ -179,7 +190,6 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
         <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '28px', padding: '36px', color: 'var(--text-primary)', width: '100%' }}>
           
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <span style={{ fontSize: '2.5rem' }}>📅</span>
             <h2 style={{ fontSize: '1.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Quiz du Jour Terminé !
             </h2>
@@ -212,27 +222,114 @@ export default function DailyQuizScreen({ onBack, onUpdateUserStats }) {
               {correctCount}/3
             </span>
 
-            {/* Wordle blocks */}
-            <div style={{ fontSize: '1.8rem', letterSpacing: '6px', margin: '4px 0 8px' }}>
-              {results.attempt.q1_correct ? '🟩' : '🟥'}
-              {results.attempt.q2_correct ? '🟩' : '🟥'}
-              {results.attempt.q3_correct ? '🟩' : '🟥'}
+            {/* Results answers pills */}
+            <div style={{ display: 'flex', gap: '8px', margin: '8px 0 12px' }}>
+              {[results.attempt.q1_correct, results.attempt.q2_correct, results.attempt.q3_correct].map((correct, i) => (
+                <span
+                  key={i}
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: correct ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    border: `1px solid ${correct ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+                    color: correct ? '#34d399' : '#f87171'
+                  }}
+                >
+                  {correct ? <Check size={16} /> : <X size={16} />}
+                </span>
+              ))}
             </div>
 
             {/* Rewards */}
             <div style={{ display: 'flex', gap: '16px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><Coins size={15} /> +{results.coins_earned} pièces</span>
-              <span>⚡ +{results.points_earned} XP</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#fbbf24' }}><Zap size={14} /> +{results.points_earned} XP</span>
             </div>
           </div>
 
           {/* Share Block */}
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button className="btn-primary" onClick={handleShare} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 28px' }}>
-              <Share2 size={16} />
-              Partager mon résultat (Copier)
+              {copied ? (
+                <>
+                  <Check size={16} />
+                  Résultat copié !
+                </>
+              ) : (
+                <>
+                  <Share2 size={16} />
+                  Partager mon résultat (Copier)
+                </>
+              )}
             </button>
           </div>
+
+          {/* Answers Details Section */}
+          {results.answers_details && results.answers_details.length > 0 && (
+            <div style={{
+              textAlign: 'left',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              borderTop: '1px solid var(--border-color)',
+              paddingTop: '20px'
+            }}>
+              <h4 style={{
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                margin: 0
+              }}>
+                <CheckCircle2 size={18} style={{ color: '#2dd4bf' }} />
+                Réponses du Quiz du Jour
+              </h4>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {results.answers_details.map((item, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      backgroundColor: item.correct ? 'rgba(45, 212, 191, 0.07)' : 'rgba(251, 113, 133, 0.07)',
+                      border: `1px solid ${item.correct ? 'rgba(45, 212, 191, 0.2)' : 'rgba(251, 113, 133, 0.2)'}`
+                    }}
+                  >
+                    {item.correct ? (
+                      <CheckCircle2 size={20} style={{ color: 'var(--success)', marginTop: '2px', flexShrink: 0 }} />
+                    ) : (
+                      <XCircle size={20} style={{ color: 'var(--error)', marginTop: '2px', flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '0.95rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
+                        {index + 1}. {item.question_text}
+                      </p>
+                      
+                      {item.user_answer && !item.correct && (
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                          Votre réponse : <span style={{ color: '#fb7185', fontWeight: 500 }}>{item.user_answer}</span>
+                        </p>
+                      )}
+
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                        Bonne réponse : <span style={{ color: '#2dd4bf', fontWeight: 600 }}>{item.correct_answer}</span>
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Success Statistics */}
           <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>

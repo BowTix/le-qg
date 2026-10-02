@@ -18,7 +18,7 @@ class ShopController {
         $db = Database::getConnection();
 
         $stmt = $db->prepare("
-            SELECT u.coins,
+            SELECT u.coins, u.craft_stars,
                    (SELECT COUNT(*) FROM cards) AS total_cards,
                    (SELECT COUNT(*) FROM user_cards uc WHERE uc.user_id = ? AND uc.quantity > 0) AS unlocked_cards
             FROM users u
@@ -30,6 +30,7 @@ class ShopController {
         echo json_encode([
             'success' => true,
             'coins' => (int) ($summary['coins'] ?? 0),
+            'craft_stars' => (int) ($summary['craft_stars'] ?? 0),
             'total_cards' => (int) ($summary['total_cards'] ?? 0),
             'unlocked_cards' => (int) ($summary['unlocked_cards'] ?? 0),
         ]);
@@ -43,8 +44,8 @@ class ShopController {
         $userId = (int) $authUser['user_id'];
         $db = Database::getConnection();
 
-        // 1. Get user profile and coins
-        $stmtUser = $db->prepare("SELECT coins, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
+        // 1. Get user profile, coins and craft stars
+        $stmtUser = $db->prepare("SELECT coins, craft_stars, equipped_border, equipped_color, equipped_title FROM users WHERE id = ?");
         $stmtUser->execute([$userId]);
         $userData = $stmtUser->fetch();
 
@@ -74,6 +75,9 @@ class ShopController {
                 'name' => $item['name'],
                 'rarity' => $item['rarity'],
                 'set' => $item['card_set'],
+                'season_id' => (int) ($item['season_id'] ?? 1),
+                'card_number' => (int) ($item['card_number'] ?? 1),
+                'is_collector' => (bool) ($item['is_collector'] ?? false),
                 'description' => $item['description'],
                 'image_url' => $item['image_url'] ?? ("/assets/cards/" . str_replace('card_', '', $item['id']) . ".jpg")
             ];
@@ -149,6 +153,7 @@ class ShopController {
         echo json_encode([
             'success' => true,
             'coins' => (int) ($userData['coins'] ?? 0),
+            'craft_stars' => (int) ($userData['craft_stars'] ?? 0),
             'equipped' => [
                 'border' => $userData['equipped_border'],
                 'color' => $userData['equipped_color'],
@@ -260,8 +265,8 @@ class ShopController {
             return;
         }
 
-        // Load all cards from database
-        $stmtCards = $db->query("SELECT * FROM cards");
+        // Load all cards eligible for standard boosters from database
+        $stmtCards = $db->query("SELECT * FROM cards WHERE is_collector = 0 AND rarity != 'ultime'");
         $allCards = $stmtCards->fetchAll(PDO::FETCH_ASSOC);
 
         if (empty($allCards)) {
@@ -283,6 +288,9 @@ class ShopController {
                 'name' => $card['name'],
                 'rarity' => $card['rarity'],
                 'set' => $card['card_set'],
+                'season_id' => (int) ($card['season_id'] ?? 1),
+                'card_number' => (int) ($card['card_number'] ?? 1),
+                'is_collector' => (bool) ($card['is_collector'] ?? false),
                 'description' => $card['description'],
                 'image_url' => $card['image_url'] ?? ("/assets/cards/" . str_replace('card_', '', $card['id']) . ".jpg")
             ];
@@ -293,29 +301,51 @@ class ShopController {
                 $rareCards[] = $cardFormatted;
             } elseif ($card['rarity'] === 'epic') {
                 $epicCards[] = $cardFormatted;
-            } else {
+            } elseif ($card['rarity'] === 'legendary') {
                 $legendaryCards[] = $cardFormatted;
             }
         }
 
-        // Draw 3 cards based on weighted probability
-        // Common: 65%, Rare: 25%, Epic: 8%, Legendary: 2%
+        // Draw 3 cards based on weighted probability per slot:
+        // Slots 1 & 2 (Standard): Common 75%, Rare 20%, Epic 4%, Legendary 1%
+        // Slot 3 (Guaranteed Rare+): Rare 70%, Epic 22%, Legendary 8% (0% Common)
         $drawnCards = [];
-        for ($i = 0; $i < 3; $i++) {
-            $rand = rand(1, 100);
-            if ($rand <= 65 && !empty($commonCards)) {
-                $drawnCards[] = $commonCards[array_rand($commonCards)];
-            } elseif ($rand <= 90 && !empty($rareCards)) {
-                $drawnCards[] = $rareCards[array_rand($rareCards)];
-            } elseif ($rand <= 98 && !empty($epicCards)) {
-                $drawnCards[] = $epicCards[array_rand($epicCards)];
-            } elseif (!empty($legendaryCards)) {
-                $drawnCards[] = $legendaryCards[array_rand($legendaryCards)];
+
+        // Helper function to pick card by rarity
+        $pickCard = function(string $rarity) use (&$commonCards, &$rareCards, &$epicCards, &$legendaryCards) {
+            $pool = match ($rarity) {
+                'legendary' => $legendaryCards,
+                'epic' => $epicCards,
+                'rare' => $rareCards,
+                default => $commonCards,
+            };
+            if (!empty($pool)) return $pool[array_rand($pool)];
+            $all = array_merge($commonCards, $rareCards, $epicCards, $legendaryCards);
+            return $all[array_rand($all)];
+        };
+
+        // Slots 1 & 2
+        for ($i = 0; $i < 2; $i++) {
+            $rand = mt_rand(1, 100);
+            if ($rand <= 75) {
+                $drawnCards[] = $pickCard('common');
+            } elseif ($rand <= 95) {
+                $drawnCards[] = $pickCard('rare');
+            } elseif ($rand <= 99) {
+                $drawnCards[] = $pickCard('epic');
             } else {
-                // Fallback to absolute random if target rarity pool was empty
-                $allPool = array_merge($commonCards, $rareCards, $epicCards, $legendaryCards);
-                $drawnCards[] = $allPool[array_rand($allPool)];
+                $drawnCards[] = $pickCard('legendary');
             }
+        }
+
+        // Slot 3 (Rare+ Garanti)
+        $rand3 = mt_rand(1, 100);
+        if ($rand3 <= 70) {
+            $drawnCards[] = $pickCard('rare');
+        } elseif ($rand3 <= 92) {
+            $drawnCards[] = $pickCard('epic');
+        } else {
+            $drawnCards[] = $pickCard('legendary');
         }
 
         try {
@@ -362,16 +392,28 @@ class ShopController {
 
             // Track quests progress after transaction success
             \App\Controllers\QuestController::incrementProgress($userId, 'open_chests');
+            \App\Controllers\QuestController::incrementProgress($userId, 'cards_obtained', count($cardsResult));
+            $duplicatesDrawn = 0;
             foreach ($cardsResult as $res) {
                 if ($res['is_new']) {
                     \App\Controllers\QuestController::incrementProgress($userId, 'cards_unlocked');
+                } else {
+                    $duplicatesDrawn++;
                 }
             }
+            if ($duplicatesDrawn > 0) {
+                \App\Controllers\QuestController::incrementProgress($userId, 'recycle_duplicates', $duplicatesDrawn);
+            }
+
+            $stmtFreshStars = $db->prepare("SELECT craft_stars FROM users WHERE id = ?");
+            $stmtFreshStars->execute([$userId]);
+            $craftStars = (int) $stmtFreshStars->fetchColumn();
 
             echo json_encode([
                 'success' => true,
                 'drawn_cards' => $cardsResult,
-                'new_coins' => $coins - $boosterCost
+                'new_coins' => $coins - $boosterCost,
+                'craft_stars' => $craftStars
             ]);
         } catch (Exception $e) {
             $db->rollBack();
@@ -455,19 +497,55 @@ class ShopController {
             SELECT COUNT(DISTINCT uc.card_id) 
             FROM user_cards uc
             JOIN cards c ON uc.card_id = c.id
-            WHERE uc.user_id = ? AND c.card_set = ?
+            WHERE uc.user_id = ? AND c.card_set = ? AND uc.quantity > 0
         ");
         $stmtCountOwned->execute([$userId, $cardSet]);
         $ownedInSet = intval($stmtCountOwned->fetchColumn());
 
         if ($ownedInSet === $totalInSet && $totalInSet > 0) {
-            // Unlock reward in database
-            $stmtReward = $db->prepare("
-                INSERT INTO user_cosmetics (user_id, item_type, item_value) 
-                VALUES (?, ?, ?)
-                ON DUPLICATE KEY UPDATE item_value = item_value
+            // Check if cosmetic already claimed
+            $stmtCheckClaimed = $db->prepare("SELECT id FROM user_cosmetics WHERE user_id = ? AND item_type = ? AND item_value = ?");
+            $stmtCheckClaimed->execute([$userId, $reward['reward_type'], $reward['reward_value']]);
+            $alreadyClaimed = (bool) $stmtCheckClaimed->fetch();
+
+            if (!$alreadyClaimed) {
+                // Unlock reward in database
+                $stmtReward = $db->prepare("
+                    INSERT INTO user_cosmetics (user_id, item_type, item_value) 
+                    VALUES (?, ?, ?)
+                    ON DUPLICATE KEY UPDATE item_value = item_value
+                ");
+                $stmtReward->execute([$userId, $reward['reward_type'], $reward['reward_value']]);
+
+                // Bonus de Complétion de Série (Section 8) : +250 coins et +120 XP
+                $stmtBonus = $db->prepare("UPDATE users SET coins = coins + 250, global_score = global_score + 120 WHERE id = ?");
+                $stmtBonus->execute([$userId]);
+            }
+
+            // Check for 100/100 Ultimate Season Completion
+            $stmtSeasonCount = $db->prepare("
+                SELECT COUNT(DISTINCT uc.card_id)
+                FROM user_cards uc
+                JOIN cards c ON uc.card_id = c.id
+                WHERE uc.user_id = ? AND c.season_id = 1 AND c.card_number <= 100 AND uc.quantity > 0
             ");
-            $stmtReward->execute([$userId, $reward['reward_type'], $reward['reward_value']]);
+            $stmtSeasonCount->execute([$userId]);
+            $seasonOwned = intval($stmtSeasonCount->fetchColumn());
+
+            if ($seasonOwned >= 100) {
+                $stmtCheckMaster = $db->prepare("SELECT id FROM user_cosmetics WHERE user_id = ? AND item_type = 'title' AND item_value = 'Maître d\'Omnia — Saison 1'");
+                $stmtCheckMaster->execute([$userId]);
+                if (!$stmtCheckMaster->fetch()) {
+                    $stmtMasterTitle = $db->prepare("INSERT IGNORE INTO user_cosmetics (user_id, item_type, item_value) VALUES (?, 'title', 'Maître d\'Omnia — Saison 1')");
+                    $stmtMasterTitle->execute([$userId]);
+
+                    $stmtMasterBorder = $db->prepare("INSERT IGNORE INTO user_cosmetics (user_id, item_type, item_value) VALUES (?, 'border', 'border-holographic')");
+                    $stmtMasterBorder->execute([$userId]);
+
+                    $stmtSecretCard = $db->prepare("INSERT INTO user_cards (user_id, card_id, quantity) VALUES (?, 'card_secret_101', 1) ON DUPLICATE KEY UPDATE quantity = quantity + 1");
+                    $stmtSecretCard->execute([$userId]);
+                }
+            }
 
             // Determine temporary frontend setId representation
             $setsIdMap = [
@@ -487,11 +565,300 @@ class ShopController {
             return [
                 'set_id' => $setId,
                 'set_name' => $cardSet,
-                'reward_label' => $reward['reward_label']
+                'reward_label' => $reward['reward_label'] . ($alreadyClaimed ? '' : ' (+250 🪙, +120 XP)')
             ];
         }
 
         return null;
+    }
+
+    /**
+     * POST /api/cards/recycle
+     * Recycles duplicates (quantity > 1) into Crafting Stars
+     * Body: { card_id?: string, count?: int, all?: boolean }
+     */
+    public function recycleCards(array $data) {
+        $authUser = AuthMiddleware::authenticate();
+        $userId = (int) $authUser['user_id'];
+        $db = Database::getConnection();
+
+        $all = !empty($data['all']);
+        $targetCardId = trim($data['card_id'] ?? '');
+        $requestedCount = max(1, intval($data['count'] ?? 1));
+
+        $starsMap = [
+            'common' => 1,
+            'rare' => 3,
+            'epic' => 8,
+            'legendary' => 20,
+            'ultime' => 50,
+            'ultimate' => 50
+        ];
+
+        try {
+            $db->beginTransaction();
+
+            $totalRecycled = 0;
+            $totalStars = 0;
+
+            if ($all) {
+                $stmt = $db->prepare("
+                    SELECT uc.card_id, uc.quantity, c.rarity 
+                    FROM user_cards uc
+                    JOIN cards c ON uc.card_id = c.id
+                    WHERE uc.user_id = ? AND uc.quantity > 1
+                ");
+                $stmt->execute([$userId]);
+                $duplicates = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (empty($duplicates)) {
+                    $db->rollBack();
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Aucun doublon disponible à recycler.']);
+                    return;
+                }
+
+                $stmtUpdate = $db->prepare("UPDATE user_cards SET quantity = 1 WHERE user_id = ? AND card_id = ?");
+
+                foreach ($duplicates as $dup) {
+                    $excess = intval($dup['quantity']) - 1;
+                    if ($excess > 0) {
+                        $rarity = $dup['rarity'] ?? 'common';
+                        $perCard = $starsMap[$rarity] ?? 1;
+                        $totalRecycled += $excess;
+                        $totalStars += ($excess * $perCard);
+                        $stmtUpdate->execute([$userId, $dup['card_id']]);
+                    }
+                }
+            } else {
+                if (empty($targetCardId)) {
+                    $db->rollBack();
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Identifiant de carte manquant.']);
+                    return;
+                }
+
+                $stmt = $db->prepare("
+                    SELECT uc.quantity, c.rarity
+                    FROM user_cards uc
+                    JOIN cards c ON uc.card_id = c.id
+                    WHERE uc.user_id = ? AND uc.card_id = ?
+                ");
+                $stmt->execute([$userId, $targetCardId]);
+                $cardRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$cardRow || intval($cardRow['quantity']) <= 1) {
+                    $db->rollBack();
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Vous ne possédez aucun doublon pour cette carte.']);
+                    return;
+                }
+
+                $availableExcess = intval($cardRow['quantity']) - 1;
+                $countToRecycle = min($requestedCount, $availableExcess);
+                $rarity = $cardRow['rarity'] ?? 'common';
+                $perCard = $starsMap[$rarity] ?? 1;
+
+                $totalRecycled = $countToRecycle;
+                $totalStars = $countToRecycle * $perCard;
+
+                $stmtUpdate = $db->prepare("UPDATE user_cards SET quantity = quantity - ? WHERE user_id = ? AND card_id = ?");
+                $stmtUpdate->execute([$countToRecycle, $userId, $targetCardId]);
+            }
+
+            // Award Crafting Stars to user
+            $stmtAward = $db->prepare("UPDATE users SET craft_stars = craft_stars + ? WHERE id = ?");
+            $stmtAward->execute([$totalStars, $userId]);
+
+            $db->commit();
+
+            // Increment quest progress for recycling duplicates
+            \App\Controllers\QuestController::incrementProgress($userId, 'recycle_duplicates', $totalRecycled);
+
+            // Fetch fresh craft_stars and updated user_cards
+            $stmtFreshStars = $db->prepare("SELECT craft_stars FROM users WHERE id = ?");
+            $stmtFreshStars->execute([$userId]);
+            $newCraftStars = (int) $stmtFreshStars->fetchColumn();
+
+            $stmtCards = $db->prepare("SELECT card_id, quantity FROM user_cards WHERE user_id = ? AND quantity > 0");
+            $stmtCards->execute([$userId]);
+            $unlockedCards = [];
+            foreach ($stmtCards->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $unlockedCards[$row['card_id']] = (int) $row['quantity'];
+            }
+
+            echo json_encode([
+                'success' => true,
+                'message' => "{$totalRecycled} doublon(s) recyclé(s) pour +{$totalStars} ⭐ !",
+                'recycled_count' => $totalRecycled,
+                'stars_awarded' => $totalStars,
+                'stars_gained' => $totalStars,
+                'craft_stars' => $newCraftStars,
+                'unlocked_cards' => $unlockedCards
+            ]);
+        } catch (Exception $e) {
+            $db->rollBack();
+            http_response_code(500);
+            echo json_encode(['error' => 'Erreur lors du recyclage : ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * POST /api/cards/craft
+     * Crafts a specific card with Crafting Stars
+     * Body: { card_id: string }
+     */
+    public function craftCard(array $data) {
+        $authUser = AuthMiddleware::authenticate();
+        $userId = (int) $authUser['user_id'];
+        $db = Database::getConnection();
+
+        $cardId = trim($data['card_id'] ?? '');
+        $rarity = trim($data['rarity'] ?? '');
+
+        // Crafting costs by rarity (Section 7)
+        $craftCosts = [
+            'common' => 15,
+            'rare' => 35,
+            'epic' => 80,
+            'legendary' => 180
+        ];
+
+        if (!empty($rarity)) {
+            if (!isset($craftCosts[$rarity])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Rareté invalide.']);
+                return;
+            }
+
+            // Find all undiscovered cards of this rarity for the user (non-collector base season)
+            $stmtMissing = $db->prepare("
+                SELECT * FROM cards c 
+                WHERE c.rarity = ? 
+                  AND c.is_collector = 0
+                  AND c.id NOT IN (
+                      SELECT card_id FROM user_cards WHERE user_id = ? AND quantity > 0
+                  )
+            ");
+            $stmtMissing->execute([$rarity, $userId]);
+            $missingCards = $stmtMissing->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($missingCards)) {
+                http_response_code(400);
+                echo json_encode(['error' => "Toutes les cartes de cette rareté sont déjà débloquées !"]);
+                return;
+            }
+
+            $card = $missingCards[array_rand($missingCards)];
+            $cardId = $card['id'];
+        } elseif (!empty($cardId)) {
+            // Fetch card details by ID
+            $stmtCard = $db->prepare("SELECT * FROM cards WHERE id = ?");
+            $stmtCard->execute([$cardId]);
+            $card = $stmtCard->fetch(PDO::FETCH_ASSOC);
+
+            if (!$card) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Carte introuvable dans le catalogue.']);
+                return;
+            }
+            $rarity = $card['rarity'] ?? 'common';
+        } else {
+            http_response_code(400);
+            echo json_encode(['error' => 'Rareté ou identifiant de carte manquant.']);
+            return;
+        }
+
+        $cost = $craftCosts[$rarity] ?? 15;
+
+        // Check user stars
+        $stmtUser = $db->prepare("SELECT craft_stars FROM users WHERE id = ?");
+        $stmtUser->execute([$userId]);
+        $currentStars = intval($stmtUser->fetchColumn());
+
+        if ($currentStars < $cost) {
+            http_response_code(400);
+            echo json_encode(['error' => "Étoiles insuffisantes. Il vous faut {$cost} étoiles pour fabriquer cette carte ({$currentStars} disponibles)."]);
+            return;
+        }
+
+        try {
+            $db->beginTransaction();
+
+            // Deduct stars
+            $stmtDeduct = $db->prepare("UPDATE users SET craft_stars = craft_stars - ? WHERE id = ?");
+            $stmtDeduct->execute([$cost, $userId]);
+
+            // Check if user already owns it
+            $stmtCheck = $db->prepare("SELECT quantity FROM user_cards WHERE user_id = ? AND card_id = ?");
+            $stmtCheck->execute([$userId, $cardId]);
+            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            $isNew = !$existing || intval($existing['quantity']) === 0;
+
+            // Insert or increment quantity
+            $stmtAdd = $db->prepare("
+                INSERT INTO user_cards (user_id, card_id, quantity) 
+                VALUES (?, ?, 1) 
+                ON DUPLICATE KEY UPDATE quantity = quantity + 1
+            ");
+            $stmtAdd->execute([$userId, $cardId]);
+
+            // Check completed sets
+            $unlockedSets = [];
+            if ($isNew) {
+                $setInfo = $this->checkForCompletedSets($db, $userId, $cardId);
+                if ($setInfo) {
+                    $unlockedSets[] = $setInfo;
+                }
+            }
+
+            $db->commit();
+
+            // Trigger quests
+            \App\Controllers\QuestController::incrementProgress($userId, 'craft_card', 1);
+            \App\Controllers\QuestController::incrementProgress($userId, 'cards_obtained', 1);
+            if ($isNew) {
+                \App\Controllers\QuestController::incrementProgress($userId, 'cards_unlocked', 1);
+            }
+
+            // Fresh data
+            $stmtFreshStars = $db->prepare("SELECT craft_stars FROM users WHERE id = ?");
+            $stmtFreshStars->execute([$userId]);
+            $newCraftStars = (int) $stmtFreshStars->fetchColumn();
+
+            $stmtCards = $db->prepare("SELECT card_id, quantity FROM user_cards WHERE user_id = ? AND quantity > 0");
+            $stmtCards->execute([$userId]);
+            $unlockedCards = [];
+            foreach ($stmtCards->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $unlockedCards[$row['card_id']] = (int) $row['quantity'];
+            }
+
+            $cardFormatted = [
+                'id' => $card['id'],
+                'name' => $card['name'],
+                'rarity' => $card['rarity'],
+                'set' => $card['card_set'],
+                'season_id' => (int) ($card['season_id'] ?? 1),
+                'card_number' => (int) ($card['card_number'] ?? 1),
+                'is_collector' => (bool) ($card['is_collector'] ?? false),
+                'description' => $card['description'],
+                'image_url' => $card['image_url'] ?? ("/assets/cards/" . str_replace('card_', '', $card['id']) . ".jpg")
+            ];
+
+            echo json_encode([
+                'success' => true,
+                'message' => "Carte \"{$card['name']}\" fabriquée avec succès !",
+                'card' => $cardFormatted,
+                'craft_stars' => $newCraftStars,
+                'is_new' => $isNew,
+                'unlocked_cards' => $unlockedCards,
+                'unlocked_sets' => $unlockedSets
+            ]);
+        } catch (Exception $e) {
+            $db->rollBack();
+            http_response_code(500);
+            echo json_encode(['error' => 'Erreur lors de la fabrication de la carte : ' . $e->getMessage()]);
+        }
     }
 
     /**

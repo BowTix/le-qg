@@ -1,8 +1,8 @@
 const SERVICE_WORKER_SOURCE = String.raw`
-const APP_CACHE = 'le-qg-app-' + VERSION;
-const RUNTIME_CACHE = 'le-qg-runtime-' + VERSION;
-const FONT_CACHE = 'le-qg-fonts-v1';
-const CACHE_PREFIX = 'le-qg-';
+const APP_CACHE = 'omnia-app-' + VERSION;
+const RUNTIME_CACHE = 'omnia-runtime-' + VERSION;
+const FONT_CACHE = 'omnia-fonts-v1';
+const CACHE_PREFIX = 'omnia-';
 const FONT_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com', 'api.fontshare.com']);
 
 async function cacheResponse(cacheName, request, response) {
@@ -77,7 +77,7 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('sync', (event) => {
-  if (event.tag !== 'le-qg-offline-results') return;
+  if (event.tag !== 'omnia-offline-results') return;
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clients) => clients.forEach((client) => client.postMessage({ type: 'SYNC_OFFLINE_RESULTS' })))
@@ -87,7 +87,7 @@ self.addEventListener('sync', (event) => {
 
 export default function vitePwaPlugin() {
   return {
-    name: 'le-qg-pwa',
+    name: 'omnia-pwa',
     apply: 'build',
     generateBundle(_, bundle) {
       const version = Date.now().toString(36);

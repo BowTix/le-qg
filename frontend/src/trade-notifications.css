@@ -60,11 +60,6 @@ button.notification-item:hover, .notification-item:hover { background: rgba(51, 
 .trade-page__empty h2 { margin: 14px 0 5px; color: var(--text-primary); font-size: 1.1rem; }
 .trade-page__empty p { margin: 0 0 18px; font-size: .78rem; }
 
-[data-theme="light"] .notifications__panel { border-color: rgba(15, 23, 42, .13); background: rgba(248, 250, 252, .98); color: #172033; }
-[data-theme="light"] .notifications__panel > header h3, [data-theme="light"] .notifications__empty strong { color: #172033; }
-[data-theme="light"] button.notification-item:hover, [data-theme="light"] .notification-item:hover, [data-theme="light"] .notifications__panel > footer button { background: rgba(226, 232, 240, .65); }
-[data-theme="light"] .notification-item small b { color: #334155; }
-[data-theme="light"] .trade-page__hero, [data-theme="light"] .trade-page__content, [data-theme="light"] .trade-page__stats > div { border-color: rgba(15, 23, 42, .1); background-color: rgba(255, 255, 255, .72); }
 
 @media (max-width: 800px) {
   .trade-page { padding-top: 28px; }

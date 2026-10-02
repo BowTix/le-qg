@@ -38,14 +38,12 @@ class UserController {
         }
 
         $stmtCards = $db->prepare("
-            SELECT c.id, c.name, c.rarity, c.card_set, c.description, c.image_url,
+            SELECT c.id, c.name, c.rarity, c.card_set, c.season_id, c.card_number, c.is_collector, c.description, c.image_url,
                    uc.quantity, uc.unlocked_at
             FROM user_cards uc
             JOIN cards c ON c.id = uc.card_id
             WHERE uc.user_id = ? AND uc.quantity > 0
-            ORDER BY c.card_set ASC,
-                     FIELD(c.rarity, 'legendary', 'epic', 'rare', 'common') ASC,
-                     c.name ASC
+            ORDER BY c.season_id ASC, c.card_number ASC, c.name ASC
         ");
         $stmtCards->execute([$userId]);
         $cardsRaw = $stmtCards->fetchAll(PDO::FETCH_ASSOC);
@@ -68,6 +66,9 @@ class UserController {
                 'name' => $card['name'],
                 'rarity' => $card['rarity'],
                 'set' => $card['card_set'],
+                'season_id' => (int) ($card['season_id'] ?? 1),
+                'card_number' => (int) ($card['card_number'] ?? 1),
+                'is_collector' => (bool) ($card['is_collector'] ?? false),
                 'description' => $card['description'],
                 'image_url' => $card['image_url'],
                 'quantity' => $quantity,

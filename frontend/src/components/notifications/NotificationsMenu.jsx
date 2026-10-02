@@ -1,22 +1,55 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeftRight, Bell, Check, UserPlus, X } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ArrowLeftRight, Bell, Check, CheckCheck, UserPlus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../utils/api';
 
-export default function NotificationsMenu() {
-  const navigate = useNavigate();
-  const rootRef = useRef(null);
-  const [open, setOpen] = useState(false);
+const STORAGE_KEY = 'read_notifications';
+
+function getStoredReadIds() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveStoredReadIds(idsSet) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...idsSet]));
+  } catch (error) {
+    console.error('Failed to save read notifications:', error);
+  }
+}
+
+export function useNotifications() {
   const [loading, setLoading] = useState(false);
   const [trades, setTrades] = useState([]);
   const [friendRequests, setFriendRequests] = useState([]);
+  const [readIds, setReadIds] = useState(getStoredReadIds);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
       const [tradeData, friendData] = await Promise.all([api.get('/trades'), api.get('/friends')]);
-      setTrades((tradeData.incoming || []).filter((trade) => trade.status === 'pending'));
-      setFriendRequests(friendData.incoming || []);
+      const incomingTrades = (tradeData.incoming || []).filter((trade) => trade.status === 'pending');
+      const incomingFriends = friendData.incoming || [];
+      setTrades(incomingTrades);
+      setFriendRequests(incomingFriends);
+
+      // Clean up stale IDs that no longer exist
+      const activeIds = new Set([
+        ...incomingTrades.map((t) => `trade-${t.id}`),
+        ...incomingFriends.map((f) => `friend-${f.friendship_id}`),
+      ]);
+      setReadIds((prev) => {
+        const cleaned = new Set([...prev].filter((id) => activeIds.has(id)));
+        if (cleaned.size !== prev.size) {
+          saveStoredReadIds(cleaned);
+          return cleaned;
+        }
+        return prev;
+      });
     } catch (error) {
       console.error('Failed to load notifications:', error);
     } finally {
@@ -43,16 +76,30 @@ export default function NotificationsMenu() {
     };
   }, [load]);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (event) => {
-      if (!rootRef.current?.contains(event.target)) setOpen(false);
-    };
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
-  }, [open]);
+  const markAsRead = useCallback((id) => {
+    setReadIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      saveStoredReadIds(next);
+      return next;
+    });
+  }, []);
+
+  const markAllAsRead = useCallback(() => {
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      trades.forEach((t) => next.add(`trade-${t.id}`));
+      friendRequests.forEach((f) => next.add(`friend-${f.friendship_id}`));
+      saveStoredReadIds(next);
+      return next;
+    });
+  }, [trades, friendRequests]);
+
+  const isRead = useCallback((id) => readIds.has(id), [readIds]);
 
   const respondToFriend = async (friendshipId, action) => {
+    markAsRead(`friend-${friendshipId}`);
     try {
       await api.post('/friends/respond', { friendship_id: friendshipId, action });
       await load(true);
@@ -61,63 +108,150 @@ export default function NotificationsMenu() {
     }
   };
 
-  const goTo = (path) => {
-    setOpen(false);
+  const unreadTrades = trades.filter((t) => !readIds.has(`trade-${t.id}`));
+  const unreadFriendRequests = friendRequests.filter((f) => !readIds.has(`friend-${f.friendship_id}`));
+  const unreadCount = unreadTrades.length + unreadFriendRequests.length;
+  const totalCount = trades.length + friendRequests.length;
+
+  return {
+    trades,
+    friendRequests,
+    count: unreadCount,
+    unreadCount,
+    totalCount,
+    loading,
+    respondToFriend,
+    markAsRead,
+    markAllAsRead,
+    isRead,
+    load,
+  };
+}
+
+export function ProfileNotifications({ notifications, onClose }) {
+  const navigate = useNavigate();
+  const { trades, friendRequests, unreadCount, totalCount, loading, respondToFriend, markAsRead, markAllAsRead, isRead } = notifications;
+
+  const goTo = (path, idToMark = null) => {
+    if (idToMark) markAsRead(idToMark);
+    onClose?.();
     navigate(path);
   };
 
-  const count = trades.length + friendRequests.length;
-
   return (
-    <div className="notifications" ref={rootRef}>
-      <button
-        className="app-header__icon notifications__trigger"
-        type="button"
-        onClick={(event) => { event.stopPropagation(); setOpen((value) => !value); if (!open) load(); }}
-        aria-label={`Notifications${count ? ` (${count})` : ''}`}
-        aria-expanded={open}
-      >
-        <Bell size={18} />
-        {count > 0 && <span>{count > 9 ? '9+' : count}</span>}
-      </button>
+    <div className="app-user__notif-section">
+      <div className="app-user__notif-header">
+        <span className="app-user__notif-title">
+          <Bell size={13} style={{ color: unreadCount > 0 ? '#ef4444' : '#94a3b8' }} />
+          Notifications
+        </span>
+        <div className="app-user__notif-header-actions">
+          {unreadCount > 0 && <span className="app-user__notif-badge">{unreadCount}</span>}
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              className="app-user__notif-mark-read"
+              onClick={markAllAsRead}
+              title="Tout marquer comme lu"
+            >
+              <CheckCheck size={12} />
+              Tout lire
+            </button>
+          )}
+        </div>
+      </div>
 
-      {open && (
-        <section className="notifications__panel" onClick={(event) => event.stopPropagation()}>
-          <header>
-            <div><span className="kicker">Activité</span><h3>Notifications</h3></div>
-            {count > 0 && <strong>{count} nouvelle{count > 1 ? 's' : ''}</strong>}
-          </header>
-
-          <div className="notifications__list">
-            {loading && count === 0 ? <div className="trade-loading"><span className="spinner" />Chargement…</div> : null}
-            {trades.map((trade) => (
-              <button className="notification-item" key={`trade-${trade.id}`} onClick={() => goTo('/echanges')}>
-                <span className="notification-item__icon notification-item__icon--trade"><ArrowLeftRight size={16} /></span>
-                <span><strong>Nouvelle proposition</strong><small>{trade.proposer.username} souhaite échanger <b>{trade.offered_card.name}</b>.</small></span>
-                <i aria-hidden="true" />
-              </button>
-            ))}
-            {friendRequests.map((request) => (
-              <div className="notification-item" key={`friend-${request.friendship_id}`}>
-                <span className="notification-item__icon"><UserPlus size={16} /></span>
-                <span><strong>Demande d’ami</strong><small>{request.username}<b>#{request.discriminator}</b> veut vous ajouter.</small></span>
-                <span className="notification-item__actions">
-                  <button type="button" onClick={() => respondToFriend(request.friendship_id, 'accept')} aria-label="Accepter"><Check size={13} /></button>
-                  <button type="button" onClick={() => respondToFriend(request.friendship_id, 'decline')} aria-label="Refuser"><X size={13} /></button>
-                </span>
+      <div className="app-user__notif-list">
+        {loading && totalCount === 0 && (
+          <div className="app-user__notif-loading">Chargement…</div>
+        )}
+        {trades.map((trade) => {
+          const id = `trade-${trade.id}`;
+          const read = isRead(id);
+          return (
+            <div
+              key={id}
+              className={`app-user__notif-item ${read ? 'is-read' : 'is-unread'}`}
+              onClick={() => goTo('/echanges', id)}
+              role="button"
+              tabIndex={0}
+            >
+              <span className="app-user__notif-icon app-user__notif-icon--trade">
+                <ArrowLeftRight size={13} />
+              </span>
+              <div className="app-user__notif-text">
+                <strong>Offre d'échange</strong>
+                <small>{trade.proposer?.username} propose {trade.offered_card?.name}</small>
               </div>
-            ))}
-            {!loading && count === 0 && (
-              <div className="notifications__empty"><span><Bell size={21} /></span><strong>Vous êtes à jour</strong><small>Aucune nouvelle notification pour le moment.</small></div>
-            )}
+              {!read && (
+                <div className="app-user__notif-actions">
+                  <button
+                    type="button"
+                    className="notif-btn notif-btn--mark"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markAsRead(id);
+                    }}
+                    title="Marquer comme lu"
+                  >
+                    <CheckCheck size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {friendRequests.map((request) => {
+          const id = `friend-${request.friendship_id}`;
+          const read = isRead(id);
+          return (
+            <div key={id} className={`app-user__notif-item ${read ? 'is-read' : 'is-unread'}`}>
+              <span className="app-user__notif-icon app-user__notif-icon--friend">
+                <UserPlus size={13} />
+              </span>
+              <div className="app-user__notif-text">
+                <strong>Demande d'ami</strong>
+                <small>{request.username}#{request.discriminator}</small>
+              </div>
+              <div className="app-user__notif-actions">
+                {!read && (
+                  <button
+                    type="button"
+                    className="notif-btn notif-btn--mark"
+                    onClick={() => markAsRead(id)}
+                    title="Marquer comme lu"
+                  >
+                    <CheckCheck size={12} />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="notif-btn notif-btn--accept"
+                  onClick={() => respondToFriend(request.friendship_id, 'accept')}
+                  title="Accepter"
+                >
+                  <Check size={12} />
+                </button>
+                <button
+                  type="button"
+                  className="notif-btn notif-btn--decline"
+                  onClick={() => respondToFriend(request.friendship_id, 'decline')}
+                  title="Refuser"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        {!loading && totalCount === 0 && (
+          <div className="app-user__notif-empty">
+            Aucune notification
           </div>
-
-          <footer>
-            <button type="button" onClick={() => goTo('/echanges')}><ArrowLeftRight size={14} /> Voir tous les échanges</button>
-            <button type="button" onClick={() => goTo('/profil')}><UserPlus size={14} /> Gérer mes amis</button>
-          </footer>
-        </section>
-      )}
+        )}
+      </div>
     </div>
   );
 }
+
+export default ProfileNotifications;

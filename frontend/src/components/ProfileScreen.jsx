@@ -203,7 +203,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
     const borderClass = equippedBorder || '';
     if (!url) {
       return (
-        <div className={`avatar-placeholder ${borderClass}`} style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: equippedBorder ? undefined : '3px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+        <div className={`avatar-placeholder ${borderClass}`} style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: equippedBorder ? undefined : 'none', boxShadow: equippedBorder ? undefined : 'none', color: 'var(--text-secondary)' }}>
           <User size={size === '100px' ? 44 : 24} />
         </div>
       );
@@ -215,7 +215,7 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
           src={`${PUBLIC_BASE}${url}`} 
           alt="Avatar" 
           className={`avatar ${borderClass}`}
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: equippedBorder ? undefined : '2px solid var(--accent-secondary)', boxShadow: equippedBorder ? undefined : '0 0 15px var(--accent-secondary-glow)' }}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: equippedBorder ? undefined : 'none', boxShadow: equippedBorder ? undefined : 'none' }}
         />
       );
     }
@@ -226,14 +226,14 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
           src={url} 
           alt="Avatar" 
           className={`avatar ${borderClass}`}
-          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: equippedBorder ? undefined : '2px solid var(--accent-secondary)', boxShadow: equippedBorder ? undefined : '0 0 15px var(--accent-secondary-glow)' }}
+          style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: equippedBorder ? undefined : 'none', boxShadow: equippedBorder ? undefined : 'none' }}
         />
       );
     }
 
     // Emoji preset (fallback)
     return (
-      <div className={`avatar-placeholder ${borderClass}`} style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize, border: equippedBorder ? undefined : '2px solid var(--accent-secondary)', boxShadow: equippedBorder ? undefined : '0 0 15px var(--accent-secondary-glow)' }}>
+      <div className={`avatar-placeholder ${borderClass}`} style={{ width: size, height: size, borderRadius: '50%', backgroundColor: 'var(--bg-input)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize, border: equippedBorder ? undefined : 'none', boxShadow: equippedBorder ? undefined : 'none' }}>
         {url}
       </div>
     );

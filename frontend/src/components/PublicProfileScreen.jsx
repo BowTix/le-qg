@@ -9,9 +9,9 @@ import TradeModal from './trades/TradeModal';
 function PublicAvatar({ user }) {
   const value = user?.avatar_url;
   const className = `public-profile__avatar ${user?.equipped_border || ''}`;
-  if (value?.startsWith('/uploads/')) return <img className={className} src={`${PUBLIC_BASE}${value}`} alt="" />;
-  if (value?.startsWith('http')) return <img className={className} src={value} alt="" />;
-  return <span className={className}>{value || user?.username?.[0]?.toUpperCase() || 'U'}</span>;
+  if (value?.startsWith('/uploads/')) return <img className={className} src={`${PUBLIC_BASE}${value}`} alt="" style={{ borderRadius: '50%' }} />;
+  if (value?.startsWith('http')) return <img className={className} src={value} alt="" style={{ borderRadius: '50%' }} />;
+  return <span className={className} style={{ borderRadius: '50%' }}>{value || user?.username?.[0]?.toUpperCase() || 'U'}</span>;
 }
 
 export default function PublicProfileScreen() {

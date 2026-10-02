@@ -141,7 +141,7 @@ function PortalGame({
   );
 }
 
-export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz }) {
+export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz, onStartMotMystere, onStartSudoku, onStartQueens, onStartShikaku }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const answers = [attempt?.q1_correct, attempt?.q2_correct, attempt?.q3_correct];
   const correctCount = answers.filter(Boolean).length;
@@ -151,6 +151,14 @@ export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz }) {
   const handleGameAction = (gameId) => {
     if (gameId === 'kculture') {
       onStartQuiz();
+    } else if (gameId === 'mot_mystere') {
+      onStartMotMystere?.();
+    } else if (gameId === 'sudoku') {
+      onStartSudoku?.();
+    } else if (gameId === 'queens') {
+      onStartQueens?.();
+    } else if (gameId === 'shikaku') {
+      onStartShikaku?.();
     }
   };
 
@@ -427,7 +435,7 @@ export function ArenaCard({ roomCode, setRoomCode, createMode, setCreateMode, jo
               onChange={(event) => setCreateMode(event.target.value)}
               style={{ padding: '9px 10px', borderRadius: '9px', border: '1px solid var(--border-color)', background: 'var(--bg-input)', color: 'var(--text-primary)' }}
             >
-              <option value="chrono_bomb">💣 Chrono-Bomb</option>
+              <option value="chrono_bomb">Chrono-Bomb</option>
               <option value="kculture">Culture générale</option>
             </select>
           </label>

@@ -72,6 +72,11 @@ class QuestionProposalController {
             ]);
 
             $db->commit();
+
+            if ($action === 'approve' && !empty($proposal['contributor_id'])) {
+                \App\Controllers\QuestController::incrementProgress((int) $proposal['contributor_id'], 'questions_submitted', 1);
+            }
+
             echo json_encode([
                 'success' => true,
                 'message' => $action === 'approve'

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
-import { ArrowLeft, Plus, Trash2, Edit3, Save, X, BookOpen, HelpCircle, Check, Calendar, ChevronLeft, ChevronRight, Search, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit3, Save, X, BookOpen, HelpCircle, Check, Calendar, ChevronLeft, ChevronRight, Search, ClipboardCheck, ShieldAlert, Dices } from 'lucide-react';
 import ProposalModeration from './admin/ProposalModeration';
 
 export default function AdminScreen({ onBack }) {
@@ -486,8 +486,8 @@ export default function AdminScreen({ onBack }) {
           <ArrowLeft size={16} />
           Retour Dashboard
         </button>
-        <h2 style={{ fontSize: '1.8rem', color: '#fb7185', fontFamily: "'Cabinet Grotesk', sans-serif", fontWeight: 800, letterSpacing: '-0.04em' }}>
-          🛡️ Espace Administrateur
+        <h2 style={{ fontSize: '1.8rem', color: '#fb7185', fontFamily: "'Cabinet Grotesk', sans-serif", fontWeight: 800, letterSpacing: '-0.04em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShieldAlert size={26} /> Espace Administrateur
         </h2>
       </div>
 
@@ -514,10 +514,13 @@ export default function AdminScreen({ onBack }) {
             fontSize: '0.85rem',
             cursor: 'pointer',
             borderRadius: '10px',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px'
           }}
         >
-          📚 Gestion des Thèmes
+          <BookOpen size={16} /> Gestion des Thèmes
         </button>
         <button className={`admin-moderation-tab ${activeTab === 'moderation' ? 'is-active' : ''}`} onClick={() => { setActiveTab('moderation'); setError(''); setSuccess(''); }}>
           <ClipboardCheck size={16} /> Questions a valider {proposals.length > 0 && <span>{proposals.length}</span>}
@@ -536,7 +539,7 @@ export default function AdminScreen({ onBack }) {
             transition: 'all 0.2s ease'
           }}
         >
-          📅 Quiz du Jour (Calendrier)
+          Quiz du Jour (Calendrier)
         </button>
       </div>
 
@@ -882,7 +885,7 @@ export default function AdminScreen({ onBack }) {
           <div className="glass-card animate-slide-up" style={{ width: '100%', maxWidth: '600px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: "'Cabinet Grotesk', sans-serif", letterSpacing: '-0.04em' }}>
-                📅 Quiz du {selectedDayStr}
+                Quiz du {selectedDayStr}
               </h3>
               <button
                 onClick={() => setSelectedDayStr(null)}
@@ -945,9 +948,9 @@ export default function AdminScreen({ onBack }) {
                     type="button"
                     className="btn-secondary"
                     onClick={handleRandomFill}
-                    style={{ fontSize: '0.8rem', padding: '6px 12px', whiteSpace: 'nowrap', flexShrink: 0 }}
+                    style={{ fontSize: '0.8rem', padding: '6px 12px', whiteSpace: 'nowrap', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    🎲 Remplir Aléatoirement
+                    <Dices size={15} /> Remplir Aléatoirement
                   </button>
                 </div>
 

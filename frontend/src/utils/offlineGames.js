@@ -1,10 +1,10 @@
 import { api } from './api';
 
-const DB_NAME = 'le-qg-offline';
+const DB_NAME = 'omnia-offline';
 const DB_VERSION = 1;
 const SESSION_STORE = 'solo_sessions';
 const OUTBOX_STORE = 'result_outbox';
-const SYNC_TAG = 'le-qg-offline-results';
+const SYNC_TAG = 'omnia-offline-results';
 let databasePromise;
 let activeFlush;
 
