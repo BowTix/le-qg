@@ -19,7 +19,7 @@ function MissionCard({ quest, claimingId, onClaim }) {
   const completed = progress >= target;
   const percentage = Math.min(100, Math.round((progress / target) * 100));
   const rewards = [
-    quest.reward_coins > 0 && `${quest.reward_coins} coins`,
+    quest.reward_coins > 0 && `${quest.reward_coins} Omnis`,
     quest.reward_xp > 0 && `${quest.reward_xp} XP`,
   ].filter(Boolean).join(' · ');
 

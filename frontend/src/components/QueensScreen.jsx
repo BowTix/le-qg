@@ -16,7 +16,8 @@ import {
   CheckCircle2,
   Eraser,
   Dumbbell,
-  Check
+  Check,
+  HelpCircle
 } from 'lucide-react';
 import { api } from '../utils/api';
 import '../queens.css';
@@ -78,6 +79,7 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
   const [toastType, setToastType] = useState('error');
   const [validating, setValidating] = useState(false);
   const [showVictoryModal, setShowVictoryModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
   const [practiceToken, setPracticeToken] = useState(null);
   const [copiedShare, setCopiedShare] = useState(false);
@@ -94,6 +96,7 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     initialBoard: null,
   });
   const wasDraggingRef = useRef(false);
+  const lastClickRef = useRef({ time: 0, cellIdx: null, initialChar: null });
 
   useEffect(() => {
     liveBoardRef.current = board;
@@ -310,12 +313,6 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     const cellIdx = getCellFromEvent(e);
     if (cellIdx === null) return;
 
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch (err) {
-      // Ignore
-    }
-
     const curChar = liveBoardRef.current[cellIdx] || '.';
     const mode = curChar === 'X' ? 'erase' : 'cross';
 
@@ -341,6 +338,16 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
       if (currentCell !== dragStateRef.current.startCell) {
         dragStateRef.current.hasMoved = true;
         wasDraggingRef.current = true;
+
+        // Pointer capture is activated only once dragging actually begins across cells
+        try {
+          if (gridWrapperRef.current && !gridWrapperRef.current.hasPointerCapture(e.pointerId)) {
+            gridWrapperRef.current.setPointerCapture(e.pointerId);
+          }
+        } catch (err) {
+          // Ignore
+        }
+
         applyDragToCells([dragStateRef.current.startCell], dragStateRef.current.mode);
       }
     }
@@ -357,8 +364,8 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     if (!dragStateRef.current.isDown) return;
 
     try {
-      if (e?.currentTarget?.hasPointerCapture?.(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
+      if (gridWrapperRef.current?.hasPointerCapture?.(e.pointerId)) {
+        gridWrapperRef.current.releasePointerCapture(e.pointerId);
       }
     } catch (err) {
       // Ignore
@@ -384,12 +391,19 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     };
   };
 
-  // 7. Cell click interaction
+  // 7. Cell click interaction (1 clic = Croix, 2 clics = Reine)
   const handleCellClick = (idx, e) => {
     if (userState?.status === 'completed') return;
     setSelectedCell(idx);
 
-    const currentChar = board[idx] || '.';
+    const now = Date.now();
+    const isDouble = (
+      (lastClickRef.current.cellIdx === idx && (now - lastClickRef.current.time) < 320) ||
+      e?.detail === 2
+    );
+
+    const currentBoard = liveBoardRef.current;
+    const currentChar = currentBoard[idx] || '.';
     let nextChar = currentChar;
 
     if (inputMode === 'queen') {
@@ -397,15 +411,36 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     } else if (inputMode === 'cross') {
       nextChar = currentChar === 'X' ? '.' : 'X';
     } else {
-      // Default cycle: Empty ('.') -> Cross ('X') -> Queen ('Q') -> Empty ('.')
-      if (currentChar === '.') nextChar = 'X';
-      else if (currentChar === 'X') nextChar = 'Q';
-      else nextChar = '.';
+      // Mode Auto / Standard:
+      if (isDouble) {
+        // Double-clic : pose une reine (ou efface si c'était déjà une reine)
+        const initialBeforeFirstClick = lastClickRef.current.initialChar;
+        if (initialBeforeFirstClick === 'Q' || currentChar === 'Q') {
+          nextChar = '.';
+        } else {
+          nextChar = 'Q';
+        }
+      } else {
+        // Clic simple :
+        // '.' -> 'X'
+        // 'X' -> '.' (efface la croix)
+        // 'Q' -> '.' (efface la reine)
+        if (currentChar === '.') nextChar = 'X';
+        else if (currentChar === 'X') nextChar = '.';
+        else nextChar = '.';
+      }
+    }
+
+    if (isDouble) {
+      lastClickRef.current = { time: 0, cellIdx: null, initialChar: null };
+    } else {
+      lastClickRef.current = { time: now, cellIdx: idx, initialChar: currentChar };
     }
 
     if (nextChar !== currentChar) {
-      setHistory((prev) => [...prev, board]);
-      const nextBoard = board.substring(0, idx) + nextChar + board.substring(idx + 1);
+      setHistory((prev) => (isDouble ? prev : [...prev, currentBoard]));
+      const nextBoard = currentBoard.substring(0, idx) + nextChar + currentBoard.substring(idx + 1);
+      liveBoardRef.current = nextBoard;
       setBoard(nextBoard);
       triggerAutoSave(nextBoard, timerSeconds);
     }
@@ -417,11 +452,14 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     if (userState?.status === 'completed') return;
     setSelectedCell(idx);
 
-    const currentChar = board[idx] || '.';
+    const currentBoard = liveBoardRef.current;
+    const currentChar = currentBoard[idx] || '.';
     const nextChar = currentChar === 'Q' ? '.' : 'Q';
 
-    setHistory((prev) => [...prev, board]);
-    const nextBoard = board.substring(0, idx) + nextChar + board.substring(idx + 1);
+    lastClickRef.current = { time: 0, cellIdx: null, initialChar: null };
+    setHistory((prev) => [...prev, currentBoard]);
+    const nextBoard = currentBoard.substring(0, idx) + nextChar + currentBoard.substring(idx + 1);
+    liveBoardRef.current = nextBoard;
     setBoard(nextBoard);
     triggerAutoSave(nextBoard, timerSeconds);
   };
@@ -431,7 +469,9 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     if (history.length === 0 || userState?.status === 'completed') return;
     const last = history[history.length - 1];
     setHistory((prev) => prev.slice(0, -1));
+    liveBoardRef.current = last;
     setBoard(last);
+    lastClickRef.current = { time: 0, cellIdx: null, initialChar: null };
     triggerAutoSave(last, timerSeconds);
   }, [history, userState, timerSeconds, triggerAutoSave]);
 
@@ -441,7 +481,9 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
     if (board === '.'.repeat(64)) return;
     setHistory((prev) => [...prev, board]);
     const cleared = '.'.repeat(64);
+    liveBoardRef.current = cleared;
     setBoard(cleared);
+    lastClickRef.current = { time: 0, cellIdx: null, initialChar: null };
     triggerAutoSave(cleared, timerSeconds);
   };
 
@@ -461,18 +503,20 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
       } else if (e.key === 'x' || e.key === 'X') {
         e.preventDefault();
         if (selectedCell !== null) {
-          const cur = board[selectedCell];
+          const cur = liveBoardRef.current[selectedCell] || '.';
           const nextChar = cur === 'X' ? '.' : 'X';
-          setHistory((prev) => [...prev, board]);
-          const nextBoard = board.substring(0, selectedCell) + nextChar + board.substring(selectedCell + 1);
+          setHistory((prev) => [...prev, liveBoardRef.current]);
+          const nextBoard = liveBoardRef.current.substring(0, selectedCell) + nextChar + liveBoardRef.current.substring(selectedCell + 1);
+          liveBoardRef.current = nextBoard;
           setBoard(nextBoard);
           triggerAutoSave(nextBoard, timerSeconds);
         }
       } else if (e.key === 'Backspace' || e.key === 'Delete') {
         e.preventDefault();
         if (selectedCell !== null) {
-          setHistory((prev) => [...prev, board]);
-          const nextBoard = board.substring(0, selectedCell) + '.' + board.substring(selectedCell + 1);
+          setHistory((prev) => [...prev, liveBoardRef.current]);
+          const nextBoard = liveBoardRef.current.substring(0, selectedCell) + '.' + liveBoardRef.current.substring(selectedCell + 1);
+          liveBoardRef.current = nextBoard;
           setBoard(nextBoard);
           triggerAutoSave(nextBoard, timerSeconds);
         }
@@ -599,8 +643,8 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
           </h1>
           <p className="queens-sub-title">
             {isPractice
-              ? "Grille aléatoire illimitée · +10 pièces · +8 XP"
-              : `${formatDateFrench(todayStr)} · Grille #${gridData?.grid_number || 1} · +60 pièces · +25 XP`}
+              ? "Grille aléatoire illimitée · +10 Omnis · +8 XP"
+              : `${formatDateFrench(todayStr)} · Grille #${gridData?.grid_number || 1} · +60 Omnis · +25 XP`}
           </p>
         </div>
 
@@ -621,39 +665,50 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
 
       {/* 2. Control Toolbar */}
       <div className="queens-toolbar">
-        {/* Left: Timer & Reset (practice only) */}
+        {/* Left: Timer */}
         <div className="queens-toolbar-group">
           <div className="queens-tool-timer">
             <Clock size={16} />
             <span>{formatTime(timerSeconds)}</span>
           </div>
 
-          {isPractice && (
-            <button
-              type="button"
-              onClick={handleResetBoard}
-              disabled={board === '.'.repeat(64) || userState?.status === 'completed'}
-              className="queens-tool-btn"
-              title="Réinitialiser la grille"
-            >
-              <RotateCcw size={16} />
-            </button>
-          )}
+          <button
+            type="button"
+            className="queens-tool-btn"
+            onClick={() => setShowRulesModal(true)}
+            title="Règles du jeu"
+          >
+            <HelpCircle size={16} />
+          </button>
         </div>
 
-        {/* Right: Practice New Grid & Validate */}
+        {/* Right: Practice Reset & New Grid & Validate */}
         <div className="queens-toolbar-group">
           {isPractice && (
-            <button
-              type="button"
-              onClick={loadPracticeGrid}
-              className="queens-nav-btn"
-              title="Générer une autre grille d'entraînement"
-              style={{ padding: '6px 12px' }}
-            >
-              <RotateCcw size={15} />
-              <span>Autre grille</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleResetBoard}
+                disabled={board === '.'.repeat(64) || userState?.status === 'completed'}
+                className="queens-nav-btn"
+                title="Effacer tout et recommencer cette grille"
+                style={{ padding: '6px 12px' }}
+              >
+                <RotateCcw size={15} />
+                <span>Recommencer</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={loadPracticeGrid}
+                className="queens-nav-btn"
+                title="Générer une autre grille d'entraînement"
+                style={{ padding: '6px 12px' }}
+              >
+                <Sparkles size={15} />
+                <span>Autre grille</span>
+              </button>
+            </>
           )}
 
           <button
@@ -732,7 +787,7 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
             <button
               className={`queens-mode-btn ${inputMode === 'cycle' ? 'is-active' : ''}`}
               onClick={() => setInputMode('cycle')}
-              title="Cycle automatique : Croix -> Reine -> Vide"
+              title="Mode automatique : 1 clic = croix, 2 clics = reine"
             >
               Auto
             </button>
@@ -812,7 +867,7 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
               </div>
               <div className="queens-stat-box">
                 <span className="queens-stat-val">+{userState?.coins_awarded || (isPractice ? 10 : 60)}</span>
-                <span className="queens-stat-lbl">Pièces</span>
+                <span className="queens-stat-lbl">Omnis</span>
               </div>
             </div>
 
@@ -835,6 +890,47 @@ export default function QueensScreen({ onBack, onUpdateUserStats }) {
                 Fermer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rules Modal */}
+      {showRulesModal && (
+        <div className="queens-modal-backdrop" onClick={() => setShowRulesModal(false)}>
+          <div className="queens-modal-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="queens-modal-close"
+              onClick={() => setShowRulesModal(false)}
+              aria-label="Fermer"
+              style={{ position: 'absolute', top: 14, right: 14, background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+            <div className="queens-victory-crown" style={{ background: 'rgba(244, 114, 182, 0.15)', color: '#f472b6' }}>
+              <HelpCircle size={32} />
+            </div>
+            <h2 className="queens-modal-title" style={{ fontSize: '1.3rem', marginBottom: '8px' }}>
+              Règles des Queens
+            </h2>
+            <div style={{ textAlign: 'left', fontSize: '0.88rem', color: '#cbd5e1', lineHeight: '1.55', margin: '14px 0 20px' }}>
+              <p style={{ margin: '0 0 10px' }}>
+                Dispose <strong>8 reines</strong> sur la grille sans aucun conflit :
+              </p>
+              <ul style={{ paddingLeft: '1.2rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li>Exactement <strong>1 reine par ligne</strong> et <strong>1 reine par colonne</strong>.</li>
+                <li>Exactement <strong>1 reine par zone colorée</strong>.</li>
+                <li>Deux reines <strong>ne peuvent jamais se toucher</strong>, ni horizontalement, ni verticalement, ni en diagonale.</li>
+                <li><strong>Contrôles :</strong> 1 clic = croix (✕), 2 clics = reine (👑), ou clic droit pour reine directe.</li>
+              </ul>
+            </div>
+            <button
+              type="button"
+              className="queens-modal-btn queens-modal-btn--primary"
+              onClick={() => setShowRulesModal(false)}
+            >
+              J'ai compris
+            </button>
           </div>
         </div>
       )}

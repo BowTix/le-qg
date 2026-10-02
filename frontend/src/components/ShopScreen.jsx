@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../utils/api';
-import { ArrowLeftRight, Coins, Sparkles, Check, CheckCircle2, Lock, Eye, EyeOff, Loader2, ArrowLeft, Trophy, CreditCard, X, ChevronLeft, ChevronRight, GraduationCap, Landmark, Car, Globe, Sword, Heart, Utensils, Gem, CloudLightning, Lightbulb, Hammer, AlertCircle, Palette, Square, User, Award, RefreshCw } from 'lucide-react';
+import { ArrowLeftRight, Sparkles, Check, CheckCircle2, Lock, Eye, EyeOff, Loader2, ArrowLeft, Trophy, CreditCard, X, ChevronLeft, ChevronRight, GraduationCap, Landmark, Car, Globe, Sword, Heart, Utensils, Gem, CloudLightning, Lightbulb, Hammer, AlertCircle, Palette, Square, User, Award, RefreshCw } from 'lucide-react';
 import { getUsernameStyle } from '../utils/progression';
 import GameCard, { RARITY_CONFIG, getCardImageSrc as getImgSrc } from './GameCard';
 import BoosterOffer from './shop/BoosterOffer';
+import OmniIcon from './OmniIcon';
+import FragmentIcon from './FragmentIcon';
 import TradeModal, { FriendPicker } from './trades/TradeModal';
 import VanillaTilt from 'vanilla-tilt';
 
@@ -410,9 +412,9 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
         onRefreshProfile({ craft_stars: res.craft_stars });
         const starsGained = res.stars_gained ?? res.stars_awarded ?? 0;
         if (all) {
-          setFeedbackMsg({ type: 'success', text: `🎉 ${res.recycled_count} doublons recyclés ! +${starsGained} Étoiles de Craft ⭐` });
+          setFeedbackMsg({ type: 'success', text: `🎉 ${res.recycled_count} doublons recyclés ! +${starsGained} Fragments` });
         } else {
-          setFeedbackMsg({ type: 'success', text: `✨ Doublon recyclé ! +${starsGained} Étoiles de Craft ⭐` });
+          setFeedbackMsg({ type: 'success', text: `✨ Doublon recyclé ! +${starsGained} Fragments` });
         }
       } else {
         alert(res.error || 'Erreur lors du recyclage.');
@@ -431,7 +433,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
     const cost = config ? config.cost : 15;
 
     if (craftStars < cost) {
-      setFeedbackMsg({ type: 'error', text: `Étoiles de craft insuffisantes (${craftStars}/${cost} ⭐)` });
+      setFeedbackMsg({ type: 'error', text: `Fragments insuffisants (${craftStars}/${cost})` });
       return;
     }
 
@@ -473,7 +475,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
 
         setFeedbackMsg({
           type: 'success',
-          text: `✨ Carte ${res.card.name} découverte avec succès ! (-${cost} ⭐)`
+          text: `✨ Carte ${res.card.name} découverte avec succès ! (-${cost} Fragments)`
         });
 
         if (res.unlocked_sets && res.unlocked_sets.length > 0) {
@@ -655,15 +657,12 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
         <style>{boosterAnimations}</style>
         <div className="container animate-fade-in shop-page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-          <div className="shop-page__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+          <div className="standard-page-header shop-page__header">
             <div>
-              <button className="btn-secondary" onClick={onBack} style={{ padding: '8px 16px', marginBottom: '8px', borderRadius: '12px' }}>
-                <ArrowLeft size={16} /> Retour
-              </button>
-              <h1 style={{ fontSize: '1.8rem', fontWeight: 800, fontFamily: "'Cabinet Grotesk', sans-serif", letterSpacing: '-0.04em', color: '#fff' }}>
+              <h1>
                 {mode === 'collection' ? 'Mon Album de Collection' : 'Boutique'}
               </h1>
-              <p className="shop-page__subtitle">
+              <p className="standard-page-header__subtitle shop-page__subtitle">
                 {mode === 'collection' ? 'Chaque carte raconte un morceau de ta progression.' : 'Ouvre ton booster ou personnalise ton identité.'}
               </p>
             </div>
@@ -782,7 +781,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                         </>
                                     ) : (
                                         <>
-                                          Acheter — {item.price} <Coins size={14} />
+                                          Acheter — {item.price} <OmniIcon size={14} />
                                         </>
                                     )}
                                   </button>
@@ -847,7 +846,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                         </>
                                     ) : (
                                         <>
-                                          Acheter — {item.price} <Coins size={14} />
+                                          Acheter — {item.price} <OmniIcon size={14} />
                                         </>
                                     )}
                                   </button>
@@ -908,7 +907,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                         </>
                                     ) : (
                                         <>
-                                          Acheter — {item.price} <Coins size={14} />
+                                          Acheter — {item.price} <OmniIcon size={14} />
                                         </>
                                     )}
                                   </button>
@@ -968,7 +967,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                           fontWeight: viewMode === 'atelier' ? 800 : undefined
                         }}
                     >
-                      <Sparkles size={14} /> Atelier & Recyclage
+                      <FragmentIcon size={15} /> Fragments & Recyclage
                     </button>
                   </div>
 
@@ -1129,7 +1128,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                           })()}
 
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Récompense de Série (+250 🪙, +120 XP)</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Récompense de Série (+250 Omnis, +120 XP)</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {set.isUnlocked ? (
                                   <CheckCircle2 size={18} style={{ color: 'var(--success)' }} />
@@ -1301,10 +1300,10 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
                         <div>
                           <h2 style={{ fontSize: '1.4rem', fontWeight: 900, display: 'flex', alignItems: 'center', gap: '10px', color: '#facc15', margin: 0 }}>
-                            <Sparkles size={24} /> L'Atelier d'Étoiles & Recyclage
+                            <FragmentIcon size={24} /> L'Atelier de Recyclage & Fragments
                           </h2>
                           <p style={{ margin: '6px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem', maxWidth: '600px' }}>
-                            Recyclez vos doublons en <strong>Étoiles de Craft ⭐</strong> pour forger n'importe quelle carte manquante et compléter vos collections !
+                            Recyclez vos doublons en <strong>Fragments</strong> pour forger n'importe quelle carte manquante et compléter vos collections !
                           </p>
                         </div>
                         <div style={{
@@ -1322,7 +1321,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                             Votre Solde
                           </span>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.8rem', fontWeight: 900, color: '#facc15' }}>
-                            <Sparkles size={24} /> {craftStars} ⭐
+                            <FragmentIcon size={24} /> {craftStars}
                           </div>
                         </div>
                       </div>
@@ -1352,8 +1351,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                           }}>
                             <span style={{ fontWeight: 800, fontSize: '0.85rem', color: tier.color }}>{tier.label}</span>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                              <span>Recyclage : <strong style={{ color: '#fff' }}>+{tier.recycle} ⭐</strong></span>
-                              <span>Forge : <strong style={{ color: '#fff' }}>{tier.craft} ⭐</strong></span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Recyclage : <strong style={{ color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>+{tier.recycle} <FragmentIcon size={12} /></strong></span>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>Forge : <strong style={{ color: '#fff', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>{tier.craft} <FragmentIcon size={12} /></strong></span>
                             </div>
                           </div>
                         ))}
@@ -1390,8 +1389,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                               boxShadow: '0 4px 15px rgba(234, 179, 8, 0.3)'
                             }}
                           >
-                            {recycling ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                            Tout Recycler (+{totalDuplicateStars} ⭐)
+                            {recycling ? <Loader2 size={16} className="animate-spin" /> : <FragmentIcon size={16} />}
+                            Tout Recycler (+{totalDuplicateStars})
                           </button>
                         )}
                       </div>
@@ -1447,7 +1446,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                     color: '#facc15'
                                   }}
                                 >
-                                  <Sparkles size={14} /> Recycler 1 (+{starGain} ⭐)
+                                  <FragmentIcon size={14} /> Recycler 1 (+{starGain})
                                 </button>
                               </div>
                             );
@@ -1476,9 +1475,9 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                           padding: '6px 14px',
                           borderRadius: '12px'
                         }}>
-                          <Sparkles size={16} style={{ color: '#facc15' }} />
+                          <FragmentIcon size={16} />
                           <span style={{ fontSize: '0.9rem', fontWeight: 800, color: '#facc15' }}>
-                            {craftStars} Étoiles de Craft
+                            {craftStars} Fragments
                           </span>
                         </div>
                       </div>
@@ -1599,9 +1598,12 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                         background: 'rgba(0,0,0,0.65)',
                                         padding: '3px 8px',
                                         borderRadius: '8px',
-                                        border: '1px solid rgba(234, 179, 8, 0.3)'
+                                        border: '1px solid rgba(234, 179, 8, 0.3)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
                                       }}>
-                                        {r.cost} ⭐
+                                        {r.cost} <FragmentIcon size={12} />
                                       </span>
                                     </div>
 
@@ -1655,7 +1657,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                       }}>
                                         {remaining === 0
                                           ? 'Toutes débloquées !'
-                                          : (canAfford ? 'Cliquez pour forger' : 'Étoiles insuffisantes')}
+                                          : (canAfford ? 'Cliquez pour forger' : 'Fragments insuffisants')}
                                       </span>
                                     </div>
                                   </div>
@@ -1777,7 +1779,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                   ) : isFlipped ? (
                                     remaining > 0 ? (
                                       <>
-                                        <Sparkles size={16} /> Forger une autre ({r.cost} ⭐)
+                                        <FragmentIcon size={16} /> Forger une autre ({r.cost})
                                       </>
                                     ) : (
                                       <>
@@ -1790,11 +1792,11 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                     </>
                                   ) : !canAfford ? (
                                     <>
-                                      <Lock size={15} /> Forger ({r.cost} ⭐)
+                                      <Lock size={15} /> Forger ({r.cost})
                                     </>
                                   ) : (
                                     <>
-                                      <Sparkles size={16} /> Forger ({r.cost} ⭐)
+                                      <FragmentIcon size={16} /> Forger ({r.cost})
                                     </>
                                   )}
                                 </button>
@@ -1894,11 +1896,11 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                             onClick={handleBuyBooster}
                             style={{ padding: '16px 32px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center', borderRadius: '12px', fontWeight: 800 }}
                         >
-                          <CreditCard size={20} /> Acheter pour 250 <Coins size={18} />
+                          <CreditCard size={20} /> Acheter pour 250 <OmniIcon size={18} />
                         </button>
                         {coins < 250 && (
                             <span style={{ fontSize: '0.85rem', color: '#ef4444', fontWeight: 700, padding: '8px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px' }}>
-                    Solde de pièces insuffisant. Jouez des parties pour gagner des pièces !
+                    Solde d'Omnis insuffisant. Jouez des parties pour gagner des Omnis !
                   </span>
                         )}
                       </div>
@@ -2076,7 +2078,7 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                                 onClick={handleBuyBooster}
                                 style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', fontWeight: 700 }}
                             >
-                              <Sparkles size={18} /> Ouvrir un autre (250 <Coins size={16} />)
+                              <Sparkles size={18} /> Ouvrir un autre (250 <OmniIcon size={16} />)
                             </button>
                           </div>
                       )}
@@ -2192,8 +2194,8 @@ export default function ShopScreen({ user, onRefreshProfile, onBack, mode = 'sho
                           color: '#facc15'
                         }}
                       >
-                        {recycling ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                        Recycler 1 doublon (+{RECYCLE_YIELDS[zoomedCard.rarity] || 1} ⭐)
+                        {recycling ? <Loader2 size={16} className="animate-spin" /> : <FragmentIcon size={16} />}
+                        Recycler 1 doublon (+{RECYCLE_YIELDS[zoomedCard.rarity] || 1})
                       </button>
                     </div>
                   )}

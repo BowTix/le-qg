@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useState}from'react';
-import{ArrowLeftRight,Coins,Filter,Loader2,Search,X}from'lucide-react';
+import{ArrowLeftRight,Filter,Loader2,Search,X}from'lucide-react';
+import OmniIcon from '../OmniIcon';
 import{api,PUBLIC_BASE}from'../../utils/api';
 import GameCard from'../GameCard';
 
@@ -38,7 +39,7 @@ export default function TradeModal({friendId,initialOfferedCardId=null,onClose,o
      <div className="trade-card-grid">{friendCards.map(c=>{const incompatible=offered&&Math.abs(RANK[offered.rarity]-RANK[c.rarity])>1;return <CardChoice key={c.id} card={c} selected={c.id===requestedId} disabled={!c.tradeable||!offered||incompatible} onClick={()=>setRequestedId(c.id)}/>})}{friendCards.length===0&&<p className="trade-empty">Aucune carte ne correspond aux filtres.</p>}</div>
     </section>
    </div>
-   <footer className="trade-modal__footer"><div>{fee?(fee.amount>0?<p className="trade-fee"><Coins size={16}/><strong>{fee.payer}</strong> paiera {fee.amount} pièces.</p>:<p className="trade-fee">Même rareté : aucun supplément.</p>):<p>Sélectionnez deux cartes compatibles.</p>}{error&&<p className="trade-error">{error}</p>}</div><button className="btn-primary" disabled={!offered||!requested||submitting} onClick={submit}>{submitting?<Loader2 size={16} className="animate-spin"/>:<ArrowLeftRight size={16}/>}Envoyer la proposition</button></footer>
+   <footer className="trade-modal__footer"><div>{fee?(fee.amount>0?<p className="trade-fee"><OmniIcon size={16}/><strong>{fee.payer}</strong> paiera {fee.amount} Omnis.</p>:<p className="trade-fee">Même rareté : aucun supplément.</p>):<p>Sélectionnez deux cartes compatibles.</p>}{error&&<p className="trade-error">{error}</p>}</div><button className="btn-primary" disabled={!offered||!requested||submitting} onClick={submit}>{submitting?<Loader2 size={16} className="animate-spin"/>:<ArrowLeftRight size={16}/>}Envoyer la proposition</button></footer>
   </>}</section></div>;
 }
 export function FriendPicker({card,onSelect,onClose}){

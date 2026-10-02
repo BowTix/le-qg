@@ -419,6 +419,51 @@ try {
             }
             break;
 
+        case '/api/connections/grid':
+            if ($method === 'GET') {
+                (new \App\Controllers\ConnectionsController())->getGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/connections/guess':
+            if ($method === 'POST') {
+                (new \App\Controllers\ConnectionsController())->submitGuess(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/connections/practice':
+            if ($method === 'GET') {
+                (new \App\Controllers\ConnectionsController())->getPracticeGrid();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/connections/save':
+            if ($method === 'POST') {
+                (new \App\Controllers\ConnectionsController())->saveState(getRequestBody());
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
+        case '/api/connections/calendar':
+            if ($method === 'GET') {
+                (new \App\Controllers\ConnectionsController())->getCalendar();
+            } else {
+                http_response_code(405);
+                echo json_encode(["error" => "Method not allowed"]);
+            }
+            break;
+
         case '/api/admin/daily-quizzes':
             if ($method === 'GET') {
                 (new \App\Controllers\QuizController())->getDailyQuizzes();

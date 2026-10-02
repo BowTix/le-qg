@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Bomb,
   ChevronRight,
-  Coins,
   Gamepad2,
   Grid3X3,
   LayoutGrid,
@@ -20,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { GAME_CATEGORIES, getSoloGamesByCategory } from '../../utils/gamesCatalog';
+import OmniIcon from '../OmniIcon';
 
 export function ProgressBar({ value, color = '#2dd4bf' }) {
   const safeValue = Math.max(0, Math.min(100, Number(value) || 0));
@@ -141,7 +141,7 @@ function PortalGame({
   );
 }
 
-export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz, onStartMotMystere, onStartSudoku, onStartQueens, onStartShikaku }) {
+export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz, onStartMotMystere, onStartLiens, onStartSudoku, onStartQueens, onStartShikaku }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const answers = [attempt?.q1_correct, attempt?.q2_correct, attempt?.q3_correct];
   const correctCount = answers.filter(Boolean).length;
@@ -153,6 +153,8 @@ export function SoloPortal({ completed, attempt, onStartDaily, onStartQuiz, onSt
       onStartQuiz();
     } else if (gameId === 'mot_mystere') {
       onStartMotMystere?.();
+    } else if (gameId === 'liens') {
+      onStartLiens?.();
     } else if (gameId === 'sudoku') {
       onStartSudoku?.();
     } else if (gameId === 'queens') {
@@ -248,17 +250,17 @@ export function MultiplayerPortal({
       <div className="arena-portal__games">
         <PortalGame
           icon={Bomb}
-          eyebrow="Party game"
+          eyebrow="Tic-tac sous pression"
           title="Chrono-Bomb"
           description={'Trouve le mot avant l\u2019explosion.'}
           action={creating ? 'Cr\u00e9ation\u2026' : 'Lancer'}
           onClick={() => onCreate('chrono_bomb')}
           disabled={creating}
-          accent="violet"
+          accent="rose"
         />
         <PortalGame
           icon={Zap}
-          eyebrow="5 questions"
+          eyebrow="Duel de vitesse"
           title="Quiz Flash 1v1"
           description="Le plus rapide remporte le duel."
           action={creating ? 'Cr\u00e9ation\u2026' : 'D\u00e9fier'}
@@ -330,7 +332,7 @@ export function WalletCard({ coins, onOpenShop }) {
     <button className="dashboard-card dashboard-card--kpi dashboard-card--wallet" type="button" onClick={onOpenShop} aria-label="Ouvrir la boutique">
       <div className="card-topline">
         <span className="kpi-header-label kpi-header-label--amber">
-          <Coins size={14} /> Portefeuille
+          <OmniIcon size={14} /> Portefeuille
         </span>
         <ChevronRight size={17} className="kpi-chevron" />
       </div>
@@ -338,7 +340,7 @@ export function WalletCard({ coins, onOpenShop }) {
         <div className="value-row value-row--coins">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
             <h2>{safeCoins.toLocaleString('fr-FR')}</h2>
-            <span>coins</span>
+            <span>Omnis</span>
           </div>
           {safeCoins >= 250 && (
             <strong className="kpi-badge kpi-badge--amber">{boosterCount} booster{boosterCount > 1 ? 's' : ''}</strong>
@@ -350,7 +352,7 @@ export function WalletCard({ coins, onOpenShop }) {
             {safeCoins >= 250 ? (
               <span style={{ color: '#fcd34d', fontWeight: 650 }}>Prêt pour l'ouverture de booster</span>
             ) : (
-              `Encore ${neededForBooster} coins pour un booster`
+              `Encore ${neededForBooster} Omnis pour un booster`
             )}
           </span>
         </div>
@@ -415,7 +417,7 @@ export function SoloCard({ onStart }) {
   return (
     <article className="dashboard-card dashboard-card--solo">
       <div className="card-topline"><span className="icon-box"><Play size={18} fill="currentColor" /></span><span className="mono-note">Solo</span></div>
-      <div className="card-bottom"><h2>Entraînement</h2><p>Teste tes connaissances à ton rythme et gagne des pièces à chaque bonne réponse.</p><button className="button button--dark" type="button" onClick={onStart}>Jouer en solo</button></div>
+      <div className="card-bottom"><h2>Entraînement</h2><p>Teste tes connaissances à ton rythme et gagne des Omnis à chaque bonne réponse.</p><button className="button button--dark" type="button" onClick={onStart}>Jouer en solo</button></div>
     </article>
   );
 }

@@ -215,7 +215,7 @@ class ShopController {
         $price = intval($targetItem['price']);
         if ($coins < $price) {
             http_response_code(400);
-            echo json_encode(['error' => 'Pièces insuffisantes. Il vous faut ' . $price . ' pièces.']);
+            echo json_encode(['error' => 'Omnis insuffisants. Il vous faut ' . $price . ' Omnis.']);
             return;
         }
 
@@ -261,7 +261,7 @@ class ShopController {
 
         if ($coins < $boosterCost) {
             http_response_code(400);
-            echo json_encode(['error' => 'Pièces insuffisantes. Le booster coûte ' . $boosterCost . ' pièces.']);
+            echo json_encode(['error' => 'Omnis insuffisants. Le booster coûte ' . $boosterCost . ' Omnis.']);
             return;
         }
 
@@ -689,7 +689,7 @@ class ShopController {
 
             echo json_encode([
                 'success' => true,
-                'message' => "{$totalRecycled} doublon(s) recyclé(s) pour +{$totalStars} ⭐ !",
+                'message' => "{$totalRecycled} doublon(s) recyclé(s) pour +{$totalStars} Fragments !",
                 'recycled_count' => $totalRecycled,
                 'stars_awarded' => $totalStars,
                 'stars_gained' => $totalStars,
@@ -778,7 +778,7 @@ class ShopController {
 
         if ($currentStars < $cost) {
             http_response_code(400);
-            echo json_encode(['error' => "Étoiles insuffisantes. Il vous faut {$cost} étoiles pour fabriquer cette carte ({$currentStars} disponibles)."]);
+            echo json_encode(['error' => "Fragments insuffisants. Il vous faut {$cost} fragments pour fabriquer cette carte ({$currentStars} disponibles)."]);
             return;
         }
 

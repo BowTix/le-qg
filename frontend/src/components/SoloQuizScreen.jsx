@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
-import { ArrowLeft, CheckCircle2, Coins, XCircle, ChevronRight, Trophy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, ChevronRight, Trophy } from 'lucide-react';
+import OmniIcon from './OmniIcon';
 
 export default function SoloQuizScreen({ packId, gameMode = 'kculture', onBack, onUpdateUserStats }) {
   const navigate = useNavigate();
@@ -273,10 +274,10 @@ export default function SoloQuizScreen({ packId, gameMode = 'kculture', onBack, 
             </div>
             <div>
               <span style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>
-                Pièces gagnées
+                Omnis gagnés
               </span>
               <span style={{ fontSize: '1.9rem', fontWeight: 800, color: '#eab308', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                +{totalCoins} <Coins size={20} />
+                +{totalCoins} <OmniIcon size={20} />
               </span>
             </div>
           </div>

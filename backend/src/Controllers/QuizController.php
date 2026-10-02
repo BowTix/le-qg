@@ -888,7 +888,7 @@ class QuizController {
     public function getLeaderboard() {
         $authUser = AuthMiddleware::authenticate();
         $db = Database::getConnection();
-        $userId = $authUser['id'] ?? 0;
+        $userId = (int) ($authUser['user_id'] ?? $authUser['id'] ?? 0);
 
         // 1. Top players sorted by collection value
         $stmtUsers = $db->query("
@@ -953,7 +953,8 @@ class QuizController {
                     COALESCE((SELECT COUNT(*) FROM user_queens_attempts uqa WHERE uqa.user_id = u.id AND uqa.status = 'completed'), 0) +
                     COALESCE((SELECT COUNT(*) FROM user_sudoku_attempts usa WHERE usa.user_id = u.id AND usa.status = 'completed'), 0) +
                     COALESCE((SELECT COUNT(*) FROM user_shikaku_attempts ush WHERE ush.user_id = u.id AND ush.status = 'completed'), 0) +
-                    COALESCE((SELECT COUNT(*) FROM user_mystery_word_attempts umw WHERE umw.user_id = u.id AND umw.status = 'won'), 0)
+                    COALESCE((SELECT COUNT(*) FROM user_mystery_word_attempts umw WHERE umw.user_id = u.id AND umw.status = 'won'), 0) +
+                    COALESCE((SELECT COUNT(*) FROM user_connections_attempts uca WHERE uca.user_id = u.id AND uca.status = 'completed'), 0)
                 ) as puzzles_solved
             FROM users u
             GROUP BY u.id, u.username, u.discriminator, u.global_score, u.avatar_url, u.equipped_border, u.equipped_title, u.equipped_color
@@ -974,6 +975,7 @@ class QuizController {
             'sudoku_count' => 0,
             'shikaku_count' => 0,
             'mystery_word_count' => 0,
+            'connections_count' => 0,
             'total_puzzles_solved' => 0,
             'multi_wins' => 0
         ];
@@ -982,7 +984,7 @@ class QuizController {
             // Find collection rank
             try {
                 $stmtColRank = $db->prepare("
-                    SELECT COUNT(*) + 1 as rank
+                    SELECT COUNT(*) + 1 as user_rank
                     FROM (
                         SELECT u.id,
                                COALESCE(SUM(
@@ -1085,7 +1087,13 @@ class QuizController {
                 $userStats['mystery_word_count'] = (int)$stmtMw->fetchColumn();
             } catch (\Exception $e) {}
 
-            $userStats['total_puzzles_solved'] = $userStats['daily_quiz_count'] + $userStats['queens_count'] + $userStats['sudoku_count'] + $userStats['shikaku_count'] + $userStats['mystery_word_count'];
+            try {
+                $stmtConn = $db->prepare("SELECT COUNT(*) FROM user_connections_attempts WHERE user_id = ? AND status = 'completed'");
+                $stmtConn->execute([$userId]);
+                $userStats['connections_count'] = (int)$stmtConn->fetchColumn();
+            } catch (\Exception $e) {}
+
+            $userStats['total_puzzles_solved'] = $userStats['daily_quiz_count'] + $userStats['queens_count'] + $userStats['sudoku_count'] + $userStats['shikaku_count'] + $userStats['mystery_word_count'] + $userStats['connections_count'];
 
             // Multi wins
             try {
@@ -1126,6 +1134,12 @@ class QuizController {
                 $stmtH5 = $db->prepare("SELECT 'mystery_word' as type, 'Mot Mystère' as game_title, game_date as played_date, score_awarded as score, 0 as time_spent, (status = 'won') as success, created_at FROM user_mystery_word_attempts WHERE user_id = ? ORDER BY game_date DESC LIMIT 15");
                 $stmtH5->execute([$userId]);
                 $userHistory = array_merge($userHistory, $stmtH5->fetchAll(\PDO::FETCH_ASSOC));
+            } catch (\Exception $e) {}
+
+            try {
+                $stmtH6 = $db->prepare("SELECT 'connections' as type, 'Les Liens' as game_title, play_date as played_date, score_awarded as score, time_spent_seconds as time_spent, (status = 'completed') as success, COALESCE(completed_at, created_at) as created_at FROM user_connections_attempts WHERE user_id = ? ORDER BY play_date DESC LIMIT 15");
+                $stmtH6->execute([$userId]);
+                $userHistory = array_merge($userHistory, $stmtH6->fetchAll(\PDO::FETCH_ASSOC));
             } catch (\Exception $e) {}
 
             usort($userHistory, function($a, $b) {

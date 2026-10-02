@@ -20,6 +20,7 @@ export default function DashboardScreen({
   dailyStatus,
   onStartSolo,
   onStartMotMystere,
+  onStartLiens,
   onStartSudoku,
   onStartQueens,
   onStartShikaku,
@@ -112,6 +113,7 @@ export default function DashboardScreen({
             onStartDaily={onStartDailyQuiz}
             onStartQuiz={() => onStartSolo(0, 'kculture')}
             onStartMotMystere={onStartMotMystere}
+            onStartLiens={onStartLiens}
             onStartSudoku={onStartSudoku}
             onStartQueens={onStartQueens}
             onStartShikaku={onStartShikaku}

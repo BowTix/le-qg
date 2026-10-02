@@ -198,7 +198,7 @@ class TradeController {
     }
     private function charge(PDO $db,int $user,int $fee): void {
         $stmt=$db->prepare("SELECT coins FROM users WHERE id=? FOR UPDATE");$stmt->execute([$user]);
-        if((int)$stmt->fetchColumn()<$fee)throw new \DomainException("Il faut {$fee} pièces pour compenser l'écart de rareté.");
+        if((int)$stmt->fetchColumn()<$fee)throw new \DomainException("Il faut {$fee} Omnis pour compenser l'écart de rareté.");
         $db->prepare("UPDATE users SET coins=coins-? WHERE id=?")->execute([$fee,$user]);
     }
     private function refund(PDO $db,array $t): void {

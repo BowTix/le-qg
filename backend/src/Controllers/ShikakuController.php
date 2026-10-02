@@ -185,7 +185,7 @@ class ShikakuController {
                 echo json_encode([
                     'valid' => true,
                     'is_practice' => true,
-                    'message' => "Bravo ! Découpage Shikaku d'entraînement réussi (+10 pièces, +8 XP) !",
+                    'message' => "Bravo ! Découpage Shikaku d'entraînement réussi (+10 Omnis, +8 XP) !",
                     'coins_awarded' => $coinsToAward,
                     'score_awarded' => $scoreToAward,
                     'coins' => (int)($updatedUser['coins'] ?? 0),

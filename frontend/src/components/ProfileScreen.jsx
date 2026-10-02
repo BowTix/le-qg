@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, PUBLIC_BASE } from '../utils/api';
-import { ArrowLeft, User, KeyRound, Award, Heart, UserPlus, UserMinus, Check, X, ShieldAlert, BookOpen, Edit3, Image, LogOut, Trophy, Coins } from 'lucide-react';
+import { ArrowLeft, User, KeyRound, Award, Heart, UserPlus, UserMinus, Check, X, ShieldAlert, BookOpen, Edit3, Image, LogOut, Trophy } from 'lucide-react';
+import OmniIcon from './OmniIcon';
 import { getLevel, getLevelBadge, getLevelProgressDetails, getUsernameStyle } from '../utils/progression';
 
 export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
@@ -315,9 +316,9 @@ export default function ProfileScreen({ user, onBack, onUpdateUserStats }) {
             </div>
 
             <div style={{ padding: '16px', backgroundColor: 'rgba(15, 23, 42, 0.35)', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Monnaie</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Coins size={18} style={{ color: '#fbbf24' }} />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Omnis</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <OmniIcon size={20} />
                 <strong style={{ fontSize: '1.4rem', color: '#fbbf24' }}>{user.coins || 0}</strong>
               </div>
             </div>

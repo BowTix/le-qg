@@ -16,7 +16,8 @@ import {
   Eraser,
   X,
   Dumbbell,
-  Check
+  Check,
+  HelpCircle
 } from 'lucide-react';
 import { api } from '../utils/api';
 import '../shikaku.css';
@@ -81,6 +82,7 @@ export default function ShikakuScreen({ onBack, onUpdateUserStats }) {
   const [toastType, setToastType] = useState('error');
   const [validating, setValidating] = useState(false);
   const [showVictoryModal, setShowVictoryModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
   const [practiceToken, setPracticeToken] = useState(null);
   const [copiedShare, setCopiedShare] = useState(false);
@@ -428,8 +430,8 @@ export default function ShikakuScreen({ onBack, onUpdateUserStats }) {
           </h1>
           <p className="shikaku-sub-title">
             {isPractice
-              ? "Grille aléatoire illimitée · +10 pièces · +8 XP"
-              : `${formatDateFrench(todayStr)} · Grille #${gridData?.grid_number || 1} · +60 pièces · +25 XP`}
+              ? "Grille aléatoire illimitée · +10 Omnis · +8 XP"
+              : `${formatDateFrench(todayStr)} · Grille #${gridData?.grid_number || 1} · +60 Omnis · +25 XP`}
           </p>
         </div>
 
@@ -450,39 +452,50 @@ export default function ShikakuScreen({ onBack, onUpdateUserStats }) {
 
       {/* 2. Control Toolbar */}
       <div className="shikaku-toolbar">
-        {/* Left: Timer & Reset (practice only) */}
+        {/* Left: Timer */}
         <div className="shikaku-toolbar-group">
           <div className="shikaku-tool-timer">
             <Clock size={16} />
             <span>{formatTime(timerSeconds)}</span>
           </div>
 
-          {isPractice && (
-            <button
-              type="button"
-              onClick={handleClearAll}
-              disabled={rectangles.length === 0 || userState?.status === 'completed'}
-              className="shikaku-tool-btn"
-              title="Réinitialiser la grille"
-            >
-              <RotateCcw size={16} />
-            </button>
-          )}
+          <button
+            type="button"
+            className="shikaku-tool-btn"
+            onClick={() => setShowRulesModal(true)}
+            title="Règles du jeu"
+          >
+            <HelpCircle size={16} />
+          </button>
         </div>
 
-        {/* Right: Practice New Grid & Validate */}
+        {/* Right: Practice Reset & New Grid & Validate */}
         <div className="shikaku-toolbar-group">
           {isPractice && (
-            <button
-              type="button"
-              onClick={loadPracticeGrid}
-              className="shikaku-nav-btn"
-              title="Générer une autre grille d'entraînement"
-              style={{ padding: '6px 12px' }}
-            >
-              <RotateCcw size={15} />
-              <span>Autre grille</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleClearAll}
+                disabled={rectangles.length === 0 || userState?.status === 'completed'}
+                className="shikaku-nav-btn"
+                title="Effacer tous les rectangles et recommencer cette grille"
+                style={{ padding: '6px 12px' }}
+              >
+                <RotateCcw size={15} />
+                <span>Recommencer</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={loadPracticeGrid}
+                className="shikaku-nav-btn"
+                title="Générer une autre grille d'entraînement"
+                style={{ padding: '6px 12px' }}
+              >
+                <Sparkles size={15} />
+                <span>Autre grille</span>
+              </button>
+            </>
           )}
 
           <button
@@ -655,7 +668,7 @@ export default function ShikakuScreen({ onBack, onUpdateUserStats }) {
               </div>
               <div className="shikaku-stat-box">
                 <span className="shikaku-stat-val">+{userState?.coins_awarded || (isPractice ? 10 : 60)}</span>
-                <span className="shikaku-stat-lbl">Pièces</span>
+                <span className="shikaku-stat-lbl">Omnis</span>
               </div>
             </div>
 
@@ -678,6 +691,47 @@ export default function ShikakuScreen({ onBack, onUpdateUserStats }) {
                 Fermer
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rules Modal */}
+      {showRulesModal && (
+        <div className="shikaku-modal-backdrop" onClick={() => setShowRulesModal(false)}>
+          <div className="shikaku-modal-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="shikaku-modal-close"
+              onClick={() => setShowRulesModal(false)}
+              aria-label="Fermer"
+              style={{ position: 'absolute', top: 14, right: 14, background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+            <div className="shikaku-victory-icon" style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc' }}>
+              <HelpCircle size={32} />
+            </div>
+            <h2 className="shikaku-modal-title" style={{ fontSize: '1.3rem', marginBottom: '8px' }}>
+              Règles du Shikaku
+            </h2>
+            <div style={{ textAlign: 'left', fontSize: '0.88rem', color: '#cbd5e1', lineHeight: '1.55', margin: '14px 0 20px' }}>
+              <p style={{ margin: '0 0 10px' }}>
+                Découpe toute la grille en <strong>rectangles ou carrés</strong> :
+              </p>
+              <ul style={{ paddingLeft: '1.2rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <li>Chaque rectangle doit contenir <strong>exactement un seul chiffre</strong>.</li>
+                <li>Le nombre de cases du rectangle doit être égal à ce chiffre (ex: 6 = 2x3, 3x2, 1x6 ou 6x1).</li>
+                <li>Les rectangles ne doivent jamais se chevaucher et doivent couvrir 100% de la grille.</li>
+                <li><strong>Tracé :</strong> clique et glisse, ou clique sur deux coins opposés. Clique sur un rectangle pour l'effacer.</li>
+              </ul>
+            </div>
+            <button
+              type="button"
+              className="shikaku-modal-btn shikaku-modal-btn--primary"
+              onClick={() => setShowRulesModal(false)}
+            >
+              J'ai compris
+            </button>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ArrowLeft, Type, Trophy, XCircle, RotateCcw, Sparkles, Clock, AlertCircle, Coins, Award, Share2, Check } from 'lucide-react';
+import { ArrowLeft, Type, Trophy, XCircle, RotateCcw, Sparkles, Clock, AlertCircle, Award, Share2, Check, HelpCircle, X } from 'lucide-react';
+import OmniIcon from './OmniIcon';
 import { api } from '../utils/api';
 import '../mystery-word.css';
 
@@ -23,6 +24,7 @@ export default function MysteryWordScreen({ onBack, onUpdateUserStats }) {
   const [rewards, setRewards] = useState({ coins: 0, score: 0 });
   const [timeLeftToMidnight, setTimeLeftToMidnight] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Fetch initial status on mount
   useEffect(() => {
@@ -227,8 +229,19 @@ export default function MysteryWordScreen({ onBack, onUpdateUserStats }) {
           <ArrowLeft size={16} /> Retour
         </button>
 
-        <div className="mystery-attempt-badge">
-          Tentative <strong>{Math.min(guesses.length + (isGameOver ? 0 : 1), 6)}</strong> / 6
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setShowRulesModal(true)}
+            className="btn-secondary mystery-back-btn"
+            title="Règles du jeu"
+            style={{ padding: '6px 10px' }}
+          >
+            <HelpCircle size={16} />
+          </button>
+          <div className="mystery-attempt-badge">
+            Tentative <strong>{Math.min(guesses.length + (isGameOver ? 0 : 1), 6)}</strong> / 6
+          </div>
         </div>
       </div>
 
@@ -315,7 +328,7 @@ export default function MysteryWordScreen({ onBack, onUpdateUserStats }) {
             <div className="mystery-rewards-pill">
               {rewards.coins > 0 && (
                 <span className="mystery-reward-coins">
-                  <Coins size={16} /> +{rewards.coins} pièces
+                  <OmniIcon size={16} /> +{rewards.coins} Omnis
                 </span>
               )}
               {rewards.score > 0 && (
@@ -386,6 +399,54 @@ export default function MysteryWordScreen({ onBack, onUpdateUserStats }) {
               })}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Rules Modal */}
+      {showRulesModal && (
+        <div className="mystery-modal-backdrop" onClick={() => setShowRulesModal(false)}>
+          <div className="mystery-modal-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="mystery-modal-close"
+              onClick={() => setShowRulesModal(false)}
+              aria-label="Fermer"
+              style={{ position: 'absolute', top: 14, right: 14, background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+            <div className="mystery-victory-icon" style={{ background: 'rgba(163, 230, 53, 0.15)', color: '#a3e635', width: 56, height: 56, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+              <HelpCircle size={32} />
+            </div>
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#fff', margin: '0 0 8px' }}>
+              Règles du Mot Mystère
+            </h2>
+            <div style={{ textAlign: 'left', fontSize: '0.88rem', color: '#cbd5e1', lineHeight: '1.55', margin: '14px 0 20px' }}>
+              <p style={{ margin: '0 0 10px' }}>
+                Devine le mot caché de <strong>5 lettres</strong> en 6 essais maximum :
+              </p>
+              <ul style={{ paddingLeft: '1.2rem', margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <li>Chaque tentative doit être un mot valide de 5 lettres du dictionnaire.</li>
+                <li>
+                  <strong style={{ color: '#22c55e' }}>Vert</strong> : La lettre est correcte et bien placée.
+                </li>
+                <li>
+                  <strong style={{ color: '#eab308' }}>Orange / Jaune</strong> : La lettre est présente dans le mot mais à une autre place.
+                </li>
+                <li>
+                  <strong style={{ color: '#64748b' }}>Gris</strong> : La lettre n'est pas dans le mot.
+                </li>
+              </ul>
+            </div>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => setShowRulesModal(false)}
+              style={{ width: '100%', padding: '10px', fontSize: '0.9rem' }}
+            >
+              J'ai compris
+            </button>
+          </div>
         </div>
       )}
     </div>

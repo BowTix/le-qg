@@ -2650,6 +2650,34 @@ button.dashboard-card:hover { border-color: rgba(255, 255, 255, .35); box-shadow
 
 
 /* =========================================================
+   STANDARD PAGE HEADER & LAYOUT UNIFICATION
+   ========================================================= */
+.standard-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 4px 2px 14px;
+}
+.standard-page-header h1 {
+  margin: 0;
+  color: #fff;
+  font-family: 'Cabinet Grotesk', sans-serif;
+  font-size: clamp(26px, 3.2vw, 38px);
+  font-weight: 800;
+  letter-spacing: -.05em;
+  line-height: 1.1;
+}
+.standard-page-header__subtitle {
+  max-width: 580px;
+  margin: 4px 0 0;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* =========================================================
    COLLECTION & SHOP — editorial storefront
    ========================================================= */
 
@@ -3072,7 +3100,7 @@ body.has-zoomed-card .mobile-nav {
 .mode-portal__status { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding: 6px 9px; border: 1px solid rgba(255, 255, 255, .11); border-radius: 99px; background: rgba(15, 23, 42, .18); color: rgba(240, 253, 250, .72); font-family: 'Space Grotesk', monospace; font-size: 8px; letter-spacing: .04em; }
 .mode-portal__status > span { width: 6px; height: 6px; border-radius: 50%; background: #5eead4; box-shadow: 0 0 0 4px rgba(94, 234, 212, .1); }
 
-.solo-portal__games { position: relative; z-index: 2; display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(205px, .92fr); gap: 12px; }
+.solo-portal__games { position: relative; z-index: 2; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .daily-portal {
   position: relative;
   display: flex;
@@ -3202,16 +3230,159 @@ body.has-zoomed-card .mobile-nav {
   text-align: left;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
-  transition: transform .2s ease, border-color .2s ease, background .2s ease;
+  transition: border-color .2s ease, background .2s ease;
 }
-.portal-game:hover:not(:disabled) { border-color: rgba(255, 255, 255, .24); background: rgba(15, 23, 42, .34); transform: translateX(2px); }
+.portal-game:hover:not(:disabled) { border-color: rgba(255, 255, 255, .24); background: rgba(15, 23, 42, .34); }
 .portal-game:disabled { cursor: default; opacity: .62; }
-.portal-game__icon, .portal-join__icon { display: grid; place-items: center; width: 42px; height: 42px; border: 1px solid rgba(255, 255, 255, .1); border-radius: 13px; background: rgba(255, 255, 255, .08); }
-.portal-game--teal .portal-game__icon, .portal-game--lime .portal-game__icon { color: #99f6e4; }
-.portal-game--amber .portal-game__icon { color: #fcd34d; }
-.portal-game--violet .portal-game__icon { color: #e9d5ff; background: rgba(192, 132, 252, .13); }
-.portal-game--blue .portal-game__icon { color: #bae6fd; background: rgba(56, 189, 248, .12); }
-.portal-game--fuchsia .portal-game__icon { color: #f5d0fe; background: rgba(217, 70, 239, .14); }
+.portal-game__icon, .portal-join__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .08);
+  transform-origin: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  transition: transform 0.25s ease, color 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+  flex-shrink: 0;
+}
+
+.portal-game__icon svg, .portal-join__icon svg {
+  display: block;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+
+.portal-game:hover:not(:disabled) .portal-game__icon {
+  transform: scale(1.06) rotate(5deg);
+}
+
+.portal-join:hover .portal-join__icon {
+  transform: scale(1.06) rotate(5deg);
+}
+
+/* 1. Culture & Pop - Teal */
+.portal-game--teal .portal-game__icon {
+  color: #2dd4bf;
+  background: rgba(45, 212, 191, .14);
+  border-color: rgba(45, 212, 191, .28);
+}
+.portal-game--teal:hover:not(:disabled) {
+  border-color: rgba(45, 212, 191, .3);
+}
+.portal-game--teal:hover:not(:disabled) .portal-game__icon {
+  background: rgba(45, 212, 191, .22);
+  border-color: rgba(45, 212, 191, .45);
+}
+
+/* 2. Mot Mystère - Lime */
+.portal-game--lime .portal-game__icon {
+  color: #a3e635;
+  background: rgba(163, 230, 53, .14);
+  border-color: rgba(163, 230, 53, .28);
+}
+.portal-game--lime:hover:not(:disabled) {
+  border-color: rgba(163, 230, 53, .3);
+}
+.portal-game--lime:hover:not(:disabled) .portal-game__icon {
+  background: rgba(163, 230, 53, .22);
+  border-color: rgba(163, 230, 53, .45);
+}
+
+/* 3. Sudoku - Amber / Gold */
+.portal-game--amber .portal-game__icon {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, .14);
+  border-color: rgba(251, 191, 36, .28);
+}
+.portal-game--amber:hover:not(:disabled) {
+  border-color: rgba(251, 191, 36, .3);
+}
+.portal-game--amber:hover:not(:disabled) .portal-game__icon {
+  background: rgba(251, 191, 36, .22);
+  border-color: rgba(251, 191, 36, .45);
+}
+
+/* 4. Queens - Fuchsia / Pink */
+.portal-game--fuchsia .portal-game__icon {
+  color: #f472b6;
+  background: rgba(244, 114, 182, .14);
+  border-color: rgba(244, 114, 182, .28);
+}
+.portal-game--fuchsia:hover:not(:disabled) {
+  border-color: rgba(244, 114, 182, .3);
+}
+.portal-game--fuchsia:hover:not(:disabled) .portal-game__icon {
+  background: rgba(244, 114, 182, .22);
+  border-color: rgba(244, 114, 182, .45);
+}
+
+/* 5. Shikaku - Violet / Indigo */
+.portal-game--violet .portal-game__icon {
+  color: #c084fc;
+  background: rgba(192, 132, 252, .14);
+  border-color: rgba(192, 132, 252, .28);
+}
+.portal-game--violet:hover:not(:disabled) {
+  border-color: rgba(192, 132, 252, .3);
+}
+.portal-game--violet:hover:not(:disabled) .portal-game__icon {
+  background: rgba(192, 132, 252, .22);
+  border-color: rgba(192, 132, 252, .45);
+}
+
+/* 6. Chrono-Bomb - Rose / Crimson */
+.portal-game--rose .portal-game__icon {
+  color: #fb7185;
+  background: rgba(251, 113, 133, .14);
+  border-color: rgba(251, 113, 133, .28);
+}
+.portal-game--rose:hover:not(:disabled) {
+  border-color: rgba(251, 113, 133, .3);
+}
+.portal-game--rose:hover:not(:disabled) .portal-game__icon {
+  background: rgba(251, 113, 133, .22);
+  border-color: rgba(251, 113, 133, .45);
+}
+
+/* 7. Quiz Flash 1v1 - Sky Blue */
+.portal-game--blue .portal-game__icon {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, .14);
+  border-color: rgba(56, 189, 248, .28);
+}
+.portal-game--blue:hover:not(:disabled) {
+  border-color: rgba(56, 189, 248, .3);
+}
+.portal-game--blue:hover:not(:disabled) .portal-game__icon {
+  background: rgba(56, 189, 248, .22);
+  border-color: rgba(56, 189, 248, .45);
+}
+
+/* 8. Les Liens - Cyan / Electric */
+.portal-game--cyan .portal-game__icon {
+  color: #06b6d4;
+  background: rgba(6, 182, 212, .14);
+  border-color: rgba(6, 182, 212, .28);
+}
+.portal-game--cyan:hover:not(:disabled) {
+  border-color: rgba(6, 182, 212, .3);
+}
+.portal-game--cyan:hover:not(:disabled) .portal-game__icon {
+  background: rgba(6, 182, 212, .22);
+  border-color: rgba(6, 182, 212, .45);
+}
+
+/* Join Room with Code */
+.portal-join__icon {
+  color: #c084fc;
+  background: rgba(192, 132, 252, .14);
+  border-color: rgba(192, 132, 252, .28);
+}
 .portal-game__copy { display: flex; min-width: 0; flex-direction: column; }
 .portal-game__copy strong { overflow: hidden; margin-top: 2px; color: #fff; font-size: 13px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .portal-game__copy > span { overflow: hidden; margin-top: 2px; color: rgba(226, 232, 240, .58); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
@@ -3560,7 +3731,7 @@ body.has-zoomed-card .mobile-nav {
 @media (max-width: 920px) {
   .dashboard-modes { grid-template-columns: 1fr; }
   .mode-portal { min-height: auto; }
-  .solo-portal__games { grid-template-columns: minmax(0, 1.08fr) minmax(205px, .92fr); }
+  .solo-portal__games { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .daily-portal { min-height: 304px; }
   .daily-portal__visual { top: -42px; }
   .solo-portal__quick { grid-template-columns: 1fr; grid-template-rows: repeat(3, minmax(0, 1fr)); }
@@ -3645,7 +3816,7 @@ body.has-zoomed-card .mobile-nav {
   .mode-portal__header p { max-width: 430px; font-size: 13px; }
   .mode-portal__status { padding: 7px 10px; font-size: 9px; }
 
-  .solo-portal__games { grid-template-columns: minmax(0, 1.1fr) minmax(225px, .9fr); gap: 13px; }
+  .solo-portal__games { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
   .solo-portal__scrollable, .arena-portal__games { gap: 11px; }
   .solo-portal__scrollable { max-height: 295px; }
   .daily-portal { min-height: 329px; padding: 22px; border-radius: 24px; }

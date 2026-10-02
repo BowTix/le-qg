@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeftRight, Check, Coins, Loader2, RefreshCw, ShoppingBag, X } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, Check, Loader2, RefreshCw, ShoppingBag, X } from 'lucide-react';
+import OmniIcon from '../OmniIcon';
 import { useNavigate } from 'react-router-dom';
 import Pusher from 'pusher-js';
 import { api } from '../../utils/api';
@@ -20,7 +21,7 @@ function TradeRow({ trade, onAction, busy }) {
         <ArrowLeftRight size={17} />
         <span><small>{incoming ? 'Vous donnez' : 'Vous demandez'}</small><strong>{trade.requested_card.name}</strong><em>{trade.requested_card.rarity}</em></span>
       </div>
-      {trade.coin_fee > 0 && <p><Coins size={13} />{trade.viewer_pays_fee ? `Vous payez ${trade.coin_fee} pièces` : `${other.username} paie ${trade.coin_fee} pièces`}</p>}
+      {trade.coin_fee > 0 && <p><OmniIcon size={13} />{trade.viewer_pays_fee ? `Vous payez ${trade.coin_fee} Omnis` : `${other.username} paie ${trade.coin_fee} Omnis`}</p>}
       {trade.status === 'pending' && (
         <div className="trade-inbox__actions">
           {incoming ? <>
@@ -33,8 +34,9 @@ function TradeRow({ trade, onAction, busy }) {
   );
 }
 
-export default function TradeScreen({ user }) {
+export default function TradeScreen({ user, onBack }) {
   const navigate = useNavigate();
+  const handleBack = onBack || (() => navigate('/dashboard'));
   const [data, setData] = useState({ incoming: [], outgoing: [], pending_count: 0 });
   const [tab, setTab] = useState('incoming');
   const [busy, setBusy] = useState(null);
@@ -96,10 +98,17 @@ export default function TradeScreen({ user }) {
 
   return (
     <div className="trade-page animate-fade-in">
-      <header className="trade-page__hero">
-        <div><span className="kicker">Marché privé</span><h1>Mes échanges</h1><p>Retrouvez vos propositions, comparez les cartes et répondez aux offres de vos amis.</p></div>
-        <button className="btn-primary" type="button" onClick={() => navigate('/collection')}><ShoppingBag size={16} /> Choisir une carte à échanger</button>
-      </header>
+      <div className="standard-page-header">
+        <div>
+          <h1>Mes échanges</h1>
+          <p className="standard-page-header__subtitle">
+            Retrouvez vos propositions, comparez les cartes et répondez aux offres de vos amis.
+          </p>
+        </div>
+        <button className="btn-primary" type="button" onClick={() => navigate('/collection')} style={{ alignSelf: 'center' }}>
+          <ShoppingBag size={16} /> Choisir une carte à échanger
+        </button>
+      </div>
       <section className="trade-page__stats" aria-label="Résumé des échanges">
         <div><span>À traiter</span><strong>{data.pending_count || 0}</strong><small>propositions reçues</small></div>
         <div><span>En attente</span><strong>{sentPending}</strong><small>propositions envoyées</small></div>

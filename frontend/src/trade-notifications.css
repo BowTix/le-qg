@@ -30,7 +30,15 @@ button.notification-item:hover, .notification-item:hover { background: rgba(51, 
 .notifications__panel > footer button:hover { background: rgba(45, 212, 191, .1); color: #5eead4; }
 
 /* Dedicated trades page */
-.trade-page { width: min(1080px, 100%); margin: 0 auto; padding: 42px 0 70px; }
+.trade-page {
+  width: 100%;
+  max-width: var(--app-content-max);
+  margin: 0 auto;
+  padding: 36px 0 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 .trade-page__hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; padding: 35px 38px; border: 1px solid rgba(45, 212, 191, .2); border-radius: 28px; background: radial-gradient(circle at 88% 0, rgba(45, 212, 191, .18), transparent 34%), rgba(15, 23, 42, .58); box-shadow: var(--card-shadow); }
 .trade-page__hero h1 { margin: 7px 0 8px; color: var(--text-primary); font-family: 'Cabinet Grotesk', sans-serif; font-size: clamp(2.2rem, 5vw, 3.5rem); letter-spacing: -.06em; line-height: 1; }
 .trade-page__hero p { max-width: 620px; margin: 0; color: var(--text-secondary); font-size: .9rem; line-height: 1.65; }

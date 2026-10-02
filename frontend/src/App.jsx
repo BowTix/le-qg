@@ -19,6 +19,7 @@ const MysteryWordScreen = lazy(() => import('./components/MysteryWordScreen'));
 const SudokuScreen = lazy(() => import('./components/SudokuScreen'));
 const QueensScreen = lazy(() => import('./components/QueensScreen'));
 const ShikakuScreen = lazy(() => import('./components/ShikakuScreen'));
+const ConnectionsScreen = lazy(() => import('./components/ConnectionsScreen'));
 const TradeScreen = lazy(() => import('./components/trades/TradeScreen'));
 
 function PrivateRoute({ user, authLoading, children }) {
@@ -139,6 +140,7 @@ export default function App() {
                   onOpenLeaderboard={() => navigate('/performance')}
                   onStartDailyQuiz={() => navigate('/quiz/jour')}
                   onStartMotMystere={() => navigate('/solo/mot-mystere')}
+                  onStartLiens={() => navigate('/solo/liens')}
                   onStartSudoku={() => navigate('/solo/sudoku')}
                   onStartQueens={() => navigate('/solo/queens')}
                   onStartShikaku={() => navigate('/solo/shikaku')}
@@ -150,6 +152,7 @@ export default function App() {
               <Route path="/quiz/jour" element={protectedScreen(<DailyQuizScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
               <Route path="/quiz/solo" element={protectedScreen(<SoloQuizScreen packId={soloPackId} gameMode={soloGameMode || 'classic'} onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
               <Route path="/solo/mot-mystere" element={protectedScreen(<MysteryWordScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
+              <Route path="/solo/liens" element={protectedScreen(<ConnectionsScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
               <Route path="/solo/sudoku" element={protectedScreen(<SudokuScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
               <Route path="/solo/queens" element={protectedScreen(<QueensScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
               <Route path="/solo/shikaku" element={protectedScreen(<ShikakuScreen onBack={() => navigate('/dashboard')} onUpdateUserStats={updateUserStats} />)} />
@@ -162,7 +165,7 @@ export default function App() {
               <Route path="/joueur/:userId" element={protectedScreen(<PublicProfileScreen />)} />
               <Route path="/boutique" element={protectedScreen(<ShopScreen key="shop" user={user} mode="shop" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
               <Route path="/collection" element={protectedScreen(<ShopScreen key="collection" user={user} mode="collection" onRefreshProfile={updateUserStats} onBack={() => navigate('/dashboard')} />)} />
-              <Route path="/echanges" element={protectedScreen(<TradeScreen user={user} />)} />
+              <Route path="/echanges" element={protectedScreen(<TradeScreen user={user} onBack={() => navigate('/dashboard')} />)} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
             </Suspense>

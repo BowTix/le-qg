@@ -27,7 +27,8 @@ import {
   ArrowRight,
   Flame,
   Shield,
-  Star
+  Star,
+  Link2
 } from 'lucide-react';
 import '../performance.css';
 
@@ -172,7 +173,7 @@ export default function LeaderboardScreen({ user, onBack }) {
   const filteredHistory = useMemo(() => {
     if (historyFilter === 'all') return userHistory;
     if (historyFilter === 'daily_quiz') return userHistory.filter((h) => h.type === 'daily_quiz');
-    if (historyFilter === 'logic') return userHistory.filter((h) => ['queens', 'sudoku', 'shikaku', 'mystery_word'].includes(h.type));
+    if (historyFilter === 'logic') return userHistory.filter((h) => ['queens', 'sudoku', 'shikaku', 'mystery_word', 'connections'].includes(h.type));
     if (historyFilter === 'arena') return [];
     return userHistory;
   }, [userHistory, historyFilter]);
@@ -203,6 +204,8 @@ export default function LeaderboardScreen({ user, onBack }) {
         return <Boxes size={20} />;
       case 'mystery_word':
         return <Type size={20} />;
+      case 'connections':
+        return <Link2 size={20} />;
       case 'daily_quiz':
         return <Zap size={20} />;
       default:
@@ -221,25 +224,15 @@ export default function LeaderboardScreen({ user, onBack }) {
 
   return (
     <div className="perf-container animate-slide-up">
-      {/* 1. Header Bar */}
-      <header className="perf-header">
-        <div className="perf-header__title-group">
-          <div className="perf-header__icon-box">
-            <Trophy size={26} />
-          </div>
-          <div>
-            <h1 className="perf-header__title">Espace Performance</h1>
-            <p className="perf-header__subtitle">
-              Classements officiels, statistiques personnelles & historique complet
-            </p>
-          </div>
+      {/* 1. Standard Header Bar */}
+      <div className="standard-page-header">
+        <div>
+          <h1>Espace Performance</h1>
+          <p className="standard-page-header__subtitle">
+            Classements officiels, statistiques personnelles & historique complet.
+          </p>
         </div>
-
-        <button className="btn-secondary" onClick={onBack} style={{ padding: '8px 16px', fontSize: '0.88rem' }}>
-          <ArrowLeft size={16} />
-          Retour Accueil
-        </button>
-      </header>
+      </div>
 
       {/* 2. Top KPI Cards Strip */}
       <div className="perf-kpi-grid">
@@ -400,7 +393,6 @@ export default function LeaderboardScreen({ user, onBack }) {
               {!searchQuery && (first || second || third) && (
                 <div className="perf-podium-card">
                   <span className="perf-podium-header">
-                    <Crown size={18} />
                     Podium des Champions
                   </span>
 
@@ -577,7 +569,7 @@ export default function LeaderboardScreen({ user, onBack }) {
                   className={`perf-filter-pill ${historyFilter === 'logic' ? 'is-active' : ''}`}
                   onClick={() => setHistoryFilter('logic')}
                 >
-                  <Grid size={14} />
+                  <Boxes size={14} />
                   <span>Jeux de Logique</span>
                 </button>
 
@@ -745,6 +737,14 @@ export default function LeaderboardScreen({ user, onBack }) {
 
                     <div className="perf-game-breakdown-row">
                       <div className="perf-game-breakdown-left">
+                        <Link2 size={16} color="#06b6d4" />
+                        <span>Les Liens (Connections)</span>
+                      </div>
+                      <span className="perf-game-breakdown-count">{userStats?.connections_count || 0}</span>
+                    </div>
+
+                    <div className="perf-game-breakdown-row">
+                      <div className="perf-game-breakdown-left">
                         <Zap size={16} color="#06b6d4" />
                         <span>Quiz du Jour</span>
                       </div>
@@ -814,6 +814,9 @@ export default function LeaderboardScreen({ user, onBack }) {
                   </button>
                   <button className="btn-primary" onClick={() => navigate('/solo/shikaku')}>
                     <Boxes size={15} /> Shikaku
+                  </button>
+                  <button className="btn-primary" onClick={() => navigate('/solo/liens')}>
+                    <Link2 size={15} /> Les Liens
                   </button>
                   <button className="btn-primary" onClick={() => navigate('/quiz/jour')}>
                     <Zap size={15} /> Quiz du Jour

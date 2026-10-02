@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, PUBLIC_BASE } from '../utils/api';
 import { getLevel, getUsernameStyle } from '../utils/progression';
-import { Users, User, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Coins, Eye, EyeOff, MessageSquare } from 'lucide-react';
+import { Users, User, Play, LogOut, ArrowLeft, CheckCircle2, XCircle, Trophy, Clock, Crown, Loader2, Gavel, Pencil, Vote, HelpCircle, Skull, Eye, EyeOff, MessageSquare } from 'lucide-react';
+import OmniIcon from './OmniIcon';
 import Pusher from 'pusher-js';
 import ChronoBombGame from './ChronoBombGame';
 import '../chrono-bomb.css';
@@ -1712,7 +1713,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
 
                       {/* Coins changes */}
                       <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffb300', minWidth: '60px', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-                        +{isWinner ? 100 : 10} <Coins size={13} />
+                        +{isWinner ? 100 : 10} <OmniIcon size={14} />
                       </span>
                     </div>
                   </div>
@@ -2156,7 +2157,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                             <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{p.score} pts</span>
                             {p.coin_bonus !== undefined && (
                                 <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ffb300', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          +{p.coin_bonus} <Coins size={12} />
+                          +{p.coin_bonus} <OmniIcon size={13} />
                         </span>
                             )}
                           </div>
@@ -2219,7 +2220,7 @@ export default function MultiplayerArena({ roomCode, user, onBack }) {
                       <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{p.score} pts</span>
                       {p.coin_bonus !== undefined && (
                           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#ffb300', minWidth: '60px', display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-                      +{p.coin_bonus} <Coins size={13} />
+                      +{p.coin_bonus} <OmniIcon size={14} />
                     </span>
                       )}
                     </div>

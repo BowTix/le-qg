@@ -1,5 +1,6 @@
 import React from 'react';
-import { Coins, CreditCard, PackageOpen, ShieldCheck, Sparkles } from 'lucide-react';
+import { CreditCard, PackageOpen, ShieldCheck, Sparkles } from 'lucide-react';
+import OmniIcon from '../OmniIcon';
 
 export default function BoosterOffer({ coins, opening, onBuy }) {
   const canBuy = coins >= 250 && !opening;
@@ -26,9 +27,9 @@ export default function BoosterOffer({ coins, opening, onBuy }) {
         </div>
         <button className="booster-buy" type="button" onClick={onBuy} disabled={!canBuy}>
           <span><CreditCard size={18} /> {opening ? 'Ouverture en cours…' : 'Ouvrir le booster'}</span>
-          <strong><Coins size={17} /> 250</strong>
+          <strong><OmniIcon size={17} /> 250</strong>
         </button>
-        {coins < 250 && <p className="booster-offer__error">Il te manque {(250 - coins).toLocaleString('fr-FR')} coins pour ouvrir ce booster.</p>}
+        {coins < 250 && <p className="booster-offer__error">Il te manque {(250 - coins).toLocaleString('fr-FR')} Omnis pour ouvrir ce booster.</p>}
       </div>
     </section>
   );
